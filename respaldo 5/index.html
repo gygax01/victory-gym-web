@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body onload="initIndex()">
+<body>
 
 <!-- ===== HEADER BRANDING ===== -->
 <header class="header-brand">
@@ -27,7 +28,7 @@
       Lector desconectado
     </span>
 
-    <button onclick="logout()">Salir</button>
+    <button id="btnLogout">Salir</button>
   </div>
 </header>
 
@@ -56,7 +57,7 @@
         <th>Salida</th>
       </tr>
     </thead>
-    <tbody id="tabla-asistencias"></tbody>
+    <tbody id="tablaAsistencias"></tbody>
   </table>
 </div>
 
@@ -74,7 +75,22 @@
 <script src="js/asistencias.js"></script>
 
 <script>
-/* ================= SUPABASE CONFIG ================= */
+/* ===============================
+   ===== DOM =====
+=============================== */
+const contadorAforo = document.getElementById("contadorAforo");
+const estadoLector = document.getElementById("estadoLector");
+const tablaAsistencias = document.getElementById("tablaAsistencias");
+const contenedorTabla = document.getElementById("contenedorTabla");
+const confirmacion = document.getElementById("confirmacion");
+const tituloConfirmacion = document.getElementById("tituloConfirmacion");
+const mensajeConfirmacion = document.getElementById("mensajeConfirmacion");
+const btnUsuarios = document.getElementById("btnUsuarios");
+const btnLogout = document.getElementById("btnLogout");
+
+/* ===============================
+   ===== SUPABASE =====
+=============================== */
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
 const SUPABASE_KEY = "sb_publishable_uV1OQab8AfWE3SzNkuleQw_W0xgyfER";
 
@@ -83,17 +99,25 @@ const supabase = window.supabase.createClient(
   SUPABASE_KEY
 );
 
-/* ================= INIT ================= */
+/* ===============================
+   ===== INIT =====
+=============================== */
+window.addEventListener("load", initIndex);
+
 function initIndex() {
   if (!verificarSesion()) return;
+
   aplicarRolIndex();
+  btnLogout.addEventListener("click", logout);
 
   cargarAsistencias();
   actualizarContador();
   escucharNFC();
 }
 
-/* ================= CONTROL DE ROL ================= */
+/* ===============================
+   ===== CONTROL DE ROL =====
+=============================== */
 function aplicarRolIndex() {
   const s = obtenerSesion();
   if (!s) return;
@@ -103,37 +127,48 @@ function aplicarRolIndex() {
   }
 }
 
-/* ================= SONIDOS ================= */
+/* ===============================
+   ===== SONIDOS =====
+=============================== */
 const sonidoCorrecto = new Audio("sounds/correct.mp3");
 const sonidoError = new Audio("sounds/error.mp3");
 
+// desbloqueo de audio por gesto
 document.addEventListener("click", () => {
-  sonidoCorrecto.play().then(() => {
-    sonidoCorrecto.pause();
-    sonidoCorrecto.currentTime = 0;
-  }).catch(()=>{});
-}, { once:true });
+  sonidoCorrecto.play()
+    .then(() => {
+      sonidoCorrecto.pause();
+      sonidoCorrecto.currentTime = 0;
+    })
+    .catch(() => {});
+}, { once: true });
 
 function playCorrecto() {
   sonidoCorrecto.currentTime = 0;
-  sonidoCorrecto.play();
+  sonidoCorrecto.play().catch(()=>{});
 }
 
 function playError() {
   sonidoError.currentTime = 0;
-  sonidoError.play();
+  sonidoError.play().catch(()=>{});
 }
 
-/* ================= AUTO SCROLL ================= */
+/* ===============================
+   ===== AUTO SCROLL =====
+=============================== */
 function autoScrollTabla() {
-  const cont = document.getElementById("contenedorTabla");
-  cont.scrollTo({ top: cont.scrollHeight, behavior: "smooth" });
+  contenedorTabla.scrollTo({
+    top: contenedorTabla.scrollHeight,
+    behavior: "smooth"
+  });
 }
 
-/* ================= NFC EN TIEMPO REAL (SUPABASE) ================= */
+/* ===============================
+   ===== NFC (SUPABASE REALTIME) =====
+=============================== */
 function escucharNFC() {
   estadoLector.className = "lector on";
-  estadoLector.innerText = "Lector conectado";
+  estadoLector.textContent = "Lector conectado";
 
   supabase
     .channel("nfc-channel")
@@ -146,18 +181,19 @@ function escucharNFC() {
       },
       payload => {
         const uid = payload.new?.uid;
-        if (!uid) return;
-        procesarTarjeta(uid);
+        if (uid) procesarTarjeta(uid);
       }
     )
     .subscribe();
 }
 
-/* ================= CONFIRMACIÓN ================= */
+/* ===============================
+   ===== CONFIRMACIÓN =====
+=============================== */
 function mostrarConfirmacion(tipo, titulo, mensaje) {
   confirmacion.className = "confirmacion " + tipo;
-  tituloConfirmacion.innerText = titulo;
-  mensajeConfirmacion.innerText = mensaje;
+  tituloConfirmacion.textContent = titulo;
+  mensajeConfirmacion.textContent = mensaje;
   confirmacion.style.display = "flex";
 
   setTimeout(() => {
@@ -165,10 +201,12 @@ function mostrarConfirmacion(tipo, titulo, mensaje) {
   }, 2200);
 }
 
-/* ================= ENTRADA / SALIDA ================= */
+/* ===============================
+   ===== ENTRADA / SALIDA =====
+=============================== */
 function procesarTarjeta(uid) {
   if (buscarEmpleadoPorTarjeta(uid)) {
-    mostrarConfirmacion("error","Tarjeta de personal","Use el login");
+    mostrarConfirmacion("error", "Tarjeta de personal", "Use el login");
     playError();
     return;
   }
@@ -177,13 +215,14 @@ function procesarTarjeta(uid) {
   const cliente = clientes.find(c => c.tarjetaUID === uid);
 
   if (!cliente) {
-    mostrarConfirmacion("error","Tarjeta no registrada","Consulte recepción");
+    mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepción");
     playError();
     return;
   }
 
   const hoyFecha = hoy();
   const asistencias = obtenerAsistencias();
+
   const abierta = asistencias.find(a =>
     a.tarjetaUID === uid &&
     a.fecha === hoyFecha &&
@@ -198,11 +237,11 @@ function procesarTarjeta(uid) {
       salida: null,
       fecha: hoyFecha
     });
-    mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
+    mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
     playCorrecto();
   } else {
     abierta.salida = horaActual();
-    mostrarConfirmacion("salida","Hasta luego",cliente.nombre);
+    mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
     playCorrecto();
   }
 
@@ -215,4 +254,3 @@ function procesarTarjeta(uid) {
 
 </body>
 </html>
-
