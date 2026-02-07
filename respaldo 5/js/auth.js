@@ -2,74 +2,17 @@
    ===== AUTH + PERMISSIONS =====
 =============================== */
 
-/*
-  ROLES:
-  - employee
-  - admin
-  - superadmin
-*/
-
-/* ===============================
-   ===== PERMISOS POR ROL =====
-=============================== */
 const ROLE_PERMISSIONS = {
   employee: {
     clients_view: true,
-    clients_create: true,
-    clients_edit: true,
-
-    attendances_register: true,
-    attendances_view: true,
-
-    memberships_view: true,
-    memberships_extend: true,
-
-    stock_view: true,
-    stock_add: true,
-
-    products_view: true,
-    products_create: true,
-
-    sales_do: true,
-    sales_view: true
+    clients_create: true
   },
-
   admin: {
     clients_view: true,
     clients_create: true,
-    clients_edit: true,
     clients_delete: true,
-
-    attendances_register: true,
-    attendances_view: true,
-    attendances_close_manual: true,
-
-    memberships_view: true,
-    memberships_extend: true,
-    memberships_reduce: true,
-    memberships_edit_manual: true,
-
-    stock_view: true,
-    stock_add: true,
-    stock_reduce_manual: true,
-    stock_delete: true,
-
-    products_view: true,
-    products_create: true,
-    products_edit: true,
-    products_delete: true,
-
-    sales_do: true,
-    sales_view: true,
-    sales_cancel: true,
-    sales_totals: true,
-
-    employees_view: true,
-    employees_create: true,
-    employees_edit: true,
-    employees_delete: true
+    employees_create: true
   },
-
   superadmin: {
     system_all: true
   }
@@ -80,7 +23,6 @@ const ROLE_PERMISSIONS = {
 =============================== */
 function login(usuario, password, delay = 0) {
   const empleados = obtenerEmpleados();
-
   const emp = empleados.find(
     e => e.usuario === usuario && e.password === password
   );
@@ -90,31 +32,21 @@ function login(usuario, password, delay = 0) {
     return false;
   }
 
-  if (delay > 0) {
-    setTimeout(() => iniciarSesion(emp), delay);
-  } else {
-    iniciarSesion(emp);
-  }
-
+  setTimeout(() => iniciarSesion(emp), delay);
   return true;
 }
 
-/* ===============================
-   ===== INICIAR SESIÓN =====
-=============================== */
 function iniciarSesion(emp) {
-  const rol = emp.rol;
-
   const permisos =
-    rol === "superadmin"
+    emp.rol === "superadmin"
       ? { system_all: true }
-      : { ...(ROLE_PERMISSIONS[rol] || {}) };
+      : { ...(ROLE_PERMISSIONS[emp.rol] || {}) };
 
   localStorage.setItem(
     "session",
     JSON.stringify({
       usuario: emp.usuario,
-      rol,
+      rol: emp.rol,
       permisos
     })
   );
@@ -146,44 +78,19 @@ function obtenerSesion() {
 =============================== */
 function can(permission) {
   const s = obtenerSesion();
-  if (!s || !s.permisos) return false;
-  if (s.permisos.system_all) return true;
-  return s.permisos[permission] === true;
+  if (!s) return false;
+  if (s.permisos?.system_all) return true;
+  return s.permisos?.[permission] === true;
 }
 
-/*
-  🔒 No rompe JS, solo bloquea acceso
-*/
+/* 🔴 AQUÍ ESTABA EL PROBLEMA */
 function requirePermission(permission) {
   if (!can(permission)) {
     alert("Acceso no autorizado");
+    location.href = "index.html"; // ✅ REDIRECCIÓN
     return false;
   }
   return true;
-}
-
-/* ===============================
-   ===== BLOQUEO POR ROL =====
-=============================== */
-function requireRole(roles) {
-  const s = obtenerSesion();
-  if (!s || !roles.includes(s.rol)) {
-    alert("Acceso no autorizado");
-    location.href = "login.html";
-    return false;
-  }
-  return true;
-}
-
-/* ===============================
-   ===== UI =====
-=============================== */
-function applyPermissions() {
-  document.querySelectorAll("[data-permission]").forEach(el => {
-    if (!can(el.dataset.permission)) {
-      el.remove();
-    }
-  });
 }
 
 /* ===============================
