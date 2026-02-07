@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body onload="initClientes()">
+<body>
 
 <header class="header-brand">
   <div class="brand">
@@ -21,7 +21,7 @@
 </header>
 
 <div class="search-bar">
-  <input id="busqueda" placeholder="Buscar cliente..." oninput="filtrar()">
+  <input id="busqueda" placeholder="Buscar cliente...">
 </div>
 
 <div class="historial-container" id="listaClientes"></div>
@@ -31,8 +31,8 @@
   <div class="box">
     <h1>Eliminar cliente</h1>
     <p>Esta acción no se puede revertir</p>
-    <button onclick="confirmarBorrado()">Confirmar</button>
-    <button onclick="cancelarBorrado()">Cancelar</button>
+    <button id="btnConfirmarBorrado">Confirmar</button>
+    <button id="btnCancelarBorrado">Cancelar</button>
   </div>
 </div>
 
@@ -42,7 +42,7 @@
     <h1>Reasignar tarjeta</h1>
     <p>Acerque la nueva tarjeta</p>
     <div id="estadoTarjeta" class="estado amarillo">Esperando tarjeta…</div>
-    <button onclick="cancelarReasignacion()">Cancelar</button>
+    <button id="btnCancelarReasignar">Cancelar</button>
   </div>
 </div>
 
@@ -53,18 +53,39 @@
 
 <script>
 /* ===============================
+   ===== DOM =====
+=============================== */
+const listaClientes = document.getElementById("listaClientes");
+const busqueda = document.getElementById("busqueda");
+const confirmBorrar = document.getElementById("confirmBorrar");
+const confirmReasignar = document.getElementById("confirmReasignar");
+const estadoTarjeta = document.getElementById("estadoTarjeta");
+
+const btnConfirmarBorrado = document.getElementById("btnConfirmarBorrado");
+const btnCancelarBorrado = document.getElementById("btnCancelarBorrado");
+const btnCancelarReasignar = document.getElementById("btnCancelarReasignar");
+
+/* ===============================
    ===== ESTADO =====
-   =============================== */
+=============================== */
 let clientes = [];
 let clienteAEliminar = null;
 let clienteAReasignar = null;
+let leyendoTarjeta = false;
 
 /* ===============================
    ===== INIT =====
-   =============================== */
+=============================== */
+window.addEventListener("load", initClientes);
+
 function initClientes() {
   if (!verificarSesion()) return;
-  requirePermission("clients_view");
+  if (!requirePermission("clients_view")) return;
+
+  busqueda.addEventListener("input", filtrar);
+  btnConfirmarBorrado.addEventListener("click", confirmarBorrado);
+  btnCancelarBorrado.addEventListener("click", cancelarBorrado);
+  btnCancelarReasignar.addEventListener("click", cancelarReasignacion);
 
   cargarClientes();
   applyPermissions();
@@ -72,7 +93,7 @@ function initClientes() {
 
 /* ===============================
    ===== CARGAR =====
-   =============================== */
+=============================== */
 function cargarClientes() {
   clientes = obtenerClientes()
     .filter(c => c && typeof c.nombre === "string")
@@ -84,28 +105,40 @@ function cargarClientes() {
 function render(lista) {
   listaClientes.innerHTML = "";
 
+  if (lista.length === 0) {
+    const p = document.createElement("p");
+    p.textContent = "No hay clientes registrados";
+    listaClientes.appendChild(p);
+    return;
+  }
+
   lista.forEach(c => {
-    const d = document.createElement("div");
-    d.className = "cliente";
+    const cont = document.createElement("div");
+    cont.className = "cliente";
 
-    d.innerHTML = `
-      <div class="cliente-header">
-        <h3>${c.nombre}</h3>
+    const header = document.createElement("div");
+    header.className = "cliente-header";
 
-        <div class="acciones">
-          <button onclick="iniciarReasignacion('${c.tarjetaUID || ""}')">
-            Reasignar tarjeta
-          </button>
+    const nombre = document.createElement("h3");
+    nombre.textContent = c.nombre;
 
-          <button data-permission="clients_delete"
-                  onclick="pedirConfirmacion('${c.tarjetaUID || ""}')">
-            Eliminar
-          </button>
-        </div>
-      </div>
-    `;
+    const acciones = document.createElement("div");
+    acciones.className = "acciones";
 
-    listaClientes.appendChild(d);
+    const btnReasignar = document.createElement("button");
+    btnReasignar.textContent = "Reasignar tarjeta";
+    btnReasignar.onclick = () => iniciarReasignacion(c.tarjetaUID || "");
+
+    const btnEliminar = document.createElement("button");
+    btnEliminar.textContent = "Eliminar";
+    btnEliminar.setAttribute("data-permission", "clients_delete");
+    btnEliminar.onclick = () => pedirConfirmacion(c.tarjetaUID || "");
+
+    acciones.append(btnReasignar, btnEliminar);
+    header.append(nombre, acciones);
+    cont.appendChild(header);
+
+    listaClientes.appendChild(cont);
   });
 
   applyPermissions();
@@ -113,19 +146,15 @@ function render(lista) {
 
 /* ===============================
    ===== FILTRO =====
-   =============================== */
+=============================== */
 function filtrar() {
   const q = busqueda.value.toLowerCase();
-  render(
-    clientes.filter(c =>
-      c.nombre.toLowerCase().includes(q)
-    )
-  );
+  render(clientes.filter(c => c.nombre.toLowerCase().includes(q)));
 }
 
 /* ===============================
    ===== ELIMINAR =====
-   =============================== */
+=============================== */
 function pedirConfirmacion(uid) {
   if (!requirePermission("clients_delete")) return;
   clienteAEliminar = uid;
@@ -149,22 +178,24 @@ function confirmarBorrado() {
 }
 
 /* ===============================
-   ===== REASIGNAR TARJETA (SUPABASE NFC) =====
-   =============================== */
+   ===== REASIGNAR TARJETA =====
+=============================== */
 function iniciarReasignacion(uidActual) {
   clienteAReasignar = uidActual;
+  leyendoTarjeta = false;
 
   estadoTarjeta.className = "estado amarillo";
-  estadoTarjeta.innerText = "Esperando tarjeta…";
+  estadoTarjeta.textContent = "Esperando tarjeta…";
   confirmReasignar.style.display = "flex";
 
   iniciarNFCControlado({
     onUID: uidNueva => {
-      if (!uidNueva) return;
+      if (!uidNueva || leyendoTarjeta) return;
+      leyendoTarjeta = true;
 
       if (uidYaRegistrada(uidNueva)) {
         estadoTarjeta.className = "estado rojo";
-        estadoTarjeta.innerText = "Tarjeta ya registrada";
+        estadoTarjeta.textContent = "Tarjeta ya registrada";
         setTimeout(cancelarReasignacion, 1500);
         return;
       }
@@ -179,7 +210,7 @@ function iniciarReasignacion(uidActual) {
       guardarClientes(lista);
 
       estadoTarjeta.className = "estado verde";
-      estadoTarjeta.innerText = "Tarjeta reasignada";
+      estadoTarjeta.textContent = "Tarjeta reasignada";
 
       setTimeout(() => {
         cancelarReasignacion();
@@ -189,13 +220,13 @@ function iniciarReasignacion(uidActual) {
 
     onTimeout: () => {
       estadoTarjeta.className = "estado rojo";
-      estadoTarjeta.innerText = "Tiempo de lectura agotado";
+      estadoTarjeta.textContent = "Tiempo de lectura agotado";
       setTimeout(cancelarReasignacion, 1500);
     },
 
     onError: () => {
       estadoTarjeta.className = "estado rojo";
-      estadoTarjeta.innerText = "Error de lectura";
+      estadoTarjeta.textContent = "Error de lectura";
       setTimeout(cancelarReasignacion, 1500);
     }
   });
@@ -203,6 +234,7 @@ function iniciarReasignacion(uidActual) {
 
 function cancelarReasignacion() {
   clienteAReasignar = null;
+  leyendoTarjeta = false;
   detenerNFC();
   confirmReasignar.style.display = "none";
 }
