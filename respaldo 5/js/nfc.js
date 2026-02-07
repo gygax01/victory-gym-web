@@ -1,101 +1,78 @@
 /* ===============================
-   ===== NFC ESP32 (CONTROL CENTRAL) =====
+   ===== NFC VIA SUPABASE =====
    =============================== */
 
-// ⚠️ IP DEL ESP32
-const ESP32_URL = "http://192.168.1.2/nfc";
+/* ===== SUPABASE CONFIG ===== */
+const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_uV1OQab8AfWE3SzNkuleQw_W0xgyfER";
 
-/* ===== ESTADO GLOBAL ===== */
-let intervaloNFC = null;
-let timeoutHandle = null;
-let leyendo = false;
+/* ===== CLIENT ===== */
+const supabaseClient = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
+
+/* ===== ESTADO ===== */
+let canalNFC = null;
+let escuchando = false;
 let ultimoUID = null;
 let ultimoTiempo = 0;
 
-/* ===== CONFIGURACIÓN ===== */
-const INTERVALO_MS = 250;   // lectura rápida (casi instantánea)
-const COOLDOWN_MS  = 3000;  // evita lecturas dobles
-const TIMEOUT_MS   = 10000; // máximo 10s esperando tarjeta
+/* ===== CONFIG ===== */
+const COOLDOWN_MS = 3000;
 
 /* =========================================================
-   ===== INICIAR LECTURA NFC (CONTROLADA Y SEGURA) =====
-   =========================================================
-   iniciarNFCControlado({
-     onUID(uid),        // cuando se lee tarjeta válida
-     onTimeout(),       // si pasan 10s sin tarjeta
-     onError(error)     // error de red u otro
-   })
-*/
-function iniciarNFCControlado(
-  { onUID, onTimeout, onError } = {},
-) {
-  detenerNFC(); // 🔒 asegura 1 solo lector activo
+   ===== INICIAR LECTURA NFC (REALTIME) =====
+   ========================================================= */
+function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
+  detenerNFC();
 
-  leyendo = true;
+  escuchando = true;
   ultimoUID = null;
   ultimoTiempo = 0;
 
-  /* ===== TIMEOUT GLOBAL ===== */
-  timeoutHandle = setTimeout(() => {
-    if (!leyendo) return;
-    leyendo = false;
-    detenerNFC();
-    if (typeof onTimeout === "function") {
-      onTimeout();
-    }
-  }, TIMEOUT_MS);
+  canalNFC = supabaseClient
+    .channel("nfc-events")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "nfc_events"
+      },
+      payload => {
+        if (!escuchando) return;
 
-  /* ===== LECTURA PERIÓDICA ===== */
-  intervaloNFC = setInterval(async () => {
-    if (!leyendo) return;
+        const uid = payload.new?.uid;
+        if (!uid) return;
 
-    try {
-      const res = await fetch(ESP32_URL, { cache: "no-store" });
-      if (!res.ok) return;
+        const ahora = Date.now();
+        if (uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) {
+          return;
+        }
 
-      const data = await res.json();
-      if (!data || data.status !== "ok" || !data.uid) return;
+        ultimoUID = uid;
+        ultimoTiempo = ahora;
 
-      const ahora = Date.now();
-
-      // 🔁 Evitar doble lectura de la misma tarjeta
-      if (data.uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) {
-        return;
+        if (typeof onUID === "function") {
+          onUID(uid);
+        }
       }
-
-      ultimoUID = data.uid;
-      ultimoTiempo = ahora;
-
-      leyendo = false;
-      detenerNFC();
-
-      if (typeof onUID === "function") {
-        onUID(data.uid);
+    )
+    .subscribe(status => {
+      if (status === "SUBSCRIBED") {
+        console.log("🔵 NFC Realtime conectado");
       }
-
-    } catch (err) {
-      leyendo = false;
-      detenerNFC();
-      if (typeof onError === "function") {
-        onError(err);
-      }
-    }
-  }, INTERVALO_MS);
+    });
 }
 
 /* ===============================
-   ===== DETENER LECTURA NFC =====
+   ===== DETENER NFC =====
    =============================== */
 function detenerNFC() {
-  if (intervaloNFC) {
-    clearInterval(intervaloNFC);
-    intervaloNFC = null;
+  if (canalNFC) {
+    supabaseClient.removeChannel(canalNFC);
+    canalNFC = null;
   }
-
-  if (timeoutHandle) {
-    clearTimeout(timeoutHandle);
-    timeoutHandle = null;
-  }
-
-  leyendo = false;
+  escuchando = false;
 }
