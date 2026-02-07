@@ -1,28 +1,36 @@
 /* ===============================
    ===== NFC VIA SUPABASE =====
-   =============================== */
+=============================== */
 
-/* ===== SUPABASE CONFIG ===== */
+/* ===============================
+   ===== SUPABASE CONFIG =====
+=============================== */
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_uV1OQab8AfWE3SzNkuleQw_W0xgyfER";
 
-/* ===== CLIENT ===== */
-const supabaseClient = supabase.createClient(
+/* ===============================
+   ===== CLIENT =====
+=============================== */
+const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
 );
 
-/* ===== ESTADO ===== */
+/* ===============================
+   ===== ESTADO =====
+=============================== */
 let canalNFC = null;
 let escuchando = false;
 let ultimoUID = null;
 let ultimoTiempo = 0;
 
-/* ===== CONFIG ===== */
+/* ===============================
+   ===== CONFIG =====
+=============================== */
 const COOLDOWN_MS = 3000;
 
 /* =========================================================
-   ===== INICIAR LECTURA NFC (REALTIME) =====
+   ===== INICIAR LECTURA NFC (CONTROLADA) =====
    ========================================================= */
 function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
   detenerNFC();
@@ -64,15 +72,55 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
         console.log("🔵 NFC Realtime conectado");
       }
     });
+
+  // ⏱ Timeout de seguridad (10s)
+  if (typeof onTimeout === "function") {
+    setTimeout(() => {
+      if (escuchando) {
+        detenerNFC();
+        onTimeout();
+      }
+    }, 10000);
+  }
 }
 
 /* ===============================
    ===== DETENER NFC =====
-   =============================== */
+=============================== */
 function detenerNFC() {
   if (canalNFC) {
     supabaseClient.removeChannel(canalNFC);
     canalNFC = null;
   }
   escuchando = false;
+  ultimoUID = null;
+  ultimoTiempo = 0;
 }
+
+/* ===============================
+   ===== UTIL =====
+=============================== */
+function uidYaRegistrada(uid) {
+  if (!uid) return false;
+
+  const clientes = obtenerClientes?.() || [];
+  const empleados = obtenerEmpleados?.() || [];
+
+  return (
+    clientes.some(c => c.tarjetaUID === uid) ||
+    empleados.some(e => e.tarjetaUID === uid)
+  );
+}
+
+function liberarTarjeta(uid) {
+  if (!uid) return;
+
+  const empleados = obtenerEmpleados();
+  empleados.forEach(e => {
+    if (e.tarjetaUID === uid) {
+      e.tarjetaUID = null;
+    }
+  });
+  guardarEmpleados(empleados);
+}
+
