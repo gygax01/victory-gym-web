@@ -1,16 +1,20 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <title>Clientes</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Supabase (necesario para nfc.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body onload="initClientes()">
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
     <h2>Clientes</h2>
   </div>
   <button onclick="location.href='index.html'">← Inicio</button>
@@ -42,11 +46,15 @@
   </div>
 </div>
 
+<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
 
 <script>
+/* ===============================
+   ===== ESTADO =====
+   =============================== */
 let clientes = [];
 let clienteAEliminar = null;
 let clienteAReasignar = null;
@@ -55,8 +63,9 @@ let clienteAReasignar = null;
    ===== INIT =====
    =============================== */
 function initClientes() {
-  verificarSesion();
+  if (!verificarSesion()) return;
   requirePermission("clients_view");
+
   cargarClientes();
   applyPermissions();
 }
@@ -65,7 +74,10 @@ function initClientes() {
    ===== CARGAR =====
    =============================== */
 function cargarClientes() {
-  clientes = obtenerClientes().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  clientes = obtenerClientes()
+    .filter(c => c && typeof c.nombre === "string")
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
   render(clientes);
 }
 
@@ -81,12 +93,12 @@ function render(lista) {
         <h3>${c.nombre}</h3>
 
         <div class="acciones">
-          <button onclick="iniciarReasignacion('${c.tarjetaUID}')">
+          <button onclick="iniciarReasignacion('${c.tarjetaUID || ""}')">
             Reasignar tarjeta
           </button>
 
           <button data-permission="clients_delete"
-                  onclick="pedirConfirmacion('${c.tarjetaUID}')">
+                  onclick="pedirConfirmacion('${c.tarjetaUID || ""}')">
             Eliminar
           </button>
         </div>
@@ -104,14 +116,18 @@ function render(lista) {
    =============================== */
 function filtrar() {
   const q = busqueda.value.toLowerCase();
-  render(clientes.filter(c => c.nombre.toLowerCase().includes(q)));
+  render(
+    clientes.filter(c =>
+      c.nombre.toLowerCase().includes(q)
+    )
+  );
 }
 
 /* ===============================
    ===== ELIMINAR =====
    =============================== */
 function pedirConfirmacion(uid) {
-  requirePermission("clients_delete");
+  if (!requirePermission("clients_delete")) return;
   clienteAEliminar = uid;
   confirmBorrar.style.display = "flex";
 }
@@ -122,7 +138,7 @@ function cancelarBorrado() {
 }
 
 function confirmarBorrado() {
-  requirePermission("clients_delete");
+  if (!requirePermission("clients_delete")) return;
 
   guardarClientes(
     obtenerClientes().filter(c => c.tarjetaUID !== clienteAEliminar)
@@ -133,10 +149,10 @@ function confirmarBorrado() {
 }
 
 /* ===============================
-   ===== REASIGNAR TARJETA =====
+   ===== REASIGNAR TARJETA (SUPABASE NFC) =====
    =============================== */
-function iniciarReasignacion(uid) {
-  clienteAReasignar = uid;
+function iniciarReasignacion(uidActual) {
+  clienteAReasignar = uidActual;
 
   estadoTarjeta.className = "estado amarillo";
   estadoTarjeta.innerText = "Esperando tarjeta…";
@@ -144,6 +160,8 @@ function iniciarReasignacion(uid) {
 
   iniciarNFCControlado({
     onUID: uidNueva => {
+      if (!uidNueva) return;
+
       if (uidYaRegistrada(uidNueva)) {
         estadoTarjeta.className = "estado rojo";
         estadoTarjeta.innerText = "Tarjeta ya registrada";
@@ -151,7 +169,7 @@ function iniciarReasignacion(uid) {
         return;
       }
 
-      let lista = obtenerClientes().map(c => {
+      const lista = obtenerClientes().map(c => {
         if (c.tarjetaUID === clienteAReasignar) {
           c.tarjetaUID = uidNueva;
         }
