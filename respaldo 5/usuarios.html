@@ -4,16 +4,7 @@
   <meta charset="UTF-8">
   <title>Usuarios</title>
   <link rel="stylesheet" href="css/styles.css">
-
-  <!-- Supabase solo para NFC -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- 🔒 BLOQUEO GLOBAL DE alert() -->
-  <script>
-    window.alert = function () {
-      console.warn("alert() bloqueado para UI limpia");
-    };
-  </script>
 </head>
 
 <body>
@@ -60,8 +51,9 @@
 <!-- ===== CONFIRM / MENSAJES ===== -->
 <div class="confirmacion" id="confirmacion" style="display:none">
   <div class="box">
-    <h1 id="tituloConfirm"></h1>
-    <p id="mensajeConfirm"></p>
+    <h1 id="tituloConfirm">Acceso administrativo</h1>
+    <p id="mensajeConfirm">Ingrese la contraseña maestra</p>
+
     <input id="claveInput" type="password" placeholder="Contraseña maestra">
     <button id="btnConfirmar">Confirmar</button>
   </div>
@@ -107,7 +99,10 @@ window.addEventListener("load", () => {
   };
 
   btnAsignarTarjeta.onclick = asignarTarjeta;
-  btnRegistrar.onclick = pedirClave;
+  btnRegistrar.onclick = () => {
+    confirmacion.style.display = "flex";
+    claveInput.value = "";
+  };
 });
 
 /* ================= NFC ================= */
@@ -119,13 +114,11 @@ function asignarTarjeta() {
   btnRegistrar.disabled = true;
 
   overlay.style.display = "flex";
-  estadoNFC.className = "estado amarillo";
   estadoNFC.textContent = "Esperando tarjeta…";
 
   iniciarNFCControlado({
     onUID: uid => {
       if (uidYaRegistrada(uid)) {
-        estadoNFC.className = "estado rojo";
         estadoNFC.textContent = "Tarjeta ya registrada";
         setTimeout(cerrarNFC, 1500);
         return;
@@ -133,7 +126,6 @@ function asignarTarjeta() {
 
       tarjetaUID = uid;
       uidTexto.textContent = "UID: " + uid;
-      estadoNFC.className = "estado verde";
       estadoNFC.textContent = "Tarjeta asignada";
 
       setTimeout(() => {
@@ -151,20 +143,12 @@ function cerrarNFC() {
 }
 
 /* ================= REGISTRO ================= */
-function pedirClave() {
-  tituloConfirm.textContent = "Acceso administrativo";
-  mensajeConfirm.textContent = "Ingrese la contraseña maestra";
-  claveInput.value = "";
-  claveInput.style.display = "block";
-  btnConfirmar.style.display = "block";
-  confirmacion.style.display = "flex";
-}
-
 btnConfirmar.onclick = () => {
   if (claveInput.value !== CLAVE_MAESTRA) {
     mensajeConfirm.textContent = "Contraseña incorrecta";
     return;
   }
+
   registrarUsuario();
 };
 
@@ -185,9 +169,9 @@ function registrarUsuario() {
 
   guardarEmpleados(empleados);
 
-  /* 🎉 MENSAJE BONITO + REDIRECCIÓN */
-  tituloConfirm.textContent = "Usuario registrado";
-  mensajeConfirm.textContent = "Redirigiendo al inicio de sesión…";
+  /* ✅ MENSAJE BONITO, MISMO OVERLAY */
+  tituloConfirm.textContent = "Registro completado";
+  mensajeConfirm.textContent = "Usuario registrado correctamente";
   claveInput.style.display = "none";
   btnConfirmar.style.display = "none";
 
