@@ -1,9 +1,13 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Inicio - Gym</title>
+  <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body onload="initIndex()">
@@ -37,7 +41,6 @@
   <button onclick="location.href='clientes.html'">Clientes</button>
   <button onclick="location.href='historial.html'">Historial</button>
 
-  <!-- SOLO ADMIN / SUPERADMIN -->
   <button id="btnUsuarios" style="display:none"
           onclick="location.href='usuarios.html'">
     Usuarios
@@ -66,35 +69,30 @@
   </div>
 </div>
 
+<!-- ===== SCRIPTS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/asistencias.js"></script>
 
 <script>
+/* ================= SUPABASE CONFIG ================= */
+const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
+const SUPABASE_KEY = "PEGA_AQUI_TU_sb_publishable_KEY";
+
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
 /* ================= INIT ================= */
 function initIndex() {
-  // 🔒 1. Verificar sesión
   if (!verificarSesion()) return;
-
-  // 🔒 2. Aplicar rol
   aplicarRolIndex();
 
-  // 🔄 3. Inicializar sistema
-  iniciarHeartbeat();
-  iniciarLectura();
   cargarAsistencias();
   actualizarContador();
+  escucharNFC();
 }
-
-/* ================= CONFIG ================= */
-const ESP32_URL = "http://192.168.1.2/nfc";
-const COOLDOWN_MS = 5000;
-
-let bloqueado = false;
-let lectorConectado = false;
-let heartbeatInterval = null;
-let lecturaInterval = null;
-const ultimoUsoTarjeta = {};
 
 /* ================= CONTROL DE ROL ================= */
 function aplicarRolIndex() {
@@ -133,53 +131,26 @@ function autoScrollTabla() {
   cont.scrollTo({ top: cont.scrollHeight, behavior: "smooth" });
 }
 
-/* ================= HEARTBEAT ================= */
-function iniciarHeartbeat() {
-  if (heartbeatInterval) clearInterval(heartbeatInterval);
+/* ================= ESCUCHAR NFC EN TIEMPO REAL ================= */
+function escucharNFC() {
+  estadoLector.className = "lector on";
+  estadoLector.innerText = "Lector conectado";
 
-  heartbeatInterval = setInterval(async () => {
-    try {
-      const res = await fetch(ESP32_URL, { cache: "no-store" });
-      setLectorEstado(res.ok);
-    } catch {
-      setLectorEstado(false);
-    }
-  }, 1500);
-}
-
-function setLectorEstado(conectado) {
-  if (conectado === lectorConectado) return;
-
-  lectorConectado = conectado;
-  estadoLector.className = "lector " + (conectado ? "on" : "off");
-  estadoLector.innerText = conectado
-    ? "Lector conectado"
-    : "Lector desconectado";
-
-  if (!conectado) playError();
-}
-
-/* ================= LECTURA NFC ================= */
-function iniciarLectura() {
-  if (lecturaInterval) clearInterval(lecturaInterval);
-
-  lecturaInterval = setInterval(async () => {
-    if (bloqueado || !lectorConectado) return;
-
-    try {
-      const res = await fetch(ESP32_URL, { cache: "no-store" });
-      const data = await res.json();
-
-      if (!data || data.status !== "ok" || !data.uid) return;
-
-      const ahora = Date.now();
-      if (ahora - (ultimoUsoTarjeta[data.uid] || 0) < COOLDOWN_MS) return;
-
-      ultimoUsoTarjeta[data.uid] = ahora;
-      bloqueado = true;
-      procesarTarjeta(data.uid);
-    } catch {}
-  }, 600);
+  supabase
+    .channel("nfc-channel")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "nfc_events"
+      },
+      payload => {
+        const uid = payload.new.uid;
+        procesarTarjeta(uid);
+      }
+    )
+    .subscribe();
 }
 
 /* ================= CONFIRMACIÓN ================= */
@@ -191,60 +162,54 @@ function mostrarConfirmacion(tipo, titulo, mensaje) {
 
   setTimeout(() => {
     confirmacion.style.display = "none";
-    bloqueado = false;
   }, 2200);
 }
 
 /* ================= ENTRADA / SALIDA ================= */
 function procesarTarjeta(uid) {
-  try {
-    if (buscarEmpleadoPorTarjeta(uid)) {
-      mostrarConfirmacion("error","Tarjeta de personal","Use el login");
-      playError();
-      return;
-    }
-
-    const clientes = obtenerClientes();
-    const cliente = clientes.find(c => c.tarjetaUID === uid);
-
-    if (!cliente) {
-      mostrarConfirmacion("error","Tarjeta no registrada","Consulte recepción");
-      playError();
-      return;
-    }
-
-    const hoyFecha = hoy();
-    const asistencias = obtenerAsistencias();
-    const abierta = asistencias.find(a =>
-      a.tarjetaUID === uid &&
-      a.fecha === hoyFecha &&
-      a.salida === null
-    );
-
-    if (!abierta) {
-      asistencias.push({
-        tarjetaUID: uid,
-        nombre: cliente.nombre,
-        entrada: horaActual(),
-        salida: null,
-        fecha: hoyFecha
-      });
-      mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
-      playCorrecto();
-    } else {
-      abierta.salida = horaActual();
-      mostrarConfirmacion("salida","Hasta luego",cliente.nombre);
-      playCorrecto();
-    }
-
-    guardarAsistencias(asistencias);
-    cargarAsistencias();
-    actualizarContador();
-    autoScrollTabla();
-
-  } finally {
-    setTimeout(() => bloqueado = false, 2500);
+  if (buscarEmpleadoPorTarjeta(uid)) {
+    mostrarConfirmacion("error","Tarjeta de personal","Use el login");
+    playError();
+    return;
   }
+
+  const clientes = obtenerClientes();
+  const cliente = clientes.find(c => c.tarjetaUID === uid);
+
+  if (!cliente) {
+    mostrarConfirmacion("error","Tarjeta no registrada","Consulte recepción");
+    playError();
+    return;
+  }
+
+  const hoyFecha = hoy();
+  const asistencias = obtenerAsistencias();
+  const abierta = asistencias.find(a =>
+    a.tarjetaUID === uid &&
+    a.fecha === hoyFecha &&
+    a.salida === null
+  );
+
+  if (!abierta) {
+    asistencias.push({
+      tarjetaUID: uid,
+      nombre: cliente.nombre,
+      entrada: horaActual(),
+      salida: null,
+      fecha: hoyFecha
+    });
+    mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
+    playCorrecto();
+  } else {
+    abierta.salida = horaActual();
+    mostrarConfirmacion("salida","Hasta luego",cliente.nombre);
+    playCorrecto();
+  }
+
+  guardarAsistencias(asistencias);
+  cargarAsistencias();
+  actualizarContador();
+  autoScrollTabla();
 }
 </script>
 
