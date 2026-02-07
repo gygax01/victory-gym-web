@@ -82,10 +82,12 @@
 </style>
 </head>
 
-<body onload="verificarSesion(); cargarProductos();">
+<body>
 
-<header>
-  <h2>Punto de Venta</h2>
+<header class="header-brand">
+  <div class="brand">
+    <h2>Punto de Venta</h2>
+  </div>
   <button onclick="location.href='index.html'">⬅ Inicio</button>
 </header>
 
@@ -105,7 +107,7 @@
       Total $<span id="total">0</span>
     </div>
 
-    <input id="pago" type="number" placeholder="¿Con cuánto paga?">
+    <input id="pago" type="number" min="0" placeholder="¿Con cuánto paga?">
     <button onclick="cobrar()">Cobrar</button>
     <button onclick="cancelar()">Cancelar</button>
   </div>
@@ -119,76 +121,120 @@
   </div>
 </div>
 
+<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
 <script>
+/* ===============================
+   ===== INIT =====
+   =============================== */
+document.addEventListener("DOMContentLoaded", () => {
+  if (!verificarSesion()) return;
+  if (!requirePermission("sales_do")) return;
+  cargarProductos();
+});
+
+/* ===============================
+   ===== ESTADO =====
+   =============================== */
 let productos = [];
 let carrito = [];
 
-function cargarProductos(){
-  grid.innerHTML="";
-  productos = obtenerProductos();
-  productos.forEach(p=>{
-    if(p.stock<=0) return;
-    const d=document.createElement("div");
-    d.className="prod";
-    d.innerHTML=`<b>${p.nombre}</b><span>$${p.precio}</span>`;
-    d.onclick=()=>agregar(p.nombre);
+/* ===============================
+   ===== PRODUCTOS =====
+   =============================== */
+function cargarProductos() {
+  grid.innerHTML = "";
+  productos = obtenerProductos().filter(
+    p => p && typeof p.nombre === "string" && p.stock > 0
+  );
+
+  productos.forEach(p => {
+    const d = document.createElement("div");
+    d.className = "prod";
+    d.innerHTML = `<b>${p.nombre}</b><span>$${p.precio}</span>`;
+    d.onclick = () => agregar(p.nombre);
     grid.appendChild(d);
   });
 }
 
-function agregar(nombre){
+/* ===============================
+   ===== CARRITO =====
+   =============================== */
+function agregar(nombre) {
   carrito.push(nombre);
   render();
 }
 
-function render(){
-  lista.innerHTML="";
-  let t=0;
-  carrito.forEach(n=>{
-    const p=productos.find(x=>x.nombre===n);
-    t+=p.precio;
-    lista.innerHTML+=`<li>${n}<span>$${p.precio}</span></li>`;
+function render() {
+  lista.innerHTML = "";
+  let t = 0;
+
+  carrito.forEach(n => {
+    const p = productos.find(x => x.nombre === n);
+    if (!p) return;
+    t += Number(p.precio) || 0;
+    lista.innerHTML += `<li>${n}<span>$${p.precio}</span></li>`;
   });
-  total.innerText=t;
+
+  total.innerText = t.toFixed(2);
 }
 
-function cancelar(){
-  if(!confirm("¿Cancelar venta?"))return;
-  carrito=[]; pago.value="";
+/* ===============================
+   ===== CANCELAR =====
+   =============================== */
+function cancelar() {
+  if (!confirm("¿Cancelar venta?")) return;
+  carrito = [];
+  pago.value = "";
   render();
 }
 
-function cobrar(){
-  const totalVenta=Number(total.innerText);
-  const paga=Number(pago.value);
-  if(paga<totalVenta){alert("Pago insuficiente");return;}
+/* ===============================
+   ===== COBRAR =====
+   =============================== */
+function cobrar() {
+  const totalVenta = Number(total.innerText);
+  const paga = Number(pago.value);
+
+  if (carrito.length === 0) {
+    alert("Carrito vacío");
+    return;
+  }
+
+  if (paga < totalVenta) {
+    alert("Pago insuficiente");
+    return;
+  }
 
   // descontar stock
-  carrito.forEach(n=>{
-    const p=productos.find(x=>x.nombre===n);
-    p.stock--;
+  carrito.forEach(n => {
+    const p = productos.find(x => x.nombre === n);
+    if (p) p.stock--;
   });
   guardarProductos(productos);
 
   // registrar venta
-  const ventas=obtenerVentas();
+  const ventas = obtenerVentas();
   ventas.push({
-    fecha:hoy(),
-    hora:horaActual(),
-    total:totalVenta
+    fecha: hoy(),
+    hora: horaActual(),
+    total: totalVenta
   });
   guardarVentas(ventas);
 
   // mostrar cambio
-  cambio.innerText=(paga-totalVenta).toFixed(2);
-  overlay.style.display="flex";
+  cambio.innerText = (paga - totalVenta).toFixed(2);
+  overlay.style.display = "flex";
 
-  setTimeout(()=>location.href="index.html",4000);
+  setTimeout(() => {
+    overlay.style.display = "none";
+    location.href = "index.html";
+  }, 3500);
 }
 </script>
 
 </body>
 </html>
+
