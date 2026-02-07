@@ -16,7 +16,7 @@
     <img src="img/logo.png" alt="Victory Pro Fitness">
     <h2>Gestión de usuarios</h2>
   </div>
-  <button onclick="volver()">← Volver</button>
+  <button id="btnVolver">← Volver</button>
 </header>
 
 <!-- ================= REGISTRO ================= -->
@@ -24,21 +24,24 @@
   <div class="usuarios-col">
     <h3>Registrar usuario</h3>
 
-    <input id="nombre" placeholder="Nombre completo">
-    <input id="usuario" placeholder="Usuario">
-    <input id="password" type="password" placeholder="Contraseña">
+    <input id="inputNombre" placeholder="Nombre completo">
+    <input id="inputUsuario" placeholder="Usuario">
+    <input id="inputPassword" type="password" placeholder="Contraseña">
 
-    <select id="rol">
+    <select id="selectRol">
       <option value="employee">Empleado</option>
       <option value="admin">Administrador</option>
     </select>
 
-    <button class="nfc" onclick="asignarTarjeta()">Asignar tarjeta</button>
+    <button class="nfc" id="btnAsignarTarjeta">
+      Asignar tarjeta
+    </button>
+
     <p id="uidTexto" class="uid"></p>
   </div>
 
   <div class="usuarios-col">
-    <button id="btnRegistrar" onclick="pedirClaveRegistro()" disabled>
+    <button id="btnRegistrar" disabled>
       Registrar usuario
     </button>
   </div>
@@ -46,7 +49,7 @@
 
 <!-- ================= BUSCADOR / LISTAS ================= -->
 <div class="search-bar" id="buscador">
-  <input id="busqueda" placeholder="Buscar usuario..." oninput="renderUsuarios()">
+  <input id="inputBusqueda" placeholder="Buscar usuario...">
 </div>
 
 <div class="historial-container" id="listasUsuarios">
@@ -61,7 +64,7 @@
 <div class="overlay" id="overlay" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
-    <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
+    <div id="estadoNFC" class="estado amarillo">Esperando tarjeta…</div>
   </div>
 </div>
 
@@ -74,7 +77,7 @@
   </div>
 </div>
 
-<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
+<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
@@ -82,27 +85,70 @@
 <script>
 /* ===============================
    ===== CONFIG =====
-   =============================== */
+=============================== */
 const CLAVE_MAESTRA = "victory(profitness)";
+
+/* ===============================
+   ===== DOM =====
+=============================== */
+const btnVolver = document.getElementById("btnVolver");
+const registroCard = document.getElementById("registroCard");
+const buscador = document.getElementById("buscador");
+const listasUsuarios = document.getElementById("listasUsuarios");
+
+const inputNombre = document.getElementById("inputNombre");
+const inputUsuario = document.getElementById("inputUsuario");
+const inputPassword = document.getElementById("inputPassword");
+const selectRol = document.getElementById("selectRol");
+const btnAsignarTarjeta = document.getElementById("btnAsignarTarjeta");
+const btnRegistrar = document.getElementById("btnRegistrar");
+const uidTexto = document.getElementById("uidTexto");
+
+const inputBusqueda = document.getElementById("inputBusqueda");
+const listaAdmins = document.getElementById("listaAdmins");
+const listaEmpleados = document.getElementById("listaEmpleados");
+
+const overlay = document.getElementById("overlay");
+const estadoNFC = document.getElementById("estadoNFC");
+
+const confirmacion = document.getElementById("confirmacion");
+const tituloConfirm = document.getElementById("tituloConfirm");
+const mensajeConfirm = document.getElementById("mensajeConfirm");
+const accionesConfirm = document.getElementById("accionesConfirm");
+
+/* ===============================
+   ===== ESTADO =====
+=============================== */
 let tarjetaUID = null;
 let usuarioAEliminar = null;
 let usuarioAReasignar = null;
+let leyendoNFC = false;
 
 /* ===============================
    ===== INIT =====
-   =============================== */
-document.addEventListener("DOMContentLoaded", () => {
-  const params = new URLSearchParams(window.location.search);
-  const modoRegistro = params.get("modo") === "registro";
+=============================== */
+window.addEventListener("load", initUsuarios);
 
+function initUsuarios() {
   if (!verificarSesion()) return;
 
-  const s = obtenerSesion();
-  if (!["admin","superadmin"].includes(s.rol)) {
+  const sesion = obtenerSesion();
+  if (!["admin","superadmin"].includes(sesion.rol)) {
     alert("Acceso no autorizado");
     location.href = "index.html";
     return;
   }
+
+  const params = new URLSearchParams(window.location.search);
+  const modoRegistro = params.get("modo") === "registro";
+
+  btnVolver.addEventListener("click", () => {
+    location.href = modoRegistro ? "login.html" : "index.html";
+  });
+
+  btnAsignarTarjeta.addEventListener("click", asignarTarjeta);
+  btnRegistrar.addEventListener("click", pedirClaveRegistro);
+  inputBusqueda.addEventListener("input", renderUsuarios);
 
   if (modoRegistro) {
     buscador.remove();
@@ -110,45 +156,38 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     renderUsuarios();
   }
-});
-
-/* ===============================
-   ===== VOLVER =====
-   =============================== */
-function volver() {
-  const params = new URLSearchParams(window.location.search);
-  location.href = params.get("modo") === "registro"
-    ? "login.html"
-    : "index.html";
 }
 
 /* ===============================
-   ===== NFC REGISTRO USUARIO =====
-   =============================== */
+   ===== NFC REGISTRO =====
+=============================== */
 function asignarTarjeta() {
+  if (leyendoNFC) return;
+
   tarjetaUID = null;
+  leyendoNFC = true;
   btnRegistrar.disabled = true;
 
   overlay.style.display = "flex";
-  estado.className = "estado amarillo";
-  estado.innerText = "Esperando tarjeta…";
-  uidTexto.innerText = "";
+  estadoNFC.className = "estado amarillo";
+  estadoNFC.textContent = "Esperando tarjeta…";
+  uidTexto.textContent = "";
 
   iniciarNFCControlado({
     onUID: uid => {
       if (!uid) return;
 
       if (uidYaRegistrada(uid)) {
-        estado.className = "estado rojo";
-        estado.innerText = "Tarjeta ya registrada";
+        estadoNFC.className = "estado rojo";
+        estadoNFC.textContent = "Tarjeta ya registrada";
         setTimeout(cerrarPopup, 1500);
         return;
       }
 
       tarjetaUID = uid;
-      uidTexto.innerText = "UID: " + uid;
-      estado.className = "estado verde";
-      estado.innerText = "Tarjeta asignada";
+      uidTexto.textContent = "UID: " + uid;
+      estadoNFC.className = "estado verde";
+      estadoNFC.textContent = "Tarjeta asignada";
 
       setTimeout(() => {
         cerrarPopup();
@@ -157,14 +196,14 @@ function asignarTarjeta() {
     },
 
     onTimeout: () => {
-      estado.className = "estado rojo";
-      estado.innerText = "Tiempo de lectura agotado";
+      estadoNFC.className = "estado rojo";
+      estadoNFC.textContent = "Tiempo agotado";
       setTimeout(cerrarPopup, 1500);
     },
 
     onError: () => {
-      estado.className = "estado rojo";
-      estado.innerText = "Error de lectura";
+      estadoNFC.className = "estado rojo";
+      estadoNFC.textContent = "Error de lectura";
       setTimeout(cerrarPopup, 1500);
     }
   });
@@ -173,36 +212,43 @@ function asignarTarjeta() {
 function cerrarPopup() {
   overlay.style.display = "none";
   detenerNFC();
+  leyendoNFC = false;
 }
 
 /* ===============================
-   ===== REGISTRO USUARIO =====
-   =============================== */
+   ===== REGISTRO =====
+=============================== */
 function pedirClaveRegistro() {
-  if (!tarjetaUID) return alert("Asigne una tarjeta primero");
+  if (!tarjetaUID) {
+    alert("Asigne una tarjeta primero");
+    return;
+  }
 
   mostrarConfirm(
     "Acceso administrativo",
     "Ingrese la contraseña maestra",
-    `
-      <input id="claveInput" type="password">
-      <button onclick="confirmarRegistro()">Confirmar</button>
-      <button onclick="cerrarConfirm()">Cancelar</button>
-    `
+    () => confirmarRegistro()
   );
 }
 
 function confirmarRegistro() {
-  if (claveInput.value !== CLAVE_MAESTRA) {
+  const clave = document.getElementById("claveInput")?.value;
+  if (clave !== CLAVE_MAESTRA) {
     alert("Contraseña incorrecta");
     return;
   }
+
   cerrarConfirm();
   registrarUsuario();
 }
 
 function registrarUsuario() {
-  if (!nombre.value || !usuario.value || !password.value || !tarjetaUID) {
+  if (
+    !inputNombre.value.trim() ||
+    !inputUsuario.value.trim() ||
+    !inputPassword.value ||
+    !tarjetaUID
+  ) {
     alert("Complete todos los datos");
     return;
   }
@@ -210,27 +256,27 @@ function registrarUsuario() {
   const empleados = obtenerEmpleados();
 
   empleados.push({
-    nombre: nombre.value.trim(),
-    usuario: usuario.value.trim(),
-    password: password.value,
-    rol: rol.value,
+    nombre: inputNombre.value.trim(),
+    usuario: inputUsuario.value.trim(),
+    password: inputPassword.value,
+    rol: selectRol.value,
     tarjetaUID
   });
 
   guardarEmpleados(empleados);
 
-  mostrarConfirm(
+  mostrarConfirmSimple(
     "Correcto",
     "Usuario registrado correctamente",
-    `<button onclick="cerrarConfirm(); location.reload()">Aceptar</button>`
+    () => location.reload()
   );
 }
 
 /* ===============================
-   ===== LISTA USUARIOS =====
-   =============================== */
+   ===== LISTA =====
+=============================== */
 function renderUsuarios() {
-  const q = busqueda.value.toLowerCase();
+  const q = inputBusqueda.value.toLowerCase();
 
   const empleados = obtenerEmpleados()
     .filter(e =>
@@ -243,45 +289,59 @@ function renderUsuarios() {
   listaEmpleados.innerHTML = "";
 
   empleados.forEach(e => {
-    const d = document.createElement("div");
-    d.className = "cliente";
+    const card = document.createElement("div");
+    card.className = "cliente";
 
-    d.innerHTML = `
-      <div class="cliente-header">
-        <h3>${e.nombre}</h3>
-        <div class="acciones">
-          <button onclick="iniciarReasignacion('${e.usuario}')">
-            Reasignar tarjeta
-          </button>
-          <button class="btn-borrar"
-                  onclick="confirmarEliminar('${e.usuario}')">
-            Eliminar
-          </button>
-        </div>
-      </div>
-      <p class="meta">${e.usuario} · ${e.rol}</p>
-    `;
+    const header = document.createElement("div");
+    header.className = "cliente-header";
 
-    if (e.rol === "admin") listaAdmins.appendChild(d);
-    else listaEmpleados.appendChild(d);
+    const nombre = document.createElement("h3");
+    nombre.textContent = e.nombre;
+
+    const acciones = document.createElement("div");
+    acciones.className = "acciones";
+
+    const btnReasignar = document.createElement("button");
+    btnReasignar.textContent = "Reasignar tarjeta";
+    btnReasignar.onclick = () => iniciarReasignacion(e.usuario);
+
+    const btnEliminar = document.createElement("button");
+    btnEliminar.className = "btn-borrar";
+    btnEliminar.textContent = "Eliminar";
+    btnEliminar.onclick = () => confirmarEliminar(e.usuario);
+
+    acciones.append(btnReasignar, btnEliminar);
+    header.append(nombre, acciones);
+
+    const meta = document.createElement("p");
+    meta.className = "meta";
+    meta.textContent = e.usuario + " · " + e.rol;
+
+    card.append(header, meta);
+
+    if (e.rol === "admin" || e.rol === "superadmin") {
+      listaAdmins.appendChild(card);
+    } else {
+      listaEmpleados.appendChild(card);
+    }
   });
 }
 
 /* ===============================
-   ===== REASIGNAR TARJETA =====
-   =============================== */
+   ===== REASIGNAR =====
+=============================== */
 function iniciarReasignacion(usuario) {
   usuarioAReasignar = usuario;
 
   overlay.style.display = "flex";
-  estado.className = "estado amarillo";
-  estado.innerText = "Esperando tarjeta…";
+  estadoNFC.className = "estado amarillo";
+  estadoNFC.textContent = "Esperando tarjeta…";
 
   iniciarNFCControlado({
     onUID: uid => {
       if (uidYaRegistrada(uid)) {
-        estado.className = "estado rojo";
-        estado.innerText = "Tarjeta ya registrada";
+        estadoNFC.className = "estado rojo";
+        estadoNFC.textContent = "Tarjeta ya registrada";
         setTimeout(cerrarPopup, 1500);
         return;
       }
@@ -295,42 +355,27 @@ function iniciarReasignacion(usuario) {
 
       guardarEmpleados(empleados);
 
-      estado.className = "estado verde";
-      estado.innerText = "Tarjeta reasignada";
+      estadoNFC.className = "estado verde";
+      estadoNFC.textContent = "Tarjeta reasignada";
 
       setTimeout(() => {
         cerrarPopup();
         renderUsuarios();
       }, 1200);
-    },
-
-    onTimeout: () => {
-      estado.className = "estado rojo";
-      estado.innerText = "Tiempo de lectura agotado";
-      setTimeout(cerrarPopup, 1500);
-    },
-
-    onError: () => {
-      estado.className = "estado rojo";
-      estado.innerText = "Error de lectura";
-      setTimeout(cerrarPopup, 1500);
     }
   });
 }
 
 /* ===============================
-   ===== ELIMINAR USUARIO =====
-   =============================== */
+   ===== ELIMINAR =====
+=============================== */
 function confirmarEliminar(usuario) {
   usuarioAEliminar = usuario;
 
   mostrarConfirm(
     "¿Eliminar usuario?",
     "Esta acción no se puede revertir",
-    `
-      <button onclick="pedirClaveEliminar()">Sí</button>
-      <button onclick="cerrarConfirm()">No</button>
-    `
+    () => pedirClaveEliminar()
   );
 }
 
@@ -338,16 +383,13 @@ function pedirClaveEliminar() {
   mostrarConfirm(
     "Confirmación final",
     "Ingrese la contraseña maestra",
-    `
-      <input id="claveInput" type="password">
-      <button onclick="eliminarUsuario()">Confirmar</button>
-      <button onclick="cerrarConfirm()">Cancelar</button>
-    `
+    () => eliminarUsuario()
   );
 }
 
 function eliminarUsuario() {
-  if (claveInput.value !== CLAVE_MAESTRA) {
+  const clave = document.getElementById("claveInput")?.value;
+  if (clave !== CLAVE_MAESTRA) {
     alert("Contraseña incorrecta");
     return;
   }
@@ -362,22 +404,48 @@ function eliminarUsuario() {
     liberarTarjeta(eliminado.tarjetaUID);
   }
 
-  mostrarConfirm(
-    "Correcto",
-    "Usuario eliminado correctamente",
-    `<button onclick="cerrarConfirm()">Aceptar</button>`
-  );
-
+  cerrarConfirm();
   renderUsuarios();
 }
 
 /* ===============================
-   ===== CONFIRM =====
-   =============================== */
-function mostrarConfirm(t, m, a) {
-  tituloConfirm.innerText = t;
-  mensajeConfirm.innerText = m;
-  accionesConfirm.innerHTML = a;
+   ===== CONFIRM UI =====
+=============================== */
+function mostrarConfirm(titulo, mensaje, onConfirm) {
+  tituloConfirm.textContent = titulo;
+  mensajeConfirm.textContent = mensaje;
+
+  accionesConfirm.innerHTML = "";
+
+  const input = document.createElement("input");
+  input.type = "password";
+  input.id = "claveInput";
+
+  const btnOk = document.createElement("button");
+  btnOk.textContent = "Confirmar";
+  btnOk.onclick = onConfirm;
+
+  const btnCancel = document.createElement("button");
+  btnCancel.textContent = "Cancelar";
+  btnCancel.onclick = cerrarConfirm;
+
+  accionesConfirm.append(input, btnOk, btnCancel);
+  confirmacion.style.display = "flex";
+}
+
+function mostrarConfirmSimple(t, m, onClose) {
+  tituloConfirm.textContent = t;
+  mensajeConfirm.textContent = m;
+  accionesConfirm.innerHTML = "";
+
+  const btn = document.createElement("button");
+  btn.textContent = "Aceptar";
+  btn.onclick = () => {
+    cerrarConfirm();
+    onClose?.();
+  };
+
+  accionesConfirm.appendChild(btn);
   confirmacion.style.display = "flex";
 }
 
@@ -388,4 +456,5 @@ function cerrarConfirm() {
 
 </body>
 </html>
+
 
