@@ -7,6 +7,13 @@
 
   <!-- Supabase solo para NFC -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- 🔒 BLOQUEO GLOBAL DE alert() -->
+  <script>
+    window.alert = function () {
+      console.warn("alert() bloqueado para UI limpia");
+    };
+  </script>
 </head>
 
 <body>
@@ -50,7 +57,7 @@
   </div>
 </div>
 
-<!-- ===== CONFIRM ===== -->
+<!-- ===== CONFIRM / MENSAJES ===== -->
 <div class="confirmacion" id="confirmacion" style="display:none">
   <div class="box">
     <h1 id="tituloConfirm"></h1>
@@ -84,6 +91,9 @@ const overlay = document.getElementById("overlay");
 const estadoNFC = document.getElementById("estadoNFC");
 
 const confirmacion = document.getElementById("confirmacion");
+const tituloConfirm = document.getElementById("tituloConfirm");
+const mensajeConfirm = document.getElementById("mensajeConfirm");
+const claveInput = document.getElementById("claveInput");
 const btnConfirmar = document.getElementById("btnConfirmar");
 
 /* ================= ESTADO ================= */
@@ -109,11 +119,13 @@ function asignarTarjeta() {
   btnRegistrar.disabled = true;
 
   overlay.style.display = "flex";
+  estadoNFC.className = "estado amarillo";
   estadoNFC.textContent = "Esperando tarjeta…";
 
   iniciarNFCControlado({
     onUID: uid => {
       if (uidYaRegistrada(uid)) {
+        estadoNFC.className = "estado rojo";
         estadoNFC.textContent = "Tarjeta ya registrada";
         setTimeout(cerrarNFC, 1500);
         return;
@@ -121,6 +133,7 @@ function asignarTarjeta() {
 
       tarjetaUID = uid;
       uidTexto.textContent = "UID: " + uid;
+      estadoNFC.className = "estado verde";
       estadoNFC.textContent = "Tarjeta asignada";
 
       setTimeout(() => {
@@ -139,13 +152,17 @@ function cerrarNFC() {
 
 /* ================= REGISTRO ================= */
 function pedirClave() {
+  tituloConfirm.textContent = "Acceso administrativo";
+  mensajeConfirm.textContent = "Ingrese la contraseña maestra";
+  claveInput.value = "";
+  claveInput.style.display = "block";
+  btnConfirmar.style.display = "block";
   confirmacion.style.display = "flex";
 }
 
 btnConfirmar.onclick = () => {
-  const clave = document.getElementById("claveInput").value;
-  if (clave !== CLAVE_MAESTRA) {
-    alert("Contraseña incorrecta");
+  if (claveInput.value !== CLAVE_MAESTRA) {
+    mensajeConfirm.textContent = "Contraseña incorrecta";
     return;
   }
   registrarUsuario();
@@ -153,7 +170,7 @@ btnConfirmar.onclick = () => {
 
 function registrarUsuario() {
   if (!inputNombre.value || !inputUsuario.value || !inputPassword.value || !tarjetaUID) {
-    alert("Datos incompletos");
+    mensajeConfirm.textContent = "Complete todos los datos";
     return;
   }
 
@@ -167,11 +184,18 @@ function registrarUsuario() {
   });
 
   guardarEmpleados(empleados);
-  alert("Usuario registrado correctamente");
-  location.href = "login.html";
+
+  /* 🎉 MENSAJE BONITO + REDIRECCIÓN */
+  tituloConfirm.textContent = "Usuario registrado";
+  mensajeConfirm.textContent = "Redirigiendo al inicio de sesión…";
+  claveInput.style.display = "none";
+  btnConfirmar.style.display = "none";
+
+  setTimeout(() => {
+    location.href = "login.html";
+  }, 1800);
 }
 </script>
 
 </body>
 </html>
-
