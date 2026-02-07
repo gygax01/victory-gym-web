@@ -25,7 +25,7 @@ function cargarAsistencias() {
       tr.innerHTML = `
         <td>${a.nombre}</td>
         <td>${a.entrada}</td>
-        <td>${a.salida ? a.salida : "-"}</td>
+        <td>${a.salida ?? "-"}</td>
       `;
 
       tbody.appendChild(tr);
@@ -36,13 +36,15 @@ function cargarAsistencias() {
 function actualizarContador() {
   const hoyFecha = hoy();
 
-  const dentro = obtenerAsistencias().filter(
-    a =>
-      a &&
-      a.fecha === hoyFecha &&
-      a.salida === null
+  const asistencias = obtenerAsistencias();
+  if (!Array.isArray(asistencias)) return;
+
+  const dentro = asistencias.filter(a =>
+    a &&
+    a.fecha === hoyFecha &&
+    a.salida === null
   ).length;
 
   const el = document.getElementById("contadorAforo");
-  if (el) el.innerText = "👥 Dentro: " + dentro;
+  if (el) el.innerText = `👥 Dentro: ${dentro}`;
 }
