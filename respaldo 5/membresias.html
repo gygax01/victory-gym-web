@@ -25,45 +25,64 @@
 
 <script>
 /* ===============================
+   ===== DOM =====
+=============================== */
+const listaMembresias = document.getElementById("listaMembresias");
+
+/* ===============================
    ===== INIT =====
-   =============================== */
-document.addEventListener("DOMContentLoaded", () => {
+=============================== */
+window.addEventListener("load", initMembresias);
+
+function initMembresias() {
   if (!verificarSesion()) return;
-  cargarClientes();
+  if (typeof requirePermission === "function") {
+    requirePermission("memberships_view");
+  }
+
+  cargarMembresias();
   applyPermissions();
-});
+}
 
 /* ===============================
    ===== CARGAR MEMBRESÍAS =====
-   =============================== */
-function cargarClientes() {
+=============================== */
+function cargarMembresias() {
   const clientes = obtenerClientes()
     .filter(c => c && typeof c.nombre === "string");
 
   listaMembresias.innerHTML = "";
 
-  clientes.forEach((c, i) => {
-    const d = document.createElement("div");
-    d.className = "cliente";
+  if (clientes.length === 0) {
+    const p = document.createElement("p");
+    p.textContent = "No hay clientes registrados";
+    listaMembresias.appendChild(p);
+    return;
+  }
 
+  clientes.forEach((c, index) => {
+    const card = document.createElement("div");
+    card.className = "cliente";
+
+    const nombre = document.createElement("h3");
+    nombre.textContent = c.nombre;
+
+    const pExpira = document.createElement("p");
     const expira = c.membresiaExpira ?? "—";
+    pExpira.textContent = "Expira: " + expira;
 
-    d.innerHTML = `
-      <h3>${c.nombre}</h3>
-      <p>Expira: ${expira}</p>
+    const btn7 = document.createElement("button");
+    btn7.textContent = "+7 días";
+    btn7.setAttribute("data-permission", "memberships_extend");
+    btn7.onclick = () => extenderMembresia(index, 7);
 
-      <button data-permission="memberships_extend"
-              onclick="sumar(${i}, 7)">
-        +7 días
-      </button>
+    const btn30 = document.createElement("button");
+    btn30.textContent = "+30 días";
+    btn30.setAttribute("data-permission", "memberships_extend");
+    btn30.onclick = () => extenderMembresia(index, 30);
 
-      <button data-permission="memberships_extend"
-              onclick="sumar(${i}, 30)">
-        +30 días
-      </button>
-    `;
-
-    listaMembresias.appendChild(d);
+    card.append(nombre, pExpira, btn7, btn30);
+    listaMembresias.appendChild(card);
   });
 
   applyPermissions();
@@ -71,21 +90,21 @@ function cargarClientes() {
 
 /* ===============================
    ===== EXTENDER MEMBRESÍA =====
-   =============================== */
-function sumar(i, dias) {
+=============================== */
+function extenderMembresia(index, dias) {
   if (!can("memberships_extend")) return;
 
   const clientes = obtenerClientes();
-  const c = clientes[i];
-  if (!c) return;
+  const cliente = clientes[index];
+  if (!cliente) return;
 
-  const base = new Date(c.membresiaExpira || hoy());
+  const base = new Date(cliente.membresiaExpira || hoy());
   base.setDate(base.getDate() + dias);
 
-  c.membresiaExpira = base.toISOString().split("T")[0];
+  cliente.membresiaExpira = base.toISOString().split("T")[0];
 
   guardarClientes(clientes);
-  cargarClientes();
+  cargarMembresias();
 }
 </script>
 
