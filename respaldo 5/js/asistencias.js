@@ -1,14 +1,16 @@
 /* ===============================
    ===== ASISTENCIAS GYM =====
-   =============================== */
+=============================== */
 
-/* ===== CARGAR TABLA ===== */
+/* ===============================
+   ===== CARGAR TABLA =====
+=============================== */
 function cargarAsistencias() {
   const asistencias = obtenerAsistencias();
   const hoyFecha = hoy();
 
-  const tbody = document.getElementById("tabla-asistencias");
-  if (!tbody) return;
+  const tbody = document.getElementById("tablaAsistencias");
+  if (!tbody || !Array.isArray(asistencias)) return;
 
   tbody.innerHTML = "";
 
@@ -22,21 +24,27 @@ function cargarAsistencias() {
     .forEach(a => {
       const tr = document.createElement("tr");
 
-      tr.innerHTML = `
-        <td>${a.nombre}</td>
-        <td>${a.entrada}</td>
-        <td>${a.salida ?? "-"}</td>
-      `;
+      const tdNombre = document.createElement("td");
+      tdNombre.textContent = a.nombre;
 
+      const tdEntrada = document.createElement("td");
+      tdEntrada.textContent = a.entrada;
+
+      const tdSalida = document.createElement("td");
+      tdSalida.textContent = a.salida ?? "-";
+
+      tr.append(tdNombre, tdEntrada, tdSalida);
       tbody.appendChild(tr);
     });
 }
 
-/* ===== CONTADOR AFORO ===== */
+/* ===============================
+   ===== CONTADOR AFORO =====
+=============================== */
 function actualizarContador() {
   const hoyFecha = hoy();
-
   const asistencias = obtenerAsistencias();
+
   if (!Array.isArray(asistencias)) return;
 
   const dentro = asistencias.filter(a =>
@@ -45,6 +53,15 @@ function actualizarContador() {
     a.salida === null
   ).length;
 
-  const el = document.getElementById("contadorAforo");
-  if (el) el.innerText = `👥 Dentro: ${dentro}`;
+  const contador = document.getElementById("contadorAforo");
+  if (!contador) return;
+
+  const strong = contador.querySelector("strong");
+  if (strong) {
+    strong.textContent = dentro;
+  } else {
+    contador.textContent = `Dentro: ${dentro}`;
+  }
 }
+
+
