@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,7 +5,7 @@
   <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- Supabase -->
+  <!-- Supabase (solo una vez, antes del JS que lo use) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -69,7 +68,7 @@
   </div>
 </div>
 
-<!-- ===== SCRIPTS BASE ===== -->
+<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/asistencias.js"></script>
@@ -77,7 +76,7 @@
 <script>
 /* ================= SUPABASE CONFIG ================= */
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
-const SUPABASE_KEY = "PEGA_AQUI_TU_sb_publishable_KEY";
+const SUPABASE_KEY = "sb_publishable_uV1OQab8AfWE3SzNkuleQw_W0xgyfER";
 
 const supabase = window.supabase.createClient(
   SUPABASE_URL,
@@ -131,7 +130,7 @@ function autoScrollTabla() {
   cont.scrollTo({ top: cont.scrollHeight, behavior: "smooth" });
 }
 
-/* ================= ESCUCHAR NFC EN TIEMPO REAL ================= */
+/* ================= NFC EN TIEMPO REAL (SUPABASE) ================= */
 function escucharNFC() {
   estadoLector.className = "lector on";
   estadoLector.innerText = "Lector conectado";
@@ -146,7 +145,8 @@ function escucharNFC() {
         table: "nfc_events"
       },
       payload => {
-        const uid = payload.new.uid;
+        const uid = payload.new?.uid;
+        if (!uid) return;
         procesarTarjeta(uid);
       }
     )
@@ -215,3 +215,4 @@ function procesarTarjeta(uid) {
 
 </body>
 </html>
+
