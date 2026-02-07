@@ -1,20 +1,24 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <title>Login - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Supabase (requerido por nfc.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body class="centered login-bg">
 
 <div class="card login-card">
   <div class="login-logo">
-    <img src="img/logo.png">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
   </div>
 
-  <input id="user" placeholder="Usuario">
-  <input id="pass" type="password" placeholder="Contraseña">
+  <input id="user" placeholder="Usuario" autocomplete="username">
+  <input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password">
 
   <button class="btn-login" onclick="loginManual()">Ingresar</button>
 
@@ -33,20 +37,23 @@
 </div>
 
 <!-- ===== POPUP NFC ===== -->
-<div class="overlay" id="overlay">
+<div class="overlay" id="overlay" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
     <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
   </div>
 </div>
 
+<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
 
 <script>
-/* ===== CREAR SUPERADMIN SI NO EXISTE ===== */
-(function crearSuperAdminSiNoExiste(){
+/* ===============================
+   ===== BOOTSTRAP SUPERADMIN =====
+   =============================== */
+(function crearSuperAdminSiNoExiste() {
   const emps = obtenerEmpleados();
   if (emps.some(e => e.rol === "superadmin")) return;
 
@@ -62,6 +69,9 @@
   guardarEmpleados(emps);
 })();
 
+/* ===============================
+   ===== ESTADO =====
+   =============================== */
 let leyendoNFC = false;
 
 /* ===============================
@@ -73,7 +83,7 @@ function loginManual() {
 }
 
 /* ===============================
-   ===== LOGIN CON TARJETA =====
+   ===== LOGIN CON TARJETA (NFC) =====
    =============================== */
 function loginConTarjeta() {
   if (leyendoNFC) return;
@@ -119,6 +129,9 @@ function loginConTarjeta() {
   });
 }
 
+/* ===============================
+   ===== RESET NFC =====
+   =============================== */
 function resetNFC() {
   detenerNFC();
   leyendoNFC = false;
