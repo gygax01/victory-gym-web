@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -11,7 +12,7 @@
   max-width:1100px;
   margin:20px auto;
   display:grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns:2fr 1fr;
   gap:20px;
 }
 @media(max-width:900px){
@@ -78,7 +79,10 @@
   animation:zoom .25s ease;
 }
 .overlay-cambio h1{font-size:64px;margin:0}
-@keyframes zoom{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes zoom{
+  from{transform:scale(.8);opacity:0}
+  to{transform:scale(1);opacity:1}
+}
 </style>
 </head>
 
@@ -104,12 +108,12 @@
     <ul id="lista"></ul>
 
     <div class="total">
-      Total $<span id="total">0</span>
+      Total $<span id="total">0.00</span>
     </div>
 
     <input id="pago" type="number" min="0" placeholder="¿Con cuánto paga?">
-    <button onclick="cobrar()">Cobrar</button>
-    <button onclick="cancelar()">Cancelar</button>
+    <button id="btnCobrar">Cobrar</button>
+    <button id="btnCancelar">Cancelar</button>
   </div>
 </div>
 
@@ -117,7 +121,7 @@
 <div class="overlay-cambio" id="overlay">
   <div class="box">
     <p>Cambio</p>
-    <h1>$<span id="cambio"></span></h1>
+    <h1>$<span id="cambio">0.00</span></h1>
   </div>
 </div>
 
@@ -127,76 +131,122 @@
 
 <script>
 /* ===============================
-   ===== INIT =====
-   =============================== */
-document.addEventListener("DOMContentLoaded", () => {
-  if (!verificarSesion()) return;
-  if (!requirePermission("sales_do")) return;
-  cargarProductos();
-});
+   ===== DOM =====
+=============================== */
+const grid = document.getElementById("grid");
+const lista = document.getElementById("lista");
+const totalSpan = document.getElementById("total");
+const pagoInput = document.getElementById("pago");
+const overlay = document.getElementById("overlay");
+const cambioSpan = document.getElementById("cambio");
+const btnCobrar = document.getElementById("btnCobrar");
+const btnCancelar = document.getElementById("btnCancelar");
 
 /* ===============================
    ===== ESTADO =====
-   =============================== */
+=============================== */
 let productos = [];
 let carrito = [];
 
 /* ===============================
+   ===== INIT =====
+=============================== */
+window.addEventListener("load", initPOS);
+
+function initPOS() {
+  if (!verificarSesion()) return;
+  if (!requirePermission("sales_do")) return;
+
+  btnCobrar.addEventListener("click", cobrar);
+  btnCancelar.addEventListener("click", cancelar);
+
+  cargarProductos();
+}
+
+/* ===============================
    ===== PRODUCTOS =====
-   =============================== */
+=============================== */
 function cargarProductos() {
   grid.innerHTML = "";
+
   productos = obtenerProductos().filter(
-    p => p && typeof p.nombre === "string" && p.stock > 0
+    p => p && typeof p.nombre === "string" && Number(p.stock) > 0
   );
+
+  if (productos.length === 0) {
+    const p = document.createElement("p");
+    p.textContent = "No hay productos disponibles";
+    grid.appendChild(p);
+    return;
+  }
 
   productos.forEach(p => {
     const d = document.createElement("div");
     d.className = "prod";
-    d.innerHTML = `<b>${p.nombre}</b><span>$${p.precio}</span>`;
-    d.onclick = () => agregar(p.nombre);
+
+    const nombre = document.createElement("b");
+    nombre.textContent = p.nombre;
+
+    const precio = document.createElement("span");
+    precio.textContent = "$" + Number(p.precio).toFixed(2);
+
+    d.append(nombre, precio);
+    d.addEventListener("click", () => agregarProducto(p.nombre));
+
     grid.appendChild(d);
   });
 }
 
 /* ===============================
    ===== CARRITO =====
-   =============================== */
-function agregar(nombre) {
+=============================== */
+function agregarProducto(nombre) {
   carrito.push(nombre);
-  render();
+  renderCarrito();
 }
 
-function render() {
+function renderCarrito() {
   lista.innerHTML = "";
-  let t = 0;
+  let total = 0;
 
   carrito.forEach(n => {
     const p = productos.find(x => x.nombre === n);
     if (!p) return;
-    t += Number(p.precio) || 0;
-    lista.innerHTML += `<li>${n}<span>$${p.precio}</span></li>`;
+
+    total += Number(p.precio) || 0;
+
+    const li = document.createElement("li");
+
+    const spanNombre = document.createElement("span");
+    spanNombre.textContent = n;
+
+    const spanPrecio = document.createElement("span");
+    spanPrecio.textContent = "$" + Number(p.precio).toFixed(2);
+
+    li.append(spanNombre, spanPrecio);
+    lista.appendChild(li);
   });
 
-  total.innerText = t.toFixed(2);
+  totalSpan.textContent = total.toFixed(2);
 }
 
 /* ===============================
    ===== CANCELAR =====
-   =============================== */
+=============================== */
 function cancelar() {
   if (!confirm("¿Cancelar venta?")) return;
+
   carrito = [];
-  pago.value = "";
-  render();
+  pagoInput.value = "";
+  renderCarrito();
 }
 
 /* ===============================
    ===== COBRAR =====
-   =============================== */
+=============================== */
 function cobrar() {
-  const totalVenta = Number(total.innerText);
-  const paga = Number(pago.value);
+  const totalVenta = Number(totalSpan.textContent);
+  const paga = Number(pagoInput.value);
 
   if (carrito.length === 0) {
     alert("Carrito vacío");
@@ -208,14 +258,14 @@ function cobrar() {
     return;
   }
 
-  // descontar stock
+  // Descontar stock
   carrito.forEach(n => {
     const p = productos.find(x => x.nombre === n);
-    if (p) p.stock--;
+    if (p) p.stock = Number(p.stock) - 1;
   });
   guardarProductos(productos);
 
-  // registrar venta
+  // Registrar venta
   const ventas = obtenerVentas();
   ventas.push({
     fecha: hoy(),
@@ -224,8 +274,8 @@ function cobrar() {
   });
   guardarVentas(ventas);
 
-  // mostrar cambio
-  cambio.innerText = (paga - totalVenta).toFixed(2);
+  // Mostrar cambio
+  cambioSpan.textContent = (paga - totalVenta).toFixed(2);
   overlay.style.display = "flex";
 
   setTimeout(() => {
@@ -237,4 +287,3 @@ function cobrar() {
 
 </body>
 </html>
-
