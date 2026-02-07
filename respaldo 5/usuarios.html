@@ -4,13 +4,16 @@
   <meta charset="UTF-8">
   <title>Usuarios</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Supabase (requerido por nfc.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body onload="initUsuarios()">
+<body>
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
     <h2>Gestión de usuarios</h2>
   </div>
   <button onclick="volver()">← Volver</button>
@@ -55,7 +58,7 @@
 </div>
 
 <!-- ================= POPUP NFC ================= -->
-<div class="overlay" id="overlay">
+<div class="overlay" id="overlay" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
     <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
@@ -63,7 +66,7 @@
 </div>
 
 <!-- ================= CONFIRMACION ================= -->
-<div class="confirmacion" id="confirmacion">
+<div class="confirmacion" id="confirmacion" style="display:none">
   <div class="box">
     <h1 id="tituloConfirm"></h1>
     <p id="mensajeConfirm"></p>
@@ -71,29 +74,29 @@
   </div>
 </div>
 
+<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
 
 <script>
-/* ===== CONFIG ===== */
+/* ===============================
+   ===== CONFIG =====
+   =============================== */
 const CLAVE_MAESTRA = "victory(profitness)";
 let tarjetaUID = null;
 let usuarioAEliminar = null;
 let usuarioAReasignar = null;
 
-/* ===== INIT ===== */
-function initUsuarios() {
+/* ===============================
+   ===== INIT =====
+   =============================== */
+document.addEventListener("DOMContentLoaded", () => {
   const params = new URLSearchParams(window.location.search);
   const modoRegistro = params.get("modo") === "registro";
 
-  if (modoRegistro) {
-    buscador.remove();
-    listasUsuarios.remove();
-    return;
-  }
+  if (!verificarSesion()) return;
 
-  verificarSesion();
   const s = obtenerSesion();
   if (!["admin","superadmin"].includes(s.rol)) {
     alert("Acceso no autorizado");
@@ -101,10 +104,17 @@ function initUsuarios() {
     return;
   }
 
-  renderUsuarios();
-}
+  if (modoRegistro) {
+    buscador.remove();
+    listasUsuarios.remove();
+  } else {
+    renderUsuarios();
+  }
+});
 
-/* ===== VOLVER ===== */
+/* ===============================
+   ===== VOLVER =====
+   =============================== */
 function volver() {
   const params = new URLSearchParams(window.location.search);
   location.href = params.get("modo") === "registro"
@@ -126,6 +136,8 @@ function asignarTarjeta() {
 
   iniciarNFCControlado({
     onUID: uid => {
+      if (!uid) return;
+
       if (uidYaRegistrada(uid)) {
         estado.className = "estado rojo";
         estado.innerText = "Tarjeta ya registrada";
@@ -164,7 +176,7 @@ function cerrarPopup() {
 }
 
 /* ===============================
-   ===== REGISTRO =====
+   ===== REGISTRO USUARIO =====
    =============================== */
 function pedirClaveRegistro() {
   if (!tarjetaUID) return alert("Asigne una tarjeta primero");
@@ -215,16 +227,17 @@ function registrarUsuario() {
 }
 
 /* ===============================
-   ===== LISTA =====
+   ===== LISTA USUARIOS =====
    =============================== */
 function renderUsuarios() {
   const q = busqueda.value.toLowerCase();
+
   const empleados = obtenerEmpleados()
     .filter(e =>
       e.nombre.toLowerCase().includes(q) ||
       e.usuario.toLowerCase().includes(q)
     )
-    .sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   listaAdmins.innerHTML = "";
   listaEmpleados.innerHTML = "";
@@ -273,7 +286,7 @@ function iniciarReasignacion(usuario) {
         return;
       }
 
-      let empleados = obtenerEmpleados().map(e => {
+      const empleados = obtenerEmpleados().map(e => {
         if (e.usuario === usuarioAReasignar) {
           e.tarjetaUID = uid;
         }
@@ -306,7 +319,7 @@ function iniciarReasignacion(usuario) {
 }
 
 /* ===============================
-   ===== ELIMINAR =====
+   ===== ELIMINAR USUARIO =====
    =============================== */
 function confirmarEliminar(usuario) {
   usuarioAEliminar = usuario;
@@ -345,7 +358,7 @@ function eliminarUsuario() {
   empleados = empleados.filter(e => e.usuario !== usuarioAEliminar);
   guardarEmpleados(empleados);
 
-  if (eliminado && eliminado.tarjetaUID) {
+  if (eliminado?.tarjetaUID) {
     liberarTarjeta(eliminado.tarjetaUID);
   }
 
@@ -362,10 +375,10 @@ function eliminarUsuario() {
    ===== CONFIRM =====
    =============================== */
 function mostrarConfirm(t, m, a) {
-  confirmacion.style.display = "flex";
   tituloConfirm.innerText = t;
   mensajeConfirm.innerText = m;
   accionesConfirm.innerHTML = a;
+  confirmacion.style.display = "flex";
 }
 
 function cerrarConfirm() {
@@ -375,3 +388,4 @@ function cerrarConfirm() {
 
 </body>
 </html>
+
