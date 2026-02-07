@@ -1,159 +1,170 @@
 /* ===============================
-   ===== STORAGE BASE GYM (FINAL) =====
+   ===== STORAGE BASE GYM (OFFLINE-FIRST) =====
 =============================== */
+
+/* ======================================================
+   ===== UTIL BASE =====
+====================================================== */
+function safeGet(key, def = []) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) ?? def;
+  } catch {
+    return def;
+  }
+}
+
+function safeSet(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+/* ======================================================
+   ===== COLA OFFLINE (🔥 CLAVE) =====
+====================================================== */
+function obtenerColaOffline() {
+  return safeGet("offline_queue", []);
+}
+
+function guardarColaOffline(lista) {
+  safeSet("offline_queue", lista);
+}
+
+function agregarACola(tipo, payload) {
+  const cola = obtenerColaOffline();
+  cola.push({
+    tipo,
+    payload,
+    ts: Date.now()
+  });
+  guardarColaOffline(cola);
+}
+
+/* ======================================================
+   ===== SINCRONIZACIÓN =====
+====================================================== */
+async function syncOfflineQueue() {
+  if (!navigator.onLine) return;
+
+  const cola = obtenerColaOffline();
+  if (cola.length === 0) return;
+
+  console.log("🔄 Sincronizando offline queue:", cola.length);
+
+  // ⚠️ aquí NO hacemos POST directo
+  // Supabase se entera por los flujos normales (ESP / UI)
+  // Esto es para futuras extensiones
+
+  guardarColaOffline([]);
+}
+
+window.addEventListener("online", syncOfflineQueue);
 
 /* ======================================================
    ===== EMPLEADOS =====
 ====================================================== */
 function obtenerEmpleados() {
-  try {
-    return JSON.parse(localStorage.getItem("empleados")) || [];
-  } catch {
-    return [];
-  }
+  return safeGet("empleados", []);
 }
 
 function guardarEmpleados(lista) {
-  localStorage.setItem("empleados", JSON.stringify(lista || []));
+  safeSet("empleados", lista || []);
 }
 
 /* ======================================================
    ===== CLIENTES =====
 ====================================================== */
 function obtenerClientes() {
-  try {
-    return JSON.parse(localStorage.getItem("clientes")) || [];
-  } catch {
-    return [];
-  }
+  return safeGet("clientes", []);
 }
 
 function guardarClientes(lista) {
-  localStorage.setItem("clientes", JSON.stringify(lista || []));
+  safeSet("clientes", lista || []);
+  agregarACola("clientes", lista);
 }
 
 /* ======================================================
    ===== ASISTENCIAS =====
 ====================================================== */
 function obtenerAsistencias() {
-  try {
-    return JSON.parse(localStorage.getItem("asistencias")) || [];
-  } catch {
-    return [];
-  }
+  return safeGet("asistencias", []);
 }
 
 function guardarAsistencias(lista) {
-  localStorage.setItem("asistencias", JSON.stringify(lista || []));
+  safeSet("asistencias", lista || []);
+  agregarACola("asistencias", lista);
 }
 
 /* ======================================================
    ===== PRODUCTOS =====
 ====================================================== */
 function obtenerProductos() {
-  try {
-    return JSON.parse(localStorage.getItem("productos")) || [];
-  } catch {
-    return [];
-  }
+  return safeGet("productos", []);
 }
 
 function guardarProductos(lista) {
-  localStorage.setItem("productos", JSON.stringify(lista || []));
+  safeSet("productos", lista || []);
+  agregarACola("productos", lista);
 }
 
 /* ======================================================
    ===== VENTAS =====
 ====================================================== */
 function obtenerVentas() {
-  try {
-    return JSON.parse(localStorage.getItem("ventas")) || [];
-  } catch {
-    return [];
-  }
+  return safeGet("ventas", []);
 }
 
 function guardarVentas(lista) {
-  localStorage.setItem("ventas", JSON.stringify(lista || []));
+  safeSet("ventas", lista || []);
+  agregarACola("ventas", lista);
 }
 
 /* ======================================================
    ===== TARJETAS / PERSONAS =====
 ====================================================== */
-
-/*
-  Devuelve el empleado ACTIVO asociado a una tarjeta
-*/
 function buscarEmpleadoPorTarjeta(uid) {
   if (!uid) return null;
-
-  return (
-    obtenerEmpleados().find(
-      e => typeof e.tarjetaUID === "string" && e.tarjetaUID === uid
-    ) || null
-  );
+  return obtenerEmpleados().find(
+    e => typeof e.tarjetaUID === "string" && e.tarjetaUID === uid
+  ) || null;
 }
 
-/*
-  Devuelve el cliente asociado a una tarjeta
-*/
 function buscarClientePorTarjeta(uid) {
   if (!uid) return null;
-
-  return (
-    obtenerClientes().find(
-      c => typeof c.tarjetaUID === "string" && c.tarjetaUID === uid
-    ) || null
-  );
+  return obtenerClientes().find(
+    c => typeof c.tarjetaUID === "string" && c.tarjetaUID === uid
+  ) || null;
 }
 
-/*
-  Devuelve información completa de la tarjeta
-*/
 function obtenerInfoTarjeta(uid) {
   const emp = buscarEmpleadoPorTarjeta(uid);
-  if (emp) {
-    return { tipo: "empleado", persona: emp };
-  }
+  if (emp) return { tipo: "empleado", persona: emp };
 
   const cli = buscarClientePorTarjeta(uid);
-  if (cli) {
-    return { tipo: "cliente", persona: cli };
-  }
+  if (cli) return { tipo: "cliente", persona: cli };
 
   return { tipo: null, persona: null };
 }
 
-/*
-  Indica si la tarjeta está asignada actualmente
-*/
 function uidYaRegistrada(uid) {
   if (!uid) return false;
   return obtenerInfoTarjeta(uid).tipo !== null;
 }
 
-/*
-  Libera una tarjeta (empleado o cliente eliminado)
-*/
 function liberarTarjeta(uid) {
   if (!uid) return;
 
-  const empleados = obtenerEmpleados().map(e => {
-    if (e.tarjetaUID === uid) {
-      e.tarjetaUID = null;
-    }
-    return e;
-  });
+  guardarEmpleados(
+    obtenerEmpleados().map(e => {
+      if (e.tarjetaUID === uid) e.tarjetaUID = null;
+      return e;
+    })
+  );
 
-  const clientes = obtenerClientes().map(c => {
-    if (c.tarjetaUID === uid) {
-      c.tarjetaUID = null;
-    }
-    return c;
-  });
-
-  guardarEmpleados(empleados);
-  guardarClientes(clientes);
+  guardarClientes(
+    obtenerClientes().map(c => {
+      if (c.tarjetaUID === uid) c.tarjetaUID = null;
+      return c;
+    })
+  );
 }
 
 /* ======================================================
@@ -168,4 +179,3 @@ function horaActual() {
     hour12: false
   });
 }
-
