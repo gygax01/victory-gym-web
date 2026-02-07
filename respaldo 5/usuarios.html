@@ -41,20 +41,27 @@
 </div>
 
 <!-- ===== NFC ===== -->
-<div class="overlay" id="overlay" style="display:none">
+<div class="overlay" id="overlayNFC" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
     <div id="estadoNFC" class="estado amarillo">Esperando tarjeta…</div>
   </div>
 </div>
 
-<!-- ===== CONFIRM / MENSAJES ===== -->
-<div class="confirmacion" id="confirmacion" style="display:none">
-  <div class="box">
-    <h1 id="tituloConfirm"></h1>
-    <p id="mensajeConfirm"></p>
-    <input id="claveInput" type="password" placeholder="Contraseña maestra" style="display:none">
-    <button id="btnConfirmar">Confirmar</button>
+<!-- ===== CONFIRM CLAVE ===== -->
+<div class="overlay" id="overlayClave" style="display:none">
+  <div class="popup">
+    <h2>Acceso administrativo</h2>
+    <input id="claveInput" type="password" placeholder="Contraseña maestra">
+    <button id="btnConfirmarClave">Confirmar</button>
+  </div>
+</div>
+
+<!-- ===== CONFIRM ÉXITO ===== -->
+<div class="overlay" id="overlayExito" style="display:none">
+  <div class="popup">
+    <h2>Registro completado</h2>
+    <div class="estado verde">Usuario registrado correctamente</div>
   </div>
 </div>
 
@@ -65,7 +72,6 @@
 <script>
 /* ================= CONFIG ================= */
 const CLAVE_MAESTRA = "victory(profitness)";
-const modoRegistro = new URLSearchParams(location.search).get("modo") === "registro";
 
 /* ================= DOM ================= */
 const inputNombre = document.getElementById("inputNombre");
@@ -78,14 +84,13 @@ const btnRegistrar = document.getElementById("btnRegistrar");
 const btnVolver = document.getElementById("btnVolver");
 
 const uidTexto = document.getElementById("uidTexto");
-const overlay = document.getElementById("overlay");
-const estadoNFC = document.getElementById("estadoNFC");
 
-const confirmacion = document.getElementById("confirmacion");
-const tituloConfirm = document.getElementById("tituloConfirm");
-const mensajeConfirm = document.getElementById("mensajeConfirm");
-const claveInput = document.getElementById("claveInput");
-const btnConfirmar = document.getElementById("btnConfirmar");
+const overlayNFC = document.getElementById("overlayNFC");
+const overlayClave = document.getElementById("overlayClave");
+const overlayExito = document.getElementById("overlayExito");
+
+const estadoNFC = document.getElementById("estadoNFC");
+const btnConfirmarClave = document.getElementById("btnConfirmarClave");
 
 /* ================= ESTADO ================= */
 let tarjetaUID = null;
@@ -93,12 +98,9 @@ let leyendoNFC = false;
 
 /* ================= INIT ================= */
 window.addEventListener("load", () => {
-  btnVolver.onclick = () => {
-    location.href = modoRegistro ? "login.html" : "index.html";
-  };
-
+  btnVolver.onclick = () => location.href = "login.html";
   btnAsignarTarjeta.onclick = asignarTarjeta;
-  btnRegistrar.onclick = pedirClave;
+  btnRegistrar.onclick = () => overlayClave.style.display = "flex";
 });
 
 /* ================= NFC ================= */
@@ -109,12 +111,14 @@ function asignarTarjeta() {
   tarjetaUID = null;
   btnRegistrar.disabled = true;
 
-  overlay.style.display = "flex";
+  overlayNFC.style.display = "flex";
+  estadoNFC.className = "estado amarillo";
   estadoNFC.textContent = "Esperando tarjeta…";
 
   iniciarNFCControlado({
     onUID: uid => {
       if (uidYaRegistrada(uid)) {
+        estadoNFC.className = "estado rojo";
         estadoNFC.textContent = "Tarjeta ya registrada";
         setTimeout(cerrarNFC, 1500);
         return;
@@ -122,12 +126,13 @@ function asignarTarjeta() {
 
       tarjetaUID = uid;
       uidTexto.textContent = "UID: " + uid;
+      estadoNFC.className = "estado verde";
       estadoNFC.textContent = "Tarjeta asignada";
 
       setTimeout(() => {
         cerrarNFC();
         btnRegistrar.disabled = false;
-      }, 1000);
+      }, 1200);
     }
   });
 }
@@ -135,33 +140,19 @@ function asignarTarjeta() {
 function cerrarNFC() {
   detenerNFC();
   leyendoNFC = false;
-  overlay.style.display = "none";
+  overlayNFC.style.display = "none";
 }
 
 /* ================= REGISTRO ================= */
-function pedirClave() {
-  tituloConfirm.textContent = "Acceso administrativo";
-  mensajeConfirm.textContent = "Ingrese la contraseña maestra";
-  claveInput.style.display = "block";
-  claveInput.value = "";
-  confirmacion.style.display = "flex";
+btnConfirmarClave.onclick = () => {
+  if (claveInput.value !== CLAVE_MAESTRA) return;
 
-  btnConfirmar.onclick = validarClave;
-}
-
-function validarClave() {
-  if (claveInput.value !== CLAVE_MAESTRA) {
-    mensajeConfirm.textContent = "Contraseña incorrecta";
-    return;
-  }
+  overlayClave.style.display = "none";
   registrarUsuario();
-}
+};
 
 function registrarUsuario() {
-  if (!inputNombre.value || !inputUsuario.value || !inputPassword.value || !tarjetaUID) {
-    mensajeConfirm.textContent = "Datos incompletos";
-    return;
-  }
+  if (!inputNombre.value || !inputUsuario.value || !inputPassword.value || !tarjetaUID) return;
 
   const empleados = obtenerEmpleados();
   empleados.push({
@@ -174,15 +165,11 @@ function registrarUsuario() {
 
   guardarEmpleados(empleados);
 
-  // ✅ MENSAJE BONITO (NO ALERT)
-  claveInput.style.display = "none";
-  tituloConfirm.textContent = "Registro completado";
-  mensajeConfirm.textContent = "Usuario registrado correctamente";
-  btnConfirmar.style.display = "none";
+  overlayExito.style.display = "flex";
 
   setTimeout(() => {
     location.href = "login.html";
-  }, 1800);
+  }, 2000);
 }
 </script>
 
