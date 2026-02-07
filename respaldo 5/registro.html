@@ -4,9 +4,12 @@
   <meta charset="UTF-8">
   <title>Registro de Cliente</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Supabase (requerido por nfc.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body onload="verificarSesion()">
+<body>
 
 <header class="header-brand">
   <div class="brand">
@@ -59,7 +62,7 @@
 </div>
 
 <!-- ================= POPUP NFC ================= -->
-<div class="overlay" id="overlay">
+<div class="overlay" id="overlay" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
     <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
@@ -68,23 +71,37 @@
 </div>
 
 <!-- ================= CONFIRMACION ================= -->
-<div class="confirmacion" id="confirmacion">
+<div class="confirmacion" id="confirmacion" style="display:none">
   <div class="box">
     <h1 id="tituloConfirm"></h1>
     <p id="mensajeConfirm"></p>
   </div>
 </div>
 
+<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
 
 <script>
+/* ===============================
+   ===== INIT =====
+   =============================== */
+document.addEventListener("DOMContentLoaded", () => {
+  if (!verificarSesion()) return;
+  if (!requirePermission("clients_create")) return;
+});
+
+/* ===============================
+   ===== ESTADO =====
+   =============================== */
 let tarjetaUID = null;
 let diasMembresia = 0;
 let leyendoNFC = false;
 
-/* ===== MEMBRESÍA ===== */
+/* ===============================
+   ===== MEMBRESÍA =====
+   =============================== */
 function setDias(d) {
   diasMembresia = d;
   const expira = new Date();
@@ -110,6 +127,8 @@ function abrirPopup() {
 
   iniciarNFCControlado({
     onUID: uid => {
+      if (!uid) return;
+
       if (uidYaRegistrada(uid)) {
         estado.className = "estado rojo";
         estado.innerText = "Tarjeta ya registrada";
@@ -180,10 +199,11 @@ function registrarCliente() {
 
   clientes.push({
     nombre: nombre.value.trim(),
-    peso: peso.value,
-    altura: altura.value,
-    telefono: telefono.value,
+    peso: peso.value || null,
+    altura: altura.value || null,
+    telefono: telefono.value.trim(),
     tarjetaUID,
+    fechaRegistro: hoy(),
     membresiaExpira: expira.toISOString().split("T")[0]
   });
 
@@ -199,13 +219,16 @@ function registrarCliente() {
   }, 2000);
 }
 
-/* ===== CONFIRM ===== */
+/* ===============================
+   ===== CONFIRM =====
+   =============================== */
 function mostrarConfirm(t, m) {
-  confirmacion.style.display = "flex";
   tituloConfirm.innerText = t;
   mensajeConfirm.innerText = m;
+  confirmacion.style.display = "flex";
 }
 </script>
 
 </body>
 </html>
+
