@@ -2,43 +2,30 @@
    ===== NFC VIA SUPABASE =====
 =============================== */
 
-/* ===============================
-   ===== SUPABASE CONFIG =====
-=============================== */
+/* ===== SUPABASE CONFIG ===== */
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_uV1OQab8AfWE3SzNkuleQw_W0xgyfER";
 
-/* ===============================
-   ===== CLIENT =====
-=============================== */
+/* ===== CLIENT ===== */
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
 );
 
-/* ===============================
-   ===== ESTADO =====
-=============================== */
+/* ===== ESTADO ===== */
 let canalNFC = null;
 let escuchando = false;
 
-// anti-rebote
-let ultimoUID = null;
+/* ===== ANTI-REBOTE GLOBAL ===== */
 let ultimoTiempo = 0;
-
-/* ===============================
-   ===== CONFIG =====
-=============================== */
-const COOLDOWN_MS = 800; // solo anti-rebote real
+const COOLDOWN_MS = 1200; // 1.2s realista para NFC
 
 /* =========================================================
-   ===== INICIAR LECTURA NFC (CONTINUA) =====
+   ===== INICIAR LECTURA NFC (CONTINUA REAL) =====
 ========================================================= */
 function iniciarNFCControlado({ onUID } = {}) {
   detenerNFC();
-
   escuchando = true;
-  ultimoUID = null;
   ultimoTiempo = 0;
 
   canalNFC = supabaseClient
@@ -58,28 +45,24 @@ function iniciarNFCControlado({ onUID } = {}) {
 
         const ahora = Date.now();
 
-        // 🔒 anti-rebote (NO bloqueo)
-        if (uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) {
-          return;
-        }
+        // 🔒 anti-rebote SOLO POR TIEMPO
+        if (ahora - ultimoTiempo < COOLDOWN_MS) return;
 
-        ultimoUID = uid;
         ultimoTiempo = ahora;
 
         if (typeof onUID === "function") {
           onUID(uid);
-
-          // liberar UID después del rebote
-          setTimeout(() => {
-            ultimoUID = null;
-            ultimoTiempo = 0;
-          }, COOLDOWN_MS);
         }
       }
     )
     .subscribe(status => {
-      if (status === "SUBSCRIBED") {
-        console.log("🔵 NFC escuchando (modo continuo)");
+      console.log("NFC status:", status);
+
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.warn("♻️ Reconectando NFC...");
+        setTimeout(() => {
+          if (escuchando) iniciarNFCControlado({ onUID });
+        }, 1500);
       }
     });
 }
@@ -93,6 +76,5 @@ function detenerNFC() {
     canalNFC = null;
   }
   escuchando = false;
-  ultimoUID = null;
   ultimoTiempo = 0;
 }
