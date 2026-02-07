@@ -157,20 +157,9 @@ function iniciarLecturaNFCIndex() {
   estadoLector.textContent = "Lector activo";
 
   iniciarNFCControlado({
-    onUID: uid => {
-      console.log("UID recibido:", uid);
-      procesarTarjeta(uid);
-    },
-    onTimeout: () => {
-      estadoLector.className = "lector off";
-      estadoLector.textContent = "Lector inactivo";
-      iniciarLecturaNFCIndex();
-    },
-    onError: () => {
-      estadoLector.className = "lector off";
-      estadoLector.textContent = "Error lector";
-      setTimeout(iniciarLecturaNFCIndex, 2000);
-    }
+    onUID: uid => procesarTarjeta(uid),
+    onTimeout: () => iniciarLecturaNFCIndex(),
+    onError: () => setTimeout(iniciarLecturaNFCIndex, 2000)
   });
 }
 
@@ -189,7 +178,7 @@ function mostrarConfirmacion(tipo, titulo, mensaje) {
 }
 
 /* ===============================
-   ===== ENTRADA / SALIDA =====
+   ===== ENTRADA / SALIDA (FIX FINAL) =====
 =============================== */
 function procesarTarjeta(uid) {
   if (buscarEmpleadoPorTarjeta(uid)) {
@@ -208,13 +197,15 @@ function procesarTarjeta(uid) {
   const hoyFecha = hoy();
   const asistencias = obtenerAsistencias();
 
-  const abierta = asistencias.find(a =>
-    a.tarjetaUID === uid &&
-    a.fecha === hoyFecha &&
-    a.salida === null
-  );
+  // 🔥 todas las asistencias del cliente hoy
+  const delDia = asistencias
+    .filter(a => a.tarjetaUID === uid && a.fecha === hoyFecha)
+    .sort((a, b) => a.entrada.localeCompare(b.entrada));
 
-  if (!abierta) {
+  const ultima = delDia[delDia.length - 1] || null;
+
+  if (!ultima || ultima.salida !== null) {
+    // NUEVA ENTRADA
     asistencias.push({
       tarjetaUID: uid,
       nombre: cliente.nombre,
@@ -222,10 +213,13 @@ function procesarTarjeta(uid) {
       salida: null,
       fecha: hoyFecha
     });
+
     mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
     playCorrecto();
   } else {
-    abierta.salida = horaActual();
+    // SALIDA
+    ultima.salida = horaActual();
+
     mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
     playCorrecto();
   }
