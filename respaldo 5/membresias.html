@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Membresías</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body onload="verificarSesion(); cargarClientes(); applyPermissions();">
+
+<header class="header-brand">
+  <div class="brand">
+    <img src="img/logo.png">
+    <h2>Membresías</h2>
+  </div>
+  <button onclick="location.href='index.html'">← Inicio</button>
+</header>
+
+<div class="historial-container" id="listaMembresias"></div>
+
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+
+<script>
+function cargarClientes(){
+  const clientes=obtenerClientes();
+  listaMembresias.innerHTML="";
+  clientes.forEach((c,i)=>{
+    const d=document.createElement("div");
+    d.className="cliente";
+    d.innerHTML=`
+      <h3>${c.nombre}</h3>
+      <p>Expira: ${c.membresiaExpira}</p>
+      <button data-permission="memberships_extend" onclick="sumar(${i},7)">+7</button>
+      <button data-permission="memberships_extend" onclick="sumar(${i},30)">+30</button>
+    `;
+    listaMembresias.appendChild(d);
+  });
+  applyPermissions();
+}
+
+function sumar(i,dias){
+  if(!can("memberships_extend")) return;
+  const clientes=obtenerClientes();
+  const base=new Date(clientes[i].membresiaExpira||hoy());
+  base.setDate(base.getDate()+dias);
+  clientes[i].membresiaExpira=base.toISOString().split("T")[0];
+  guardarClientes(clientes);
+  cargarClientes();
+}
+</script>
+
+</body>
+</html>

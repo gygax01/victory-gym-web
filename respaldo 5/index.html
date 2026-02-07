@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Inicio - Gym</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body onload="initIndex()">
+
+<!-- ===== HEADER BRANDING ===== -->
+<header class="header-brand">
+  <div class="brand">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
+    <h2>Asistencias del día</h2>
+  </div>
+
+  <div class="estado-sistema">
+    <span id="contadorAforo" class="contador">
+      Dentro: <strong>0</strong>
+    </span>
+
+    <span id="estadoLector" class="lector off">
+      Lector desconectado
+    </span>
+
+    <button onclick="logout()">Salir</button>
+  </div>
+</header>
+
+<!-- ===== PANEL DE ACCIONES ===== -->
+<div class="panel-acciones">
+  <button class="destacado" onclick="location.href='registro.html'">Registro</button>
+  <button onclick="location.href='pos.html'">Ventas</button>
+  <button onclick="location.href='stock.html'">Stock</button>
+  <button onclick="location.href='membresias.html'">Membresías</button>
+  <button onclick="location.href='clientes.html'">Clientes</button>
+  <button onclick="location.href='historial.html'">Historial</button>
+
+  <!-- SOLO ADMIN / SUPERADMIN -->
+  <button id="btnUsuarios" style="display:none"
+          onclick="location.href='usuarios.html'">
+    Usuarios
+  </button>
+</div>
+
+<!-- ===== TABLA ASISTENCIAS ===== -->
+<div id="contenedorTabla" style="max-height:70vh; overflow-y:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Cliente</th>
+        <th>Entrada</th>
+        <th>Salida</th>
+      </tr>
+    </thead>
+    <tbody id="tabla-asistencias"></tbody>
+  </table>
+</div>
+
+<!-- ===== CONFIRMACIÓN ===== -->
+<div class="confirmacion" id="confirmacion">
+  <div class="box">
+    <h1 id="tituloConfirmacion"></h1>
+    <p id="mensajeConfirmacion"></p>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/asistencias.js"></script>
+
+<script>
+/* ================= INIT ================= */
+function initIndex() {
+  // 🔒 1. Verificar sesión
+  if (!verificarSesion()) return;
+
+  // 🔒 2. Aplicar rol
+  aplicarRolIndex();
+
+  // 🔄 3. Inicializar sistema
+  iniciarHeartbeat();
+  iniciarLectura();
+  cargarAsistencias();
+  actualizarContador();
+}
+
+/* ================= CONFIG ================= */
+const ESP32_URL = "http://192.168.1.2/nfc";
+const COOLDOWN_MS = 5000;
+
+let bloqueado = false;
+let lectorConectado = false;
+let heartbeatInterval = null;
+let lecturaInterval = null;
+const ultimoUsoTarjeta = {};
+
+/* ================= CONTROL DE ROL ================= */
+function aplicarRolIndex() {
+  const s = obtenerSesion();
+  if (!s) return;
+
+  if (s.rol === "admin" || s.rol === "superadmin") {
+    btnUsuarios.style.display = "inline-block";
+  }
+}
+
+/* ================= SONIDOS ================= */
+const sonidoCorrecto = new Audio("sounds/correct.mp3");
+const sonidoError = new Audio("sounds/error.mp3");
+
+document.addEventListener("click", () => {
+  sonidoCorrecto.play().then(() => {
+    sonidoCorrecto.pause();
+    sonidoCorrecto.currentTime = 0;
+  }).catch(()=>{});
+}, { once:true });
+
+function playCorrecto() {
+  sonidoCorrecto.currentTime = 0;
+  sonidoCorrecto.play();
+}
+
+function playError() {
+  sonidoError.currentTime = 0;
+  sonidoError.play();
+}
+
+/* ================= AUTO SCROLL ================= */
+function autoScrollTabla() {
+  const cont = document.getElementById("contenedorTabla");
+  cont.scrollTo({ top: cont.scrollHeight, behavior: "smooth" });
+}
+
+/* ================= HEARTBEAT ================= */
+function iniciarHeartbeat() {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+  heartbeatInterval = setInterval(async () => {
+    try {
+      const res = await fetch(ESP32_URL, { cache: "no-store" });
+      setLectorEstado(res.ok);
+    } catch {
+      setLectorEstado(false);
+    }
+  }, 1500);
+}
+
+function setLectorEstado(conectado) {
+  if (conectado === lectorConectado) return;
+
+  lectorConectado = conectado;
+  estadoLector.className = "lector " + (conectado ? "on" : "off");
+  estadoLector.innerText = conectado
+    ? "Lector conectado"
+    : "Lector desconectado";
+
+  if (!conectado) playError();
+}
+
+/* ================= LECTURA NFC ================= */
+function iniciarLectura() {
+  if (lecturaInterval) clearInterval(lecturaInterval);
+
+  lecturaInterval = setInterval(async () => {
+    if (bloqueado || !lectorConectado) return;
+
+    try {
+      const res = await fetch(ESP32_URL, { cache: "no-store" });
+      const data = await res.json();
+
+      if (!data || data.status !== "ok" || !data.uid) return;
+
+      const ahora = Date.now();
+      if (ahora - (ultimoUsoTarjeta[data.uid] || 0) < COOLDOWN_MS) return;
+
+      ultimoUsoTarjeta[data.uid] = ahora;
+      bloqueado = true;
+      procesarTarjeta(data.uid);
+    } catch {}
+  }, 600);
+}
+
+/* ================= CONFIRMACIÓN ================= */
+function mostrarConfirmacion(tipo, titulo, mensaje) {
+  confirmacion.className = "confirmacion " + tipo;
+  tituloConfirmacion.innerText = titulo;
+  mensajeConfirmacion.innerText = mensaje;
+  confirmacion.style.display = "flex";
+
+  setTimeout(() => {
+    confirmacion.style.display = "none";
+    bloqueado = false;
+  }, 2200);
+}
+
+/* ================= ENTRADA / SALIDA ================= */
+function procesarTarjeta(uid) {
+  try {
+    if (buscarEmpleadoPorTarjeta(uid)) {
+      mostrarConfirmacion("error","Tarjeta de personal","Use el login");
+      playError();
+      return;
+    }
+
+    const clientes = obtenerClientes();
+    const cliente = clientes.find(c => c.tarjetaUID === uid);
+
+    if (!cliente) {
+      mostrarConfirmacion("error","Tarjeta no registrada","Consulte recepción");
+      playError();
+      return;
+    }
+
+    const hoyFecha = hoy();
+    const asistencias = obtenerAsistencias();
+    const abierta = asistencias.find(a =>
+      a.tarjetaUID === uid &&
+      a.fecha === hoyFecha &&
+      a.salida === null
+    );
+
+    if (!abierta) {
+      asistencias.push({
+        tarjetaUID: uid,
+        nombre: cliente.nombre,
+        entrada: horaActual(),
+        salida: null,
+        fecha: hoyFecha
+      });
+      mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
+      playCorrecto();
+    } else {
+      abierta.salida = horaActual();
+      mostrarConfirmacion("salida","Hasta luego",cliente.nombre);
+      playCorrecto();
+    }
+
+    guardarAsistencias(asistencias);
+    cargarAsistencias();
+    actualizarContador();
+    autoScrollTabla();
+
+  } finally {
+    setTimeout(() => bloqueado = false, 2500);
+  }
+}
+</script>
+
+</body>
+</html>

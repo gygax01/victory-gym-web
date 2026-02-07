@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Victory Pro Fitness</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body class="centered login-bg">
+
+<div class="card login-card">
+  <div class="login-logo">
+    <img src="img/logo.png">
+  </div>
+
+  <input id="user" placeholder="Usuario">
+  <input id="pass" type="password" placeholder="Contraseña">
+
+  <button class="btn-login" onclick="loginManual()">Ingresar</button>
+
+  <hr>
+
+  <button class="nfc btn-nfc" id="btnNFC" onclick="loginConTarjeta()">
+    Ingresar con tarjeta
+  </button>
+
+  <button class="btn-sec"
+          onclick="location.href='usuarios.html?modo=registro'">
+    Registrar usuario
+  </button>
+
+  <p class="small muted">Acceso exclusivo para personal autorizado</p>
+</div>
+
+<!-- ===== POPUP NFC ===== -->
+<div class="overlay" id="overlay">
+  <div class="popup">
+    <h2>Acerque la tarjeta</h2>
+    <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nfc.js"></script>
+
+<script>
+/* ===== CREAR SUPERADMIN SI NO EXISTE ===== */
+(function crearSuperAdminSiNoExiste(){
+  const emps = obtenerEmpleados();
+  if (emps.some(e => e.rol === "superadmin")) return;
+
+  emps.push({
+    nombre: "Sistema",
+    usuario: "gygax",
+    password: "admin(1234)",
+    rol: "superadmin",
+    hidden: true,
+    protected: true
+  });
+
+  guardarEmpleados(emps);
+})();
+
+let leyendoNFC = false;
+
+/* ===============================
+   ===== LOGIN MANUAL =====
+   =============================== */
+function loginManual() {
+  if (leyendoNFC) return;
+  login(user.value.trim(), pass.value, 2200);
+}
+
+/* ===============================
+   ===== LOGIN CON TARJETA =====
+   =============================== */
+function loginConTarjeta() {
+  if (leyendoNFC) return;
+
+  leyendoNFC = true;
+  btnNFC.disabled = true;
+
+  overlay.style.display = "flex";
+  estado.className = "estado amarillo";
+  estado.innerText = "Esperando tarjeta…";
+
+  iniciarNFCControlado({
+    onUID: uid => {
+      const emp = obtenerEmpleados().find(e => e.tarjetaUID === uid);
+
+      if (!emp) {
+        estado.className = "estado rojo";
+        estado.innerText = "Tarjeta no registrada";
+        setTimeout(resetNFC, 1500);
+        return;
+      }
+
+      estado.className = "estado verde";
+      estado.innerText = "Acceso correcto";
+
+      setTimeout(() => {
+        resetNFC();
+        login(emp.usuario, emp.password, 0);
+      }, 800);
+    },
+
+    onTimeout: () => {
+      estado.className = "estado rojo";
+      estado.innerText = "Tiempo de lectura agotado";
+      setTimeout(resetNFC, 1500);
+    },
+
+    onError: () => {
+      estado.className = "estado rojo";
+      estado.innerText = "Error de lectura";
+      setTimeout(resetNFC, 1500);
+    }
+  });
+}
+
+function resetNFC() {
+  detenerNFC();
+  leyendoNFC = false;
+  btnNFC.disabled = false;
+  overlay.style.display = "none";
+}
+</script>
+
+</body>
+</html>

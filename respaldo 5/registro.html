@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Registro de Cliente</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body onload="verificarSesion()">
+
+<header class="header-brand">
+  <div class="brand">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
+    <h2>Registro de Cliente</h2>
+  </div>
+
+  <button class="btn-volver" onclick="location.href='index.html'">
+    ← Inicio
+  </button>
+</header>
+
+<!-- ================= REGISTRO ================= -->
+<div class="card registro-pc">
+
+  <!-- COLUMNA IZQUIERDA -->
+  <div class="registro-col">
+    <h3>Datos del cliente</h3>
+
+    <input id="nombre" placeholder="Nombre completo">
+    <input id="peso" type="number" step="0.1" placeholder="Peso (kg)">
+    <input id="altura" type="number" step="0.01" placeholder="Altura (m)">
+    <input id="telefono" type="tel" placeholder="Teléfono">
+  </div>
+
+  <!-- COLUMNA DERECHA -->
+  <div class="registro-col">
+    <h3>Membresía</h3>
+
+    <div class="membresias-grid">
+      <button onclick="setDias(7)">7 días</button>
+      <button onclick="setDias(15)">15 días</button>
+      <button onclick="setDias(30)">1 mes</button>
+      <button onclick="setDias(90)">3 meses</button>
+    </div>
+
+    <p id="expiraTexto"></p>
+
+    <div class="registro-acciones">
+      <button class="nfc" id="btnAsignar" onclick="abrirPopup()">
+        Asignar tarjeta
+      </button>
+
+      <button id="finalizar" onclick="registrarCliente()" disabled>
+        Registrar cliente
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ================= POPUP NFC ================= -->
+<div class="overlay" id="overlay">
+  <div class="popup">
+    <h2>Acerque la tarjeta</h2>
+    <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
+    <div id="uidTexto" class="uid"></div>
+  </div>
+</div>
+
+<!-- ================= CONFIRMACION ================= -->
+<div class="confirmacion" id="confirmacion">
+  <div class="box">
+    <h1 id="tituloConfirm"></h1>
+    <p id="mensajeConfirm"></p>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nfc.js"></script>
+
+<script>
+let tarjetaUID = null;
+let diasMembresia = 0;
+let leyendoNFC = false;
+
+/* ===== MEMBRESÍA ===== */
+function setDias(d) {
+  diasMembresia = d;
+  const expira = new Date();
+  expira.setDate(expira.getDate() + d);
+  expiraTexto.innerText =
+    "Expira el: " + expira.toLocaleDateString();
+}
+
+/* ===============================
+   ===== NFC ASIGNACIÓN =====
+   =============================== */
+function abrirPopup() {
+  if (leyendoNFC) return;
+
+  tarjetaUID = null;
+  leyendoNFC = true;
+  finalizar.disabled = true;
+
+  overlay.style.display = "flex";
+  estado.className = "estado amarillo";
+  estado.innerText = "Esperando tarjeta…";
+  uidTexto.innerText = "";
+
+  iniciarNFCControlado({
+    onUID: uid => {
+      if (uidYaRegistrada(uid)) {
+        estado.className = "estado rojo";
+        estado.innerText = "Tarjeta ya registrada";
+        uidTexto.innerText = "UID: " + uid;
+        setTimeout(cerrarPopup, 1500);
+        return;
+      }
+
+      tarjetaUID = uid;
+      estado.className = "estado verde";
+      estado.innerText = "Tarjeta asignada";
+      uidTexto.innerText = "UID: " + uid;
+
+      setTimeout(() => {
+        cerrarPopup();
+        finalizar.disabled = false;
+      }, 1200);
+    },
+
+    onTimeout: () => {
+      estado.className = "estado rojo";
+      estado.innerText = "Tiempo de lectura agotado";
+      setTimeout(cerrarPopup, 1500);
+    },
+
+    onError: () => {
+      estado.className = "estado rojo";
+      estado.innerText = "Error de lectura";
+      setTimeout(cerrarPopup, 1500);
+    }
+  });
+}
+
+function cerrarPopup() {
+  overlay.style.display = "none";
+  detenerNFC();
+  leyendoNFC = false;
+}
+
+/* ===============================
+   ===== REGISTRO CLIENTE =====
+   =============================== */
+function registrarCliente() {
+  if (
+    !nombre.value.trim() ||
+    !telefono.value.trim() ||
+    !tarjetaUID ||
+    diasMembresia === 0
+  ) {
+    mostrarConfirm(
+      "Datos incompletos",
+      "Complete todos los campos antes de continuar"
+    );
+    return;
+  }
+
+  if (uidYaRegistrada(tarjetaUID)) {
+    mostrarConfirm(
+      "Tarjeta inválida",
+      "La tarjeta ya está registrada"
+    );
+    return;
+  }
+
+  const clientes = obtenerClientes();
+  const expira = new Date();
+  expira.setDate(expira.getDate() + diasMembresia);
+
+  clientes.push({
+    nombre: nombre.value.trim(),
+    peso: peso.value,
+    altura: altura.value,
+    telefono: telefono.value,
+    tarjetaUID,
+    membresiaExpira: expira.toISOString().split("T")[0]
+  });
+
+  guardarClientes(clientes);
+
+  mostrarConfirm(
+    "Registro completado",
+    "Cliente registrado correctamente"
+  );
+
+  setTimeout(() => {
+    location.href = "index.html";
+  }, 2000);
+}
+
+/* ===== CONFIRM ===== */
+function mostrarConfirm(t, m) {
+  confirmacion.style.display = "flex";
+  tituloConfirm.innerText = t;
+  mensajeConfirm.innerText = m;
+}
+</script>
+
+</body>
+</html>

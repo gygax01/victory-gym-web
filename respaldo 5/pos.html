@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Punto de Venta</title>
+<link rel="stylesheet" href="css/styles.css">
+
+<style>
+/* ===== POS LAYOUT ===== */
+.pos-wrap{
+  max-width:1100px;
+  margin:20px auto;
+  display:grid;
+  grid-template-columns: 2fr 1fr;
+  gap:20px;
+}
+@media(max-width:900px){
+  .pos-wrap{grid-template-columns:1fr}
+}
+
+/* ===== PRODUCTOS ===== */
+.productos{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:16px;
+}
+.prod{
+  background:linear-gradient(145deg,#3a3a3a,#2a2a2a);
+  border-radius:18px;
+  padding:26px;
+  text-align:center;
+  cursor:pointer;
+  transition:.15s;
+}
+.prod:hover{transform:scale(1.06)}
+.prod b{display:block;font-size:18px}
+.prod span{color:#2ecc71;font-size:22px}
+
+/* ===== CARRITO ===== */
+.carrito{
+  background:#222;
+  border-radius:16px;
+  padding:16px;
+}
+.carrito ul{list-style:none;padding:0;margin:0}
+.carrito li{
+  display:flex;
+  justify-content:space-between;
+  margin:6px 0;
+}
+
+/* ===== TOTAL ===== */
+.total{
+  background:#111;
+  border-radius:18px;
+  padding:20px;
+  text-align:center;
+  margin:14px 0;
+}
+.total span{font-size:44px;color:#2ecc71}
+
+/* ===== OVERLAY CAMBIO ===== */
+.overlay-cambio{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.7);
+  backdrop-filter:blur(6px);
+  display:none;
+  justify-content:center;
+  align-items:center;
+  z-index:5000;
+}
+.overlay-cambio .box{
+  background:#2ecc71;
+  color:#fff;
+  padding:80px;
+  border-radius:22px;
+  text-align:center;
+  animation:zoom .25s ease;
+}
+.overlay-cambio h1{font-size:64px;margin:0}
+@keyframes zoom{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+</head>
+
+<body onload="verificarSesion(); cargarProductos();">
+
+<header>
+  <h2>Punto de Venta</h2>
+  <button onclick="location.href='index.html'">⬅ Inicio</button>
+</header>
+
+<div class="pos-wrap">
+  <!-- PRODUCTOS -->
+  <div>
+    <h3>Productos</h3>
+    <div class="productos" id="grid"></div>
+  </div>
+
+  <!-- CARRITO -->
+  <div class="carrito">
+    <h3>Carrito</h3>
+    <ul id="lista"></ul>
+
+    <div class="total">
+      Total $<span id="total">0</span>
+    </div>
+
+    <input id="pago" type="number" placeholder="¿Con cuánto paga?">
+    <button onclick="cobrar()">Cobrar</button>
+    <button onclick="cancelar()">Cancelar</button>
+  </div>
+</div>
+
+<!-- CAMBIO -->
+<div class="overlay-cambio" id="overlay">
+  <div class="box">
+    <p>Cambio</p>
+    <h1>$<span id="cambio"></span></h1>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+
+<script>
+let productos = [];
+let carrito = [];
+
+function cargarProductos(){
+  grid.innerHTML="";
+  productos = obtenerProductos();
+  productos.forEach(p=>{
+    if(p.stock<=0) return;
+    const d=document.createElement("div");
+    d.className="prod";
+    d.innerHTML=`<b>${p.nombre}</b><span>$${p.precio}</span>`;
+    d.onclick=()=>agregar(p.nombre);
+    grid.appendChild(d);
+  });
+}
+
+function agregar(nombre){
+  carrito.push(nombre);
+  render();
+}
+
+function render(){
+  lista.innerHTML="";
+  let t=0;
+  carrito.forEach(n=>{
+    const p=productos.find(x=>x.nombre===n);
+    t+=p.precio;
+    lista.innerHTML+=`<li>${n}<span>$${p.precio}</span></li>`;
+  });
+  total.innerText=t;
+}
+
+function cancelar(){
+  if(!confirm("¿Cancelar venta?"))return;
+  carrito=[]; pago.value="";
+  render();
+}
+
+function cobrar(){
+  const totalVenta=Number(total.innerText);
+  const paga=Number(pago.value);
+  if(paga<totalVenta){alert("Pago insuficiente");return;}
+
+  // descontar stock
+  carrito.forEach(n=>{
+    const p=productos.find(x=>x.nombre===n);
+    p.stock--;
+  });
+  guardarProductos(productos);
+
+  // registrar venta
+  const ventas=obtenerVentas();
+  ventas.push({
+    fecha:hoy(),
+    hora:horaActual(),
+    total:totalVenta
+  });
+  guardarVentas(ventas);
+
+  // mostrar cambio
+  cambio.innerText=(paga-totalVenta).toFixed(2);
+  overlay.style.display="flex";
+
+  setTimeout(()=>location.href="index.html",4000);
+}
+</script>
+
+</body>
+</html>

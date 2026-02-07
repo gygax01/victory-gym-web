@@ -1,0 +1,1367 @@
+/* ===============================
+   ===== RESET =====
+   =============================== */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #1c1c1c;
+  color: #eaeaea;
+}
+
+/* ===============================
+   ===== GENERAL =====
+   =============================== */
+
+.centered {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.card {
+  background: #2a2a2a;
+  padding: 30px;
+  border-radius: 14px;
+  width: 360px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.45);
+}
+
+h1, h2, h3 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+input, button {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+}
+
+input {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+button {
+  background: #444;
+  color: #fff;
+  cursor: pointer;
+  transition: 
+    background .25s ease,
+    transform .35s cubic-bezier(.25,.8,.25,1);
+}
+
+button:hover {
+  background: #555;
+  transform: scale(1.04);
+}
+
+button.nfc {
+  background: #777;
+}
+
+.small {
+  font-size: 12px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+/* ===============================
+   ===== HEADER =====
+   =============================== */
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 25px;
+  background: #2a2a2a;
+  box-shadow: 0 6px 20px rgba(0,0,0,.4);
+}
+
+header button {
+  width: auto;
+  margin-left: 10px;
+}
+
+/* ===============================
+   ===== TABLAS =====
+   =============================== */
+
+table {
+  width: 95%;
+  margin: 20px auto;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px;
+  border-bottom: 1px solid #444;
+  text-align: center;
+}
+
+th {
+  background: #333;
+}
+
+/* ===============================
+   ===== HISTORIAL (ACORDEÓN) =====
+   =============================== */
+
+.historial-container {
+  width: 90%;
+  margin: 0 auto;
+}
+
+/* ===== TARJETA CLIENTE ===== */
+.cliente {
+  background: #2a2a2a;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 12px 0;
+  cursor: pointer;
+
+  /* TRANSICIONES UNIFICADAS (IMPORTANTE) */
+  transition:
+    background .25s ease,
+    box-shadow .25s ease;
+}
+
+.cliente:hover {
+  background: #333;
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+}
+
+/* Estado abierto bien marcado */
+.cliente.abierto {
+  box-shadow: inset 0 0 0 2px rgba(46,204,113,.35);
+}
+
+/* ===============================
+   ===== HEADER TARJETA =====
+   =============================== */
+
+.cliente-header {
+  display: flex;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+}
+
+/* Contenedor fijo */
+.info-wrapper {
+  flex: 1;
+  position: relative;
+}
+
+/* Bloque info (ESTÁTICO, ESTABLE) */
+.info-bloque {
+  text-align: left;
+}
+
+/* Abierto → centrado estático */
+.cliente.abierto .info-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+.cliente.abierto .info-bloque {
+  text-align: center;
+}
+
+/* Flecha */
+.flecha {
+  position: absolute;
+  right: 0;
+  font-size: 22px;
+  opacity: .6;
+  transition: transform .75s cubic-bezier(.25,.8,.25,1);
+}
+
+.cliente.abierto .flecha {
+  transform: rotate(180deg);
+}
+
+/* Nombre */
+.cliente h3 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+/* ===============================
+   ===== ACORDEÓN HISTORIAL =====
+   =============================== */
+
+.historial {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height .75s cubic-bezier(.25,.8,.25,1);
+}
+
+.historial.abierto {
+  max-height: 900px;
+}
+
+.historial table {
+  width: 100%;
+  margin-top: 15px;
+}
+
+/* Encabezado fijo (mejora real) */
+.historial table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* buscador */
+.search-bar {
+  width: 90%;
+  margin: 20px auto;
+}
+
+/* ===============================
+   ===== OVERLAY / POPUP =====
+   =============================== */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.popup {
+  background: #2a2a2a;
+  padding: 40px;
+  border-radius: 16px;
+  text-align: center;
+  width: 420px;
+  animation: zoomIn .6s cubic-bezier(.25,.8,.25,1);
+}
+
+.estado {
+  font-size: 20px;
+  margin-top: 20px;
+}
+
+.estado.amarillo { color: #f1c40f; }
+.estado.verde    { color: #2ecc71; }
+.estado.rojo     { color: #e74c3c; }
+
+.uid {
+  margin-top: 10px;
+  font-size: 14px;
+  opacity: .85;
+}
+
+/* ===============================
+   ===== CONFIRMACION GRANDE =====
+   =============================== */
+
+.confirmacion {
+  position: fixed;
+  inset: 0;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(6px);
+  z-index: 4000;
+}
+
+.confirmacion .box {
+  padding: 80px;
+  border-radius: 20px;
+  text-align: center;
+  width: 70%;
+  max-width: 720px;
+  animation: zoomBig .6s cubic-bezier(.25,.8,.25,1);
+}
+
+.confirmacion.entrada .box { background: #2ecc71; }
+.confirmacion.salida  .box { background: #3498db; }
+.confirmacion.error   .box { background: #e74c3c; }
+
+.confirmacion h1 {
+  font-size: 56px;
+  margin-bottom: 20px;
+}
+
+.confirmacion p {
+  font-size: 26px;
+}
+
+/* ===============================
+   ===== ANIMACIONES =====
+   =============================== */
+
+@keyframes zoomIn {
+  from { transform: scale(.85); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+@keyframes zoomBig {
+  from { transform: scale(.75); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+/* ===== CORRECCIÓN ALINEACIÓN NOMBRE (HISTORIAL) ===== */
+
+/* Estado cerrado → IZQUIERDA */
+.cliente .info-bloque h3 {
+  text-align: left;
+}
+
+/* Estado abierto → CENTRO */
+.cliente.abierto .info-bloque h3 {
+  text-align: center;
+}
+/* ===== MEJOR CONTRASTE TABLA HISTORIAL ===== */
+
+.historial tbody tr {
+  background: rgba(255,255,255,0.02);
+}
+
+.historial tbody tr.alt {
+  background: rgba(255,255,255,0.06);
+}
+
+/* Separador visual claro */
+.historial th,
+.historial td {
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+/* ===============================
+   ===== BRANDING HEADER =====
+   =============================== */
+
+.header-brand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand img {
+  height: 110px;           /* logo protagonista */
+  width: auto;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.5));
+}
+
+
+.brand h2 {
+  font-size: 32px;
+  margin: 0;
+  position: relative;
+}
+
+/* Detalle naranja (marca) */
+.brand h2::after {
+  content: "";
+  display: block;
+  width: 85px;
+  height: 5px;
+  background: #f3722c;
+  margin-top: 6px;
+}
+/* ===== ACENTO NARANJA VICTORY ===== */
+
+/* Estado activo */
+.cliente.abierto {
+  box-shadow: inset 0 0 0 2px rgba(243,114,44,.55);
+}
+
+/* Flecha activa */
+.cliente.abierto .flecha {
+  color: #f3722c;
+}
+
+/* Entrada destacada */
+.historial td:nth-child(2) {
+  color: #f3722c;
+  font-weight: 500;
+}
+
+/* Focus buscador */
+.search-bar input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(243,114,44,.45);
+}
+/* Borde lateral estilo gym */
+.cliente.abierto {
+  box-shadow: none;
+  border-left: 6px solid #f3722c;
+}
+.flecha {
+  font-size: 24px;
+}
+
+.cliente.abierto .flecha {
+  color: #f3722c;
+}
+/* ===== RACHAS SIN EMOJIS ===== */
+
+.racha {
+  font-size: 14px;
+  letter-spacing: .3px;
+}
+
+.racha.actual {
+  color: #f3722c;        /* energía / acción */
+  font-weight: 600;
+}
+
+.racha.maxima {
+  color: #b5b5b5;        /* histórico */
+}
+.meta {
+  border-top: 1px solid rgba(243,114,44,.25);
+  padding-top: 6px;
+  margin-top: 6px;
+}
+/* ===== HEADER INDEX ===== */
+
+.estado-sistema {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.estado-sistema .contador {
+  font-size: 15px;
+  opacity: .9;
+}
+
+.estado-sistema .contador strong {
+  color: #f3722c;
+}
+
+.estado-sistema .lector {
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #333;
+}
+
+.estado-sistema .lector.off {
+  color: #e74c3c;
+}
+
+.estado-sistema .lector.on {
+  color: #2ecc71;
+}
+/* ===== PANEL PRINCIPAL INDEX ===== */
+
+.panel-acciones {
+  width: 90%;
+  margin: 25px auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.panel-acciones button {
+  background: #2a2a2a;
+  padding: 18px;
+  font-size: 15px;
+  border-radius: 14px;
+  transition: 
+    transform .25s ease,
+    box-shadow .25s ease;
+}
+
+.panel-acciones button:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0,0,0,.45);
+}
+
+/* Acción destacada */
+.panel-acciones button.destacado {
+  border-left: 5px solid #f3722c;
+}
+/* ===== AJUSTE BOTÓN ELIMINAR (CLIENTES) ===== */
+
+.btn-borrar {
+  width: auto !important;
+  min-width: unset;
+  padding: 8px 14px;        /* más pequeño */
+  font-size: 14px;
+  border-radius: 8px;
+  margin-left: auto;        /* empuja a la derecha */
+  opacity: 0.85;
+}
+
+/* Hover más controlado */
+.btn-borrar:hover {
+  opacity: 1;
+  transform: none;          /* sin zoom agresivo */
+}
+
+/* Header acomoda bien nombre + botón */
+.cliente-header {
+  gap: 16px;
+}
+/* ===== ESPACIO PARA FLECHA (CLIENTES) ===== */
+
+/* Reservamos espacio a la derecha para la flecha */
+.cliente-header {
+  padding-right: 46px; /* espacio exclusivo flecha */
+}
+
+/* Flecha siempre al extremo derecho */
+.flecha {
+  right: 14px;
+}
+
+/* Botón eliminar se separa de la flecha */
+.btn-borrar {
+  margin-right: 32px; /* deja respirar a la flecha */
+}
+/* ===============================
+   ===== TOAST FEEDBACK =====
+   =============================== */
+
+.toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #2a2a2a;
+  color: #f3722c;
+  padding: 16px 28px;
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 600;
+  box-shadow: 0 12px 30px rgba(0,0,0,.55);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity .35s ease,
+    transform .35s cubic-bezier(.25,.8,.25,1);
+  z-index: 5000;
+}
+
+.toast.mostrar {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ===============================
+   ===== ACCIONES MEMBRESÍA =====
+   =============================== */
+
+.acciones-membresia {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.acciones-membresia button {
+  font-size: 18px;
+  padding: 16px;
+}
+/* ===============================
+   ===== STOCK (AJUSTE FINAL PRO) =====
+   =============================== */
+
+.stock-nuevo {
+  width: 100%;
+  max-width: 1400px;
+  margin: 30px auto;
+  padding: 40px 48px;
+  background: #2a2a2a;
+  border-radius: 18px;
+  box-shadow: 0 18px 45px rgba(0,0,0,.6);
+}
+
+/* FORM BIEN PROPORCIONADO */
+.stock-form {
+  display: grid;
+  grid-template-columns: 3.5fr 1.2fr 1.2fr 180px;
+  gap: 16px;
+  align-items: center;
+}
+
+/* INPUTS */
+.stock-form input {
+  height: 50px;
+  font-size: 15px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+/* BOTÓN AGREGAR */
+.stock-form button {
+  height: 50px;
+  width: 180px;
+  min-width: 180px;
+  background: #f3722c;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+/* GRID DE PRODUCTOS */
+.stock-grid {
+  width: 95%;
+  margin: 30px auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 22px;
+}
+
+/* TARJETA */
+.stock-card {
+  background: #2a2a2a;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.45);
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.stock-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(0,0,0,.6);
+}
+
+/* HEADER TARJETA */
+.stock-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* BOTÓN ELIMINAR */
+.btn-eliminar {
+  width: auto;
+  font-size: 13px;
+  padding: 6px 12px;
+  background: #444;
+  opacity: .75;
+  border-radius: 8px;
+}
+
+.btn-eliminar:hover {
+  background: #e74c3c;
+  opacity: 1;
+  transform: none;
+}
+
+/* PRECIO */
+.stock-card .precio {
+  color: #b5b5b5;
+  margin-bottom: 10px;
+}
+
+/* STOCK */
+.stock-cantidad {
+  font-size: 18px;
+  margin-bottom: 14px;
+}
+
+.stock-cantidad span {
+  color: #f3722c;
+  font-weight: 700;
+}
+
+/* BOTONES STOCK */
+.stock-botones {
+  display: flex;
+  gap: 10px;
+}
+
+.stock-botones button {
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+/* STOCK BAJO */
+.stock-card.bajo {
+  border-left: 6px solid #e74c3c;
+}
+
+/* FOOTER */
+.stock-footer {
+  width: 95%;
+  margin: 40px auto;
+  text-align: right;
+}
+
+.btn-guardar {
+  background: #f3722c;
+  font-size: 16px;
+  padding: 12px 26px;
+  width: auto;
+  border-radius: 10px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 950px) {
+  .stock-form {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-form button {
+    width: 100%;
+  }
+}
+
+/* ===============================
+   ===== POS – ESTILO PRO =====
+   =============================== */
+
+/* --- Tarjetas de producto --- */
+.prod {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.04),
+    0 12px 28px rgba(0,0,0,.45);
+}
+
+.prod:hover {
+  box-shadow:
+    inset 0 0 0 2px rgba(243,114,44,.6),
+    0 18px 40px rgba(0,0,0,.6);
+}
+
+/* Precio verde más vivo */
+.prod span {
+  color: #2ecc71;
+  text-shadow: 0 0 12px rgba(46,204,113,.35);
+}
+
+/* --- Carrito --- */
+.carrito {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.04),
+    0 10px 30px rgba(0,0,0,.55);
+}
+
+/* Items del carrito */
+.carrito li {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.carrito li span {
+  color: #f3722c;
+  font-weight: 500;
+}
+
+/* --- Total --- */
+.total {
+  box-shadow:
+    inset 0 0 0 2px rgba(243,114,44,.35),
+    0 10px 25px rgba(0,0,0,.5);
+}
+
+.total span {
+  text-shadow: 0 0 18px rgba(46,204,113,.5);
+}
+
+/* --- Botón COBRAR --- */
+.carrito button:first-of-type {
+  background: #f3722c;
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+.carrito button:first-of-type:hover {
+  background: #ff8a3d;
+  transform: scale(1.04);
+}
+
+/* --- Botón CANCELAR --- */
+.carrito button:last-of-type {
+  background: #444;
+  opacity: .85;
+}
+
+.carrito button:last-of-type:hover {
+  background: #555;
+}
+
+/* --- Input pago --- */
+.carrito input:focus {
+  box-shadow: 0 0 0 2px rgba(243,114,44,.45);
+  background: #3a3a3a;
+}
+
+/* --- Overlay cambio --- */
+.overlay-cambio .box {
+  box-shadow:
+    0 0 40px rgba(46,204,113,.55),
+    0 0 120px rgba(46,204,113,.35);
+}
+
+.overlay-cambio p {
+  letter-spacing: 1px;
+  opacity: .9;
+}
+
+.overlay-cambio h1 {
+  text-shadow: 0 0 30px rgba(255,255,255,.6);
+}
+/* ===============================
+   ===== REGISTRO CLIENTE =====
+   =============================== */
+
+/* Card más ancha */
+.card {
+  max-width: 920px;
+}
+
+/* Inputs en grid horizontal */
+.card input {
+  margin: 0;
+}
+
+/* Contenedor principal del registro */
+.card {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 28px;
+}
+
+/* Primera columna: datos personales */
+.card > input:nth-child(-n+4) {
+  grid-column: 1;
+}
+
+/* Línea separadora */
+.card hr {
+  grid-column: 1 / -1;
+  opacity: .3;
+}
+
+/* Título membresía */
+.card h3 {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+}
+
+/* Botones de membresía en fila */
+.card h3 + button,
+.card h3 + button + button,
+.card h3 + button + button + button,
+.card h3 + button + button + button + button {
+  grid-column: auto;
+}
+
+/* Grupo de botones membresía */
+.card h3 ~ button {
+  width: auto;
+  padding: 14px 26px;
+}
+
+/* Expira texto */
+#expiraTexto {
+  grid-column: 1 / -1;
+  text-align: center;
+  margin-top: 10px;
+  color: #f3722c;
+  font-weight: 500;
+}
+
+/* Botón asignar tarjeta */
+button.nfc {
+  grid-column: 1;
+  margin-top: 14px;
+  font-size: 16px;
+}
+
+/* Botón registrar */
+#finalizar {
+  grid-column: 2;
+  margin-top: 14px;
+  font-size: 18px;
+  background: #f3722c;
+}
+
+#finalizar:hover {
+  background: #ff8a3d;
+  transform: scale(1.03);
+}
+
+/* ===============================
+   ===== RESPONSIVE (solo aquí) =====
+   =============================== */
+
+@media (max-width: 900px) {
+  .card {
+    grid-template-columns: 1fr;
+  }
+
+  #finalizar,
+  button.nfc {
+    grid-column: 1;
+  }
+}
+/* ===============================
+   REGISTRO CLIENTE – FIX FINAL
+   =============================== */
+
+/* Card más ancha y estable */
+.card {
+  max-width: 900px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 20px;
+  justify-content: space-between;
+}
+
+/* Inputs ocupan media fila */
+.card input {
+  flex: 1 1 calc(50% - 20px);
+  min-width: 260px;
+}
+
+/* Separador */
+.card hr {
+  width: 100%;
+  opacity: .3;
+  margin: 10px 0;
+}
+
+/* Título membresía */
+.card h3 {
+  width: 100%;
+  text-align: center;
+  margin-top: 10px;
+}
+
+/* Botones de membresía en 2x2 */
+.card h3 + button,
+.card h3 + button + button,
+.card h3 + button + button + button,
+.card h3 + button + button + button + button {
+  flex: 1 1 calc(50% - 20px);
+  min-width: 180px;
+}
+
+/* Texto expira */
+#expiraTexto {
+  width: 100%;
+  text-align: center;
+  margin: 8px 0;
+  color: #f3722c;
+  font-weight: 500;
+}
+
+/* Botón NFC */
+button.nfc {
+  flex: 1 1 calc(50% - 20px);
+  font-size: 16px;
+}
+
+/* Botón registrar */
+#finalizar {
+  flex: 1 1 calc(50% - 20px);
+  background: #f3722c;
+  font-size: 17px;
+}
+
+#finalizar:hover {
+  background: #ff8a3d;
+  transform: scale(1.03);
+}
+
+/* ===============================
+   RESPONSIVE
+   =============================== */
+
+@media (max-width: 780px) {
+  .card input,
+  .card button {
+    flex: 1 1 100%;
+  }
+}
+/* ===== FIX FINAL NUEVO PRODUCTO (REAL) ===== */
+
+.card.stock-nuevo {
+  padding: 36px 40px;
+  overflow: hidden; /* 🔥 evita que algo se salga visualmente */
+}
+
+.card.stock-nuevo .stock-form {
+  display: grid;
+  grid-template-columns: 3fr 1fr 1fr 160px;
+  gap: 16px;
+  align-items: center;
+}
+
+.card.stock-nuevo input {
+  height: 46px;
+  font-size: 15px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.card.stock-nuevo button {
+  height: 46px;
+  width: 160px;
+  min-width: 160px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #f3722c;
+  border-radius: 10px;
+}
+/* ===============================
+   REGISTRO CLIENTE – DESKTOP
+   =============================== */
+
+.registro-card {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 40px 48px;
+  display: grid;
+  gap: 28px;
+}
+
+/* DATOS EN 2 COLUMNAS */
+.registro-datos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+}
+
+.registro-datos input {
+  height: 48px;
+  font-size: 15px;
+}
+
+/* SEPARADOR */
+.registro-card hr {
+  width: 100%;
+  opacity: 0.3;
+}
+
+/* MEMBRESÍA */
+.registro-membresia h3 {
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.membresia-botones {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.membresia-botones button {
+  padding: 14px;
+  font-size: 15px;
+}
+
+/* TEXTO EXPIRACIÓN */
+#expiraTexto {
+  margin-top: 12px;
+  text-align: center;
+  color: #f3722c;
+  font-weight: 500;
+}
+
+/* ACCIONES */
+.registro-acciones {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.registro-acciones button {
+  width: 220px;
+  height: 48px;
+  font-size: 15px;
+}
+
+/* BOTÓN FINAL */
+#finalizar {
+  background: #f3722c;
+  font-weight: 600;
+}
+
+/* RESPONSIVE (luego lo afinamos) */
+@media (max-width: 900px) {
+  .registro-datos {
+    grid-template-columns: 1fr;
+  }
+
+  .membresia-botones {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .registro-acciones {
+    flex-direction: column;
+  }
+
+  .registro-acciones button {
+    width: 100%;
+  }
+}
+/* ===============================
+   REGISTRO CLIENTE – FIX REAL
+   =============================== */
+
+/* Anulamos el comportamiento móvil de .card */
+.card.registro-pc {
+  max-width: 1200px;
+  width: 100%;
+  margin: 40px auto;
+  padding: 40px 48px;
+
+  /* 🔥 anulaciones clave */
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+/* Columnas */
+.card.registro-pc .registro-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Inputs */
+.card.registro-pc input {
+  height: 48px;
+  font-size: 15px;
+}
+
+/* Membresías */
+.membresias-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+/* Acciones */
+.registro-acciones {
+  margin-top: auto;
+  display: flex;
+  gap: 16px;
+}
+
+.registro-acciones button {
+  flex: 1;
+  height: 48px;
+}
+
+/* Botón final */
+#finalizar {
+  background: #f3722c;
+  font-weight: 600;
+}
+
+/* Responsive después (no ahora) */
+@media (max-width: 900px) {
+  .card.registro-pc {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===============================
+   LOGIN – ESTILO FINAL (CORREGIDO)
+   =============================== */
+
+.login-bg {
+  background: radial-gradient(circle at top, #1e1e1e, #121212);
+}
+
+/* CARD LOGIN */
+.login-card {
+  width: 380px;
+  padding: 42px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: fadeInUp .6s ease;
+}
+
+/* CONTENEDOR LOGO (AJUSTE REAL AQUÍ) */
+.login-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+  transform: translateX(-6px); /* 👈 mueve el logo a la izquierda */
+}
+
+/* LOGO */
+.login-logo img {
+  width: 350px;
+  opacity: 0;
+  animation: logoIn .8s ease forwards;
+}
+
+/* INPUTS */
+.login-card input {
+  height: 48px;
+  font-size: 15px;
+}
+
+/* BOTÓN PRINCIPAL */
+.btn-login {
+  background: #f3722c;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.btn-login:hover {
+  filter: brightness(1.1);
+}
+
+/* NFC */
+.btn-nfc {
+  background: #555;
+}
+
+/* BOTÓN SECUNDARIO */
+.btn-sec {
+  background: #444;
+}
+
+/* TEXTO */
+.muted {
+  opacity: .6;
+  text-align: center;
+  margin-top: 6px;
+}
+
+/* ===============================
+   ANIMACIONES
+   =============================== */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(25px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes logoIn {
+  from {
+    opacity: 0;
+    transform: scale(.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* ===============================
+   REGISTRO USUARIOS – PC
+   =============================== */
+
+.card.usuarios-pc {
+  max-width: 1100px;
+  width: 100%;
+  margin: 40px auto;
+  padding: 40px 48px;
+
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.card.usuarios-pc .usuarios-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card.usuarios-pc input,
+.card.usuarios-pc select {
+  height: 48px;
+  font-size: 15px;
+}
+
+.card.usuarios-pc h3 {
+  margin-bottom: 6px;
+}
+
+.card.usuarios-pc .nfc {
+  margin-top: 10px;
+}
+
+#btnRegistrar {
+  background: #f3722c;
+  font-weight: 600;
+}
+
+/* Responsive después */
+@media (max-width: 900px) {
+  .card.usuarios-pc {
+    grid-template-columns: 1fr;
+  }
+}
+/* ===============================
+   SELECT (ROL) – ESTILO DARK UI
+   =============================== */
+
+.card.usuarios-pc select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  height: 48px;
+  padding: 0 44px 0 14px;
+  font-size: 15px;
+
+  background-color: #3a3a3a;
+  color: #fff;
+
+  border: none;
+  border-radius: 12px;
+
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+  cursor: pointer;
+
+  background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white'>\
+<polygon points='4,6 12,6 8,11'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 12px;
+}
+
+/* Hover */
+.card.usuarios-pc select:hover {
+  background-color: #424242;
+}
+
+/* Focus */
+.card.usuarios-pc select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(243,114,44,.5);
+  background-color: #424242;
+}
+
+/* Opciones desplegadas */
+.card.usuarios-pc option {
+  background: #2b2b2b;
+  color: #fff;
+}

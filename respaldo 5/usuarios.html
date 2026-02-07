@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Usuarios</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body onload="initUsuarios()">
+
+<header class="header-brand">
+  <div class="brand">
+    <img src="img/logo.png">
+    <h2>Gestión de usuarios</h2>
+  </div>
+  <button onclick="volver()">← Volver</button>
+</header>
+
+<!-- ================= REGISTRO ================= -->
+<div class="card usuarios-pc" id="registroCard">
+  <div class="usuarios-col">
+    <h3>Registrar usuario</h3>
+
+    <input id="nombre" placeholder="Nombre completo">
+    <input id="usuario" placeholder="Usuario">
+    <input id="password" type="password" placeholder="Contraseña">
+
+    <select id="rol">
+      <option value="employee">Empleado</option>
+      <option value="admin">Administrador</option>
+    </select>
+
+    <button class="nfc" onclick="asignarTarjeta()">Asignar tarjeta</button>
+    <p id="uidTexto" class="uid"></p>
+  </div>
+
+  <div class="usuarios-col">
+    <button id="btnRegistrar" onclick="pedirClaveRegistro()" disabled>
+      Registrar usuario
+    </button>
+  </div>
+</div>
+
+<!-- ================= BUSCADOR / LISTAS ================= -->
+<div class="search-bar" id="buscador">
+  <input id="busqueda" placeholder="Buscar usuario..." oninput="renderUsuarios()">
+</div>
+
+<div class="historial-container" id="listasUsuarios">
+  <h3>Administradores</h3>
+  <div id="listaAdmins"></div>
+
+  <h3 style="margin-top:30px">Empleados</h3>
+  <div id="listaEmpleados"></div>
+</div>
+
+<!-- ================= POPUP NFC ================= -->
+<div class="overlay" id="overlay">
+  <div class="popup">
+    <h2>Acerque la tarjeta</h2>
+    <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
+  </div>
+</div>
+
+<!-- ================= CONFIRMACION ================= -->
+<div class="confirmacion" id="confirmacion">
+  <div class="box">
+    <h1 id="tituloConfirm"></h1>
+    <p id="mensajeConfirm"></p>
+    <div id="accionesConfirm"></div>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nfc.js"></script>
+
+<script>
+/* ===== CONFIG ===== */
+const CLAVE_MAESTRA = "victory(profitness)";
+let tarjetaUID = null;
+let usuarioAEliminar = null;
+let usuarioAReasignar = null;
+
+/* ===== INIT ===== */
+function initUsuarios() {
+  const params = new URLSearchParams(window.location.search);
+  const modoRegistro = params.get("modo") === "registro";
+
+  if (modoRegistro) {
+    buscador.remove();
+    listasUsuarios.remove();
+    return;
+  }
+
+  verificarSesion();
+  const s = obtenerSesion();
+  if (!["admin","superadmin"].includes(s.rol)) {
+    alert("Acceso no autorizado");
+    location.href = "index.html";
+    return;
+  }
+
+  renderUsuarios();
+}
+
+/* ===== VOLVER ===== */
+function volver() {
+  const params = new URLSearchParams(window.location.search);
+  location.href = params.get("modo") === "registro"
+    ? "login.html"
+    : "index.html";
+}
+
+/* ===============================
+   ===== NFC REGISTRO USUARIO =====
+   =============================== */
+function asignarTarjeta() {
+  tarjetaUID = null;
+  btnRegistrar.disabled = true;
+
+  overlay.style.display = "flex";
+  estado.className = "estado amarillo";
+  estado.innerText = "Esperando tarjeta…";
+  uidTexto.innerText = "";
+
+  iniciarNFCControlado({
+    onUID: uid => {
+      if (uidYaRegistrada(uid)) {
+        estado.className = "estado rojo";
+        estado.innerText = "Tarjeta ya registrada";
+        setTimeout(cerrarPopup, 1500);
+        return;
+      }
+
+      tarjetaUID = uid;
+      uidTexto.innerText = "UID: " + uid;
+      estado.className = "estado verde";
+      estado.innerText = "Tarjeta asignada";
+
+      setTimeout(() => {
+        cerrarPopup();
+        btnRegistrar.disabled = false;
+      }, 1200);
+    },
+
+    onTimeout: () => {
+      estado.className = "estado rojo";
+      estado.innerText = "Tiempo de lectura agotado";
+      setTimeout(cerrarPopup, 1500);
+    },
+
+    onError: () => {
+      estado.className = "estado rojo";
+      estado.innerText = "Error de lectura";
+      setTimeout(cerrarPopup, 1500);
+    }
+  });
+}
+
+function cerrarPopup() {
+  overlay.style.display = "none";
+  detenerNFC();
+}
+
+/* ===============================
+   ===== REGISTRO =====
+   =============================== */
+function pedirClaveRegistro() {
+  if (!tarjetaUID) return alert("Asigne una tarjeta primero");
+
+  mostrarConfirm(
+    "Acceso administrativo",
+    "Ingrese la contraseña maestra",
+    `
+      <input id="claveInput" type="password">
+      <button onclick="confirmarRegistro()">Confirmar</button>
+      <button onclick="cerrarConfirm()">Cancelar</button>
+    `
+  );
+}
+
+function confirmarRegistro() {
+  if (claveInput.value !== CLAVE_MAESTRA) {
+    alert("Contraseña incorrecta");
+    return;
+  }
+  cerrarConfirm();
+  registrarUsuario();
+}
+
+function registrarUsuario() {
+  if (!nombre.value || !usuario.value || !password.value || !tarjetaUID) {
+    alert("Complete todos los datos");
+    return;
+  }
+
+  const empleados = obtenerEmpleados();
+
+  empleados.push({
+    nombre: nombre.value.trim(),
+    usuario: usuario.value.trim(),
+    password: password.value,
+    rol: rol.value,
+    tarjetaUID
+  });
+
+  guardarEmpleados(empleados);
+
+  mostrarConfirm(
+    "Correcto",
+    "Usuario registrado correctamente",
+    `<button onclick="cerrarConfirm(); location.reload()">Aceptar</button>`
+  );
+}
+
+/* ===============================
+   ===== LISTA =====
+   =============================== */
+function renderUsuarios() {
+  const q = busqueda.value.toLowerCase();
+  const empleados = obtenerEmpleados()
+    .filter(e =>
+      e.nombre.toLowerCase().includes(q) ||
+      e.usuario.toLowerCase().includes(q)
+    )
+    .sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  listaAdmins.innerHTML = "";
+  listaEmpleados.innerHTML = "";
+
+  empleados.forEach(e => {
+    const d = document.createElement("div");
+    d.className = "cliente";
+
+    d.innerHTML = `
+      <div class="cliente-header">
+        <h3>${e.nombre}</h3>
+        <div class="acciones">
+          <button onclick="iniciarReasignacion('${e.usuario}')">
+            Reasignar tarjeta
+          </button>
+          <button class="btn-borrar"
+                  onclick="confirmarEliminar('${e.usuario}')">
+            Eliminar
+          </button>
+        </div>
+      </div>
+      <p class="meta">${e.usuario} · ${e.rol}</p>
+    `;
+
+    if (e.rol === "admin") listaAdmins.appendChild(d);
+    else listaEmpleados.appendChild(d);
+  });
+}
+
+/* ===============================
+   ===== REASIGNAR TARJETA =====
+   =============================== */
+function iniciarReasignacion(usuario) {
+  usuarioAReasignar = usuario;
+
+  overlay.style.display = "flex";
+  estado.className = "estado amarillo";
+  estado.innerText = "Esperando tarjeta…";
+
+  iniciarNFCControlado({
+    onUID: uid => {
+      if (uidYaRegistrada(uid)) {
+        estado.className = "estado rojo";
+        estado.innerText = "Tarjeta ya registrada";
+        setTimeout(cerrarPopup, 1500);
+        return;
+      }
+
+      let empleados = obtenerEmpleados().map(e => {
+        if (e.usuario === usuarioAReasignar) {
+          e.tarjetaUID = uid;
+        }
+        return e;
+      });
+
+      guardarEmpleados(empleados);
+
+      estado.className = "estado verde";
+      estado.innerText = "Tarjeta reasignada";
+
+      setTimeout(() => {
+        cerrarPopup();
+        renderUsuarios();
+      }, 1200);
+    },
+
+    onTimeout: () => {
+      estado.className = "estado rojo";
+      estado.innerText = "Tiempo de lectura agotado";
+      setTimeout(cerrarPopup, 1500);
+    },
+
+    onError: () => {
+      estado.className = "estado rojo";
+      estado.innerText = "Error de lectura";
+      setTimeout(cerrarPopup, 1500);
+    }
+  });
+}
+
+/* ===============================
+   ===== ELIMINAR =====
+   =============================== */
+function confirmarEliminar(usuario) {
+  usuarioAEliminar = usuario;
+
+  mostrarConfirm(
+    "¿Eliminar usuario?",
+    "Esta acción no se puede revertir",
+    `
+      <button onclick="pedirClaveEliminar()">Sí</button>
+      <button onclick="cerrarConfirm()">No</button>
+    `
+  );
+}
+
+function pedirClaveEliminar() {
+  mostrarConfirm(
+    "Confirmación final",
+    "Ingrese la contraseña maestra",
+    `
+      <input id="claveInput" type="password">
+      <button onclick="eliminarUsuario()">Confirmar</button>
+      <button onclick="cerrarConfirm()">Cancelar</button>
+    `
+  );
+}
+
+function eliminarUsuario() {
+  if (claveInput.value !== CLAVE_MAESTRA) {
+    alert("Contraseña incorrecta");
+    return;
+  }
+
+  let empleados = obtenerEmpleados();
+  const eliminado = empleados.find(e => e.usuario === usuarioAEliminar);
+
+  empleados = empleados.filter(e => e.usuario !== usuarioAEliminar);
+  guardarEmpleados(empleados);
+
+  if (eliminado && eliminado.tarjetaUID) {
+    liberarTarjeta(eliminado.tarjetaUID);
+  }
+
+  mostrarConfirm(
+    "Correcto",
+    "Usuario eliminado correctamente",
+    `<button onclick="cerrarConfirm()">Aceptar</button>`
+  );
+
+  renderUsuarios();
+}
+
+/* ===============================
+   ===== CONFIRM =====
+   =============================== */
+function mostrarConfirm(t, m, a) {
+  confirmacion.style.display = "flex";
+  tituloConfirm.innerText = t;
+  mensajeConfirm.innerText = m;
+  accionesConfirm.innerHTML = a;
+}
+
+function cerrarConfirm() {
+  confirmacion.style.display = "none";
+}
+</script>
+
+</body>
+</html>

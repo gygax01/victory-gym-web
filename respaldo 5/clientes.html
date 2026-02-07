@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Clientes</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body onload="initClientes()">
+
+<header class="header-brand">
+  <div class="brand">
+    <img src="img/logo.png">
+    <h2>Clientes</h2>
+  </div>
+  <button onclick="location.href='index.html'">← Inicio</button>
+</header>
+
+<div class="search-bar">
+  <input id="busqueda" placeholder="Buscar cliente..." oninput="filtrar()">
+</div>
+
+<div class="historial-container" id="listaClientes"></div>
+
+<!-- ===== CONFIRMAR ELIMINAR ===== -->
+<div class="confirmacion error" id="confirmBorrar">
+  <div class="box">
+    <h1>Eliminar cliente</h1>
+    <p>Esta acción no se puede revertir</p>
+    <button onclick="confirmarBorrado()">Confirmar</button>
+    <button onclick="cancelarBorrado()">Cancelar</button>
+  </div>
+</div>
+
+<!-- ===== REASIGNAR TARJETA ===== -->
+<div class="confirmacion" id="confirmReasignar">
+  <div class="box">
+    <h1>Reasignar tarjeta</h1>
+    <p>Acerque la nueva tarjeta</p>
+    <div id="estadoTarjeta" class="estado amarillo">Esperando tarjeta…</div>
+    <button onclick="cancelarReasignacion()">Cancelar</button>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nfc.js"></script>
+
+<script>
+let clientes = [];
+let clienteAEliminar = null;
+let clienteAReasignar = null;
+
+/* ===============================
+   ===== INIT =====
+   =============================== */
+function initClientes() {
+  verificarSesion();
+  requirePermission("clients_view");
+  cargarClientes();
+  applyPermissions();
+}
+
+/* ===============================
+   ===== CARGAR =====
+   =============================== */
+function cargarClientes() {
+  clientes = obtenerClientes().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  render(clientes);
+}
+
+function render(lista) {
+  listaClientes.innerHTML = "";
+
+  lista.forEach(c => {
+    const d = document.createElement("div");
+    d.className = "cliente";
+
+    d.innerHTML = `
+      <div class="cliente-header">
+        <h3>${c.nombre}</h3>
+
+        <div class="acciones">
+          <button onclick="iniciarReasignacion('${c.tarjetaUID}')">
+            Reasignar tarjeta
+          </button>
+
+          <button data-permission="clients_delete"
+                  onclick="pedirConfirmacion('${c.tarjetaUID}')">
+            Eliminar
+          </button>
+        </div>
+      </div>
+    `;
+
+    listaClientes.appendChild(d);
+  });
+
+  applyPermissions();
+}
+
+/* ===============================
+   ===== FILTRO =====
+   =============================== */
+function filtrar() {
+  const q = busqueda.value.toLowerCase();
+  render(clientes.filter(c => c.nombre.toLowerCase().includes(q)));
+}
+
+/* ===============================
+   ===== ELIMINAR =====
+   =============================== */
+function pedirConfirmacion(uid) {
+  requirePermission("clients_delete");
+  clienteAEliminar = uid;
+  confirmBorrar.style.display = "flex";
+}
+
+function cancelarBorrado() {
+  clienteAEliminar = null;
+  confirmBorrar.style.display = "none";
+}
+
+function confirmarBorrado() {
+  requirePermission("clients_delete");
+
+  guardarClientes(
+    obtenerClientes().filter(c => c.tarjetaUID !== clienteAEliminar)
+  );
+
+  cancelarBorrado();
+  cargarClientes();
+}
+
+/* ===============================
+   ===== REASIGNAR TARJETA =====
+   =============================== */
+function iniciarReasignacion(uid) {
+  clienteAReasignar = uid;
+
+  estadoTarjeta.className = "estado amarillo";
+  estadoTarjeta.innerText = "Esperando tarjeta…";
+  confirmReasignar.style.display = "flex";
+
+  iniciarNFCControlado({
+    onUID: uidNueva => {
+      if (uidYaRegistrada(uidNueva)) {
+        estadoTarjeta.className = "estado rojo";
+        estadoTarjeta.innerText = "Tarjeta ya registrada";
+        setTimeout(cancelarReasignacion, 1500);
+        return;
+      }
+
+      let lista = obtenerClientes().map(c => {
+        if (c.tarjetaUID === clienteAReasignar) {
+          c.tarjetaUID = uidNueva;
+        }
+        return c;
+      });
+
+      guardarClientes(lista);
+
+      estadoTarjeta.className = "estado verde";
+      estadoTarjeta.innerText = "Tarjeta reasignada";
+
+      setTimeout(() => {
+        cancelarReasignacion();
+        cargarClientes();
+      }, 1200);
+    },
+
+    onTimeout: () => {
+      estadoTarjeta.className = "estado rojo";
+      estadoTarjeta.innerText = "Tiempo de lectura agotado";
+      setTimeout(cancelarReasignacion, 1500);
+    },
+
+    onError: () => {
+      estadoTarjeta.className = "estado rojo";
+      estadoTarjeta.innerText = "Error de lectura";
+      setTimeout(cancelarReasignacion, 1500);
+    }
+  });
+}
+
+function cancelarReasignacion() {
+  clienteAReasignar = null;
+  detenerNFC();
+  confirmReasignar.style.display = "none";
+}
+</script>
+
+</body>
+</html>
