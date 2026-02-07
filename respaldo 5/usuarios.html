@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>Usuarios</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Supabase (solo para NFC) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -17,6 +19,7 @@
   <button id="btnVolver">← Volver</button>
 </header>
 
+<!-- ================= REGISTRO ================= -->
 <div class="card usuarios-pc" id="registroCard">
   <div class="usuarios-col">
     <h3>Registrar usuario</h3>
@@ -30,15 +33,21 @@
       <option value="admin">Administrador</option>
     </select>
 
-    <button class="nfc" id="btnAsignarTarjeta">Asignar tarjeta</button>
+    <button class="nfc" id="btnAsignarTarjeta">
+      Asignar tarjeta
+    </button>
+
     <p id="uidTexto" class="uid"></p>
   </div>
 
   <div class="usuarios-col">
-    <button id="btnRegistrar" disabled>Registrar usuario</button>
+    <button id="btnRegistrar" disabled>
+      Registrar usuario
+    </button>
   </div>
 </div>
 
+<!-- ================= LISTAS ================= -->
 <div class="search-bar" id="buscador">
   <input id="inputBusqueda" placeholder="Buscar usuario...">
 </div>
@@ -51,13 +60,17 @@
   <div id="listaEmpleados"></div>
 </div>
 
+<!-- ================= NFC ================= -->
 <div class="overlay" id="overlay" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
-    <div id="estadoNFC" class="estado amarillo">Esperando tarjeta…</div>
+    <div id="estadoNFC" class="estado amarillo">
+      Esperando tarjeta…
+    </div>
   </div>
 </div>
 
+<!-- ================= CONFIRM ================= -->
 <div class="confirmacion" id="confirmacion" style="display:none">
   <div class="box">
     <h1 id="tituloConfirm"></h1>
@@ -66,67 +79,117 @@
   </div>
 </div>
 
+<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
 
 <script>
+/* ======================================================
+   ===== CONFIG =====
+====================================================== */
 const CLAVE_MAESTRA = "victory(profitness)";
-
 const params = new URLSearchParams(window.location.search);
 const modoRegistro = params.get("modo") === "registro";
 
-window.addEventListener("load", () => {
-  // 🔐 SOLO exigir sesión si NO es modo registro
-  if (!modoRegistro) {
+/* ======================================================
+   ===== DOM =====
+====================================================== */
+const btnVolver = document.getElementById("btnVolver");
+const buscador = document.getElementById("buscador");
+const listasUsuarios = document.getElementById("listasUsuarios");
+
+const inputNombre = document.getElementById("inputNombre");
+const inputUsuario = document.getElementById("inputUsuario");
+const inputPassword = document.getElementById("inputPassword");
+const selectRol = document.getElementById("selectRol");
+
+const btnAsignarTarjeta = document.getElementById("btnAsignarTarjeta");
+const btnRegistrar = document.getElementById("btnRegistrar");
+const uidTexto = document.getElementById("uidTexto");
+
+const overlay = document.getElementById("overlay");
+const estadoNFC = document.getElementById("estadoNFC");
+
+const confirmacion = document.getElementById("confirmacion");
+const tituloConfirm = document.getElementById("tituloConfirm");
+const mensajeConfirm = document.getElementById("mensajeConfirm");
+const accionesConfirm = document.getElementById("accionesConfirm");
+
+/* ======================================================
+   ===== ESTADO =====
+====================================================== */
+let tarjetaUID = null;
+let leyendoNFC = false;
+
+/* ======================================================
+   ===== INIT =====
+====================================================== */
+window.addEventListener("load", initUsuarios);
+
+function initUsuarios() {
+  // 🔓 MODO REGISTRO INICIAL (SIN SESIÓN)
+  if (modoRegistro) {
+    buscador.remove();
+    listasUsuarios.remove();
+
+    btnVolver.onclick = () => location.href = "login.html";
+  } 
+  // 🔒 MODO NORMAL (REQUIERE SESIÓN)
+  else {
     if (!verificarSesion()) return;
 
     const sesion = obtenerSesion();
-    if (!["admin","superadmin"].includes(sesion.rol)) {
+    if (!["admin", "superadmin"].includes(sesion.rol)) {
       alert("Acceso no autorizado");
       location.href = "index.html";
       return;
     }
-  }
 
-  // UI según modo
-  if (modoRegistro) {
-    document.getElementById("buscador").remove();
-    document.getElementById("listasUsuarios").remove();
-  } else {
+    btnVolver.onclick = () => location.href = "index.html";
+    document.getElementById("inputBusqueda")
+      .addEventListener("input", renderUsuarios);
+
     renderUsuarios();
   }
 
-  document.getElementById("btnVolver").onclick = () => {
-    location.href = modoRegistro ? "login.html" : "index.html";
-  };
+  btnAsignarTarjeta.onclick = asignarTarjeta;
+  btnRegistrar.onclick = pedirClaveRegistro;
+}
 
-  document.getElementById("btnAsignarTarjeta").onclick = asignarTarjeta;
-  document.getElementById("btnRegistrar").onclick = pedirClaveRegistro;
-  document.getElementById("inputBusqueda")?.addEventListener("input", renderUsuarios);
-});
-
-/* ===== NFC ===== */
-let tarjetaUID = null;
-let leyendoNFC = false;
-
+/* ======================================================
+   ===== NFC =====
+====================================================== */
 function asignarTarjeta() {
   if (leyendoNFC) return;
+
   leyendoNFC = true;
   tarjetaUID = null;
+  btnRegistrar.disabled = true;
 
-  document.getElementById("overlay").style.display = "flex";
+  overlay.style.display = "flex";
+  estadoNFC.className = "estado amarillo";
+  estadoNFC.textContent = "Esperando tarjeta…";
+  uidTexto.textContent = "";
+
   iniciarNFCControlado({
     onUID: uid => {
       if (uidYaRegistrada(uid)) {
-        alert("Tarjeta ya registrada");
-        cerrarPopup();
+        estadoNFC.className = "estado rojo";
+        estadoNFC.textContent = "Tarjeta ya registrada";
+        setTimeout(cerrarPopup, 1500);
         return;
       }
+
       tarjetaUID = uid;
-      document.getElementById("uidTexto").textContent = "UID: " + uid;
-      document.getElementById("btnRegistrar").disabled = false;
-      cerrarPopup();
+      uidTexto.textContent = "UID: " + uid;
+      estadoNFC.className = "estado verde";
+      estadoNFC.textContent = "Tarjeta asignada";
+
+      setTimeout(() => {
+        cerrarPopup();
+        btnRegistrar.disabled = false;
+      }, 1200);
     }
   });
 }
@@ -134,25 +197,47 @@ function asignarTarjeta() {
 function cerrarPopup() {
   detenerNFC();
   leyendoNFC = false;
-  document.getElementById("overlay").style.display = "none";
+  overlay.style.display = "none";
 }
 
-/* ===== REGISTRO ===== */
+/* ======================================================
+   ===== REGISTRO =====
+====================================================== */
 function pedirClaveRegistro() {
-  mostrarConfirm("Contraseña maestra", "Ingrese la clave", confirmarRegistro);
+  if (!tarjetaUID) {
+    alert("Asigne una tarjeta primero");
+    return;
+  }
+
+  mostrarConfirm(
+    "Acceso administrativo",
+    "Ingrese la contraseña maestra",
+    confirmarRegistro
+  );
 }
 
 function confirmarRegistro() {
-  const clave = document.getElementById("claveInput").value;
+  const clave = document.getElementById("claveInput")?.value;
   if (clave !== CLAVE_MAESTRA) {
-    alert("Clave incorrecta");
+    alert("Contraseña incorrecta");
     return;
   }
+
   cerrarConfirm();
   registrarUsuario();
 }
 
 function registrarUsuario() {
+  if (
+    !inputNombre.value.trim() ||
+    !inputUsuario.value.trim() ||
+    !inputPassword.value ||
+    !tarjetaUID
+  ) {
+    alert("Complete todos los datos");
+    return;
+  }
+
   const empleados = obtenerEmpleados();
   empleados.push({
     nombre: inputNombre.value.trim(),
@@ -161,20 +246,53 @@ function registrarUsuario() {
     rol: selectRol.value,
     tarjetaUID
   });
+
   guardarEmpleados(empleados);
+
   alert("Usuario registrado correctamente");
   location.href = "login.html";
 }
 
-/* ===== CONFIRM UI ===== */
+/* ======================================================
+   ===== LISTA =====
+====================================================== */
+function renderUsuarios() {
+  const q = document.getElementById("inputBusqueda").value.toLowerCase();
+  const listaAdmins = document.getElementById("listaAdmins");
+  const listaEmpleados = document.getElementById("listaEmpleados");
+
+  listaAdmins.innerHTML = "";
+  listaEmpleados.innerHTML = "";
+
+  obtenerEmpleados()
+    .filter(e =>
+      e.nombre.toLowerCase().includes(q) ||
+      e.usuario.toLowerCase().includes(q)
+    )
+    .forEach(e => {
+      const div = document.createElement("div");
+      div.className = "cliente";
+      div.textContent = `${e.nombre} · ${e.usuario} · ${e.rol}`;
+
+      if (e.rol === "admin" || e.rol === "superadmin") {
+        listaAdmins.appendChild(div);
+      } else {
+        listaEmpleados.appendChild(div);
+      }
+    });
+}
+
+/* ======================================================
+   ===== CONFIRM UI =====
+====================================================== */
 function mostrarConfirm(t, m, onConfirm) {
   tituloConfirm.textContent = t;
   mensajeConfirm.textContent = m;
   accionesConfirm.innerHTML = "";
 
   const input = document.createElement("input");
-  input.id = "claveInput";
   input.type = "password";
+  input.id = "claveInput";
 
   const ok = document.createElement("button");
   ok.textContent = "Confirmar";
