@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,11 +7,11 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 
-<body onload="verificarSesion(); cargarClientes(); applyPermissions();">
+<body>
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
     <h2>Membresías</h2>
   </div>
   <button onclick="location.href='index.html'">← Inicio</button>
@@ -18,33 +19,71 @@
 
 <div class="historial-container" id="listaMembresias"></div>
 
+<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
 <script>
-function cargarClientes(){
-  const clientes=obtenerClientes();
-  listaMembresias.innerHTML="";
-  clientes.forEach((c,i)=>{
-    const d=document.createElement("div");
-    d.className="cliente";
-    d.innerHTML=`
+/* ===============================
+   ===== INIT =====
+   =============================== */
+document.addEventListener("DOMContentLoaded", () => {
+  if (!verificarSesion()) return;
+  cargarClientes();
+  applyPermissions();
+});
+
+/* ===============================
+   ===== CARGAR MEMBRESÍAS =====
+   =============================== */
+function cargarClientes() {
+  const clientes = obtenerClientes()
+    .filter(c => c && typeof c.nombre === "string");
+
+  listaMembresias.innerHTML = "";
+
+  clientes.forEach((c, i) => {
+    const d = document.createElement("div");
+    d.className = "cliente";
+
+    const expira = c.membresiaExpira ?? "—";
+
+    d.innerHTML = `
       <h3>${c.nombre}</h3>
-      <p>Expira: ${c.membresiaExpira}</p>
-      <button data-permission="memberships_extend" onclick="sumar(${i},7)">+7</button>
-      <button data-permission="memberships_extend" onclick="sumar(${i},30)">+30</button>
+      <p>Expira: ${expira}</p>
+
+      <button data-permission="memberships_extend"
+              onclick="sumar(${i}, 7)">
+        +7 días
+      </button>
+
+      <button data-permission="memberships_extend"
+              onclick="sumar(${i}, 30)">
+        +30 días
+      </button>
     `;
+
     listaMembresias.appendChild(d);
   });
+
   applyPermissions();
 }
 
-function sumar(i,dias){
-  if(!can("memberships_extend")) return;
-  const clientes=obtenerClientes();
-  const base=new Date(clientes[i].membresiaExpira||hoy());
-  base.setDate(base.getDate()+dias);
-  clientes[i].membresiaExpira=base.toISOString().split("T")[0];
+/* ===============================
+   ===== EXTENDER MEMBRESÍA =====
+   =============================== */
+function sumar(i, dias) {
+  if (!can("memberships_extend")) return;
+
+  const clientes = obtenerClientes();
+  const c = clientes[i];
+  if (!c) return;
+
+  const base = new Date(c.membresiaExpira || hoy());
+  base.setDate(base.getDate() + dias);
+
+  c.membresiaExpira = base.toISOString().split("T")[0];
+
   guardarClientes(clientes);
   cargarClientes();
 }
