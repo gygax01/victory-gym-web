@@ -1,46 +1,32 @@
 /* ===============================
-   ===== NFC VIA SUPABASE (FINAL) =====
-   Ultra rápido · estable · continuo
+   ===== NFC VIA SUPABASE (STABLE) =====
 =============================== */
 
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_uV1OQab8AfWE3SzNkuleQw_W0xgyfER";
 
-/* ===============================
-   ===== CLIENT =====
-=============================== */
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
 );
 
-/* ===============================
-   ===== ESTADO GLOBAL =====
-=============================== */
 let canalNFC = null;
-let escuchando = false;
-
-// anti-rebote por UID
-let ultimoUID = null;
 let ultimoTiempo = 0;
+let activo = false;
 
-// 🔥 MUY BAJO = sensación instantánea
-const COOLDOWN_MS = 400;
+const COOLDOWN_MS = 500;
 
-/* =========================================================
-   ===== INICIAR LECTURA NFC (CONTINUA REAL) =====
-========================================================= */
+/* ===============================
+   ===== INICIAR NFC =====
+=============================== */
 function iniciarNFCControlado({ onUID } = {}) {
-  // 🔒 nunca crear dos canales
-  if (escuchando && canalNFC) return;
+  detenerNFC(); // 🔥 SIEMPRE limpiar antes
 
-  detenerNFC(); // limpieza segura
-  escuchando = true;
-  ultimoUID = null;
+  activo = true;
   ultimoTiempo = 0;
 
   canalNFC = supabaseClient
-    .channel("nfc-events-live")
+    .channel("nfc-events-login")
     .on(
       "postgres_changes",
       {
@@ -49,47 +35,23 @@ function iniciarNFCControlado({ onUID } = {}) {
         table: "nfc_events"
       },
       payload => {
-        if (!escuchando) return;
+        if (!activo) return;
 
         const uid = payload.new?.uid;
         if (!uid) return;
 
         const ahora = Date.now();
+        if (ahora - ultimoTiempo < COOLDOWN_MS) return;
 
-        // 🔒 anti-rebote REAL (UID + tiempo)
-        if (uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) {
-          return;
-        }
-
-        ultimoUID = uid;
         ultimoTiempo = ahora;
-
-        // 🧠 callback inmediato
-        if (typeof onUID === "function") {
-          onUID(uid);
-        }
+        onUID && onUID(uid);
       }
     )
-    .subscribe(status => {
-      console.log("📡 NFC status:", status);
-
-      // ♻️ autorreconexión dura
-      if (
-        status === "CHANNEL_ERROR" ||
-        status === "TIMED_OUT" ||
-        status === "CLOSED"
-      ) {
-        console.warn("♻️ NFC reconectando...");
-        setTimeout(() => {
-          if (escuchando) iniciarNFCControlado({ onUID });
-        }, 800);
-      }
-    });
+    .subscribe();
 }
 
 /* ===============================
    ===== DETENER NFC =====
-   (login / registro / salir)
 =============================== */
 function detenerNFC() {
   if (canalNFC) {
@@ -98,20 +60,6 @@ function detenerNFC() {
     } catch {}
     canalNFC = null;
   }
-
-  escuchando = false;
-  ultimoUID = null;
+  activo = false;
   ultimoTiempo = 0;
-}
-
-/* ===============================
-   ===== DEBUG OPCIONAL =====
-=============================== */
-function estadoNFC() {
-  return {
-    escuchando,
-    canalActivo: !!canalNFC,
-    ultimoUID,
-    ultimoTiempo
-  };
 }
