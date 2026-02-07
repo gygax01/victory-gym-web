@@ -1,6 +1,6 @@
 /* ===============================
    ===== AUTH + PERMISSIONS =====
-   =============================== */
+=============================== */
 
 /*
   ROLES:
@@ -9,7 +9,9 @@
   - superadmin
 */
 
-/* ===== PERMISOS POR ROL ===== */
+/* ===============================
+   ===== PERMISOS POR ROL =====
+=============================== */
 const ROLE_PERMISSIONS = {
   employee: {
     clients_view: true,
@@ -75,7 +77,7 @@ const ROLE_PERMISSIONS = {
 
 /* ===============================
    ===== LOGIN =====
-   =============================== */
+=============================== */
 function login(usuario, password, delay = 0) {
   const empleados = obtenerEmpleados();
 
@@ -88,23 +90,25 @@ function login(usuario, password, delay = 0) {
     return false;
   }
 
-  delay
-    ? setTimeout(() => iniciarSesion(emp), delay)
-    : iniciarSesion(emp);
+  if (delay > 0) {
+    setTimeout(() => iniciarSesion(emp), delay);
+  } else {
+    iniciarSesion(emp);
+  }
 
   return true;
 }
 
 /* ===============================
    ===== INICIAR SESIÓN =====
-   =============================== */
+=============================== */
 function iniciarSesion(emp) {
   const rol = emp.rol;
 
   const permisos =
     rol === "superadmin"
       ? { system_all: true }
-      : { ...ROLE_PERMISSIONS[rol] };
+      : { ...(ROLE_PERMISSIONS[rol] || {}) };
 
   localStorage.setItem(
     "session",
@@ -120,9 +124,8 @@ function iniciarSesion(emp) {
 
 /* ===============================
    ===== SESIÓN =====
-   =============================== */
+=============================== */
 function verificarSesion() {
-  // 🔒 FIX: solo redirige si realmente se invoca esta función
   if (!localStorage.getItem("session")) {
     location.href = "login.html";
     return false;
@@ -140,7 +143,7 @@ function obtenerSesion() {
 
 /* ===============================
    ===== PERMISOS =====
-   =============================== */
+=============================== */
 function can(permission) {
   const s = obtenerSesion();
   if (!s || !s.permisos) return false;
@@ -149,9 +152,7 @@ function can(permission) {
 }
 
 /*
-  🔥 FIX CRÍTICO
-  - NO lanza errores
-  - NO rompe JS
+  🔒 No rompe JS, solo bloquea acceso
 */
 function requirePermission(permission) {
   if (!can(permission)) {
@@ -163,7 +164,7 @@ function requirePermission(permission) {
 
 /* ===============================
    ===== BLOQUEO POR ROL =====
-   =============================== */
+=============================== */
 function requireRole(roles) {
   const s = obtenerSesion();
   if (!s || !roles.includes(s.rol)) {
@@ -176,7 +177,7 @@ function requireRole(roles) {
 
 /* ===============================
    ===== UI =====
-   =============================== */
+=============================== */
 function applyPermissions() {
   document.querySelectorAll("[data-permission]").forEach(el => {
     if (!can(el.dataset.permission)) {
@@ -187,7 +188,7 @@ function applyPermissions() {
 
 /* ===============================
    ===== LOGOUT =====
-   =============================== */
+=============================== */
 function logout() {
   localStorage.removeItem("session");
   location.href = "login.html";
