@@ -17,14 +17,14 @@
     <img src="img/logo.png" alt="Victory Pro Fitness">
   </div>
 
-  <input id="user" placeholder="Usuario" autocomplete="username">
-  <input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password">
+  <input id="inputUser" placeholder="Usuario" autocomplete="username">
+  <input id="inputPass" type="password" placeholder="Contraseña" autocomplete="current-password">
 
-  <button class="btn-login" onclick="loginManual()">Ingresar</button>
+  <button class="btn-login" id="btnLogin">Ingresar</button>
 
   <hr>
 
-  <button class="nfc btn-nfc" id="btnNFC" onclick="loginConTarjeta()">
+  <button class="nfc btn-nfc" id="btnNFC">
     Ingresar con tarjeta
   </button>
 
@@ -40,7 +40,7 @@
 <div class="overlay" id="overlay" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
-    <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
+    <div id="estadoNFC" class="estado amarillo">Esperando tarjeta…</div>
   </div>
 </div>
 
@@ -51,8 +51,18 @@
 
 <script>
 /* ===============================
+   ===== DOM =====
+=============================== */
+const inputUser = document.getElementById("inputUser");
+const inputPass = document.getElementById("inputPass");
+const btnLogin = document.getElementById("btnLogin");
+const btnNFC = document.getElementById("btnNFC");
+const overlay = document.getElementById("overlay");
+const estadoNFC = document.getElementById("estadoNFC");
+
+/* ===============================
    ===== BOOTSTRAP SUPERADMIN =====
-   =============================== */
+=============================== */
 (function crearSuperAdminSiNoExiste() {
   const emps = obtenerEmpleados();
   if (emps.some(e => e.rol === "superadmin")) return;
@@ -71,20 +81,39 @@
 
 /* ===============================
    ===== ESTADO =====
-   =============================== */
+=============================== */
 let leyendoNFC = false;
 
 /* ===============================
+   ===== INIT =====
+=============================== */
+window.addEventListener("load", () => {
+  btnLogin.addEventListener("click", loginManual);
+  btnNFC.addEventListener("click", loginConTarjeta);
+
+  // Enter para login
+  inputPass.addEventListener("keydown", e => {
+    if (e.key === "Enter") loginManual();
+  });
+});
+
+/* ===============================
    ===== LOGIN MANUAL =====
-   =============================== */
+=============================== */
 function loginManual() {
   if (leyendoNFC) return;
-  login(user.value.trim(), pass.value, 2200);
+
+  const user = inputUser.value.trim();
+  const pass = inputPass.value;
+
+  if (!user || !pass) return;
+
+  login(user, pass, 2200);
 }
 
 /* ===============================
-   ===== LOGIN CON TARJETA (NFC) =====
-   =============================== */
+   ===== LOGIN NFC =====
+=============================== */
 function loginConTarjeta() {
   if (leyendoNFC) return;
 
@@ -92,22 +121,22 @@ function loginConTarjeta() {
   btnNFC.disabled = true;
 
   overlay.style.display = "flex";
-  estado.className = "estado amarillo";
-  estado.innerText = "Esperando tarjeta…";
+  estadoNFC.className = "estado amarillo";
+  estadoNFC.textContent = "Esperando tarjeta…";
 
   iniciarNFCControlado({
     onUID: uid => {
       const emp = obtenerEmpleados().find(e => e.tarjetaUID === uid);
 
       if (!emp) {
-        estado.className = "estado rojo";
-        estado.innerText = "Tarjeta no registrada";
+        estadoNFC.className = "estado rojo";
+        estadoNFC.textContent = "Tarjeta no registrada";
         setTimeout(resetNFC, 1500);
         return;
       }
 
-      estado.className = "estado verde";
-      estado.innerText = "Acceso correcto";
+      estadoNFC.className = "estado verde";
+      estadoNFC.textContent = "Acceso correcto";
 
       setTimeout(() => {
         resetNFC();
@@ -116,14 +145,14 @@ function loginConTarjeta() {
     },
 
     onTimeout: () => {
-      estado.className = "estado rojo";
-      estado.innerText = "Tiempo de lectura agotado";
+      estadoNFC.className = "estado rojo";
+      estadoNFC.textContent = "Tiempo de lectura agotado";
       setTimeout(resetNFC, 1500);
     },
 
     onError: () => {
-      estado.className = "estado rojo";
-      estado.innerText = "Error de lectura";
+      estadoNFC.className = "estado rojo";
+      estadoNFC.textContent = "Error de lectura";
       setTimeout(resetNFC, 1500);
     }
   });
@@ -131,7 +160,7 @@ function loginConTarjeta() {
 
 /* ===============================
    ===== RESET NFC =====
-   =============================== */
+=============================== */
 function resetNFC() {
   detenerNFC();
   leyendoNFC = false;
