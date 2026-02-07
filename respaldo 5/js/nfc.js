@@ -1,5 +1,5 @@
 /* ===============================
-   ===== NFC VIA SUPABASE (STABLE) =====
+   ===== NFC VIA SUPABASE =====
 =============================== */
 
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
@@ -11,22 +11,22 @@ const supabaseClient = window.supabase.createClient(
 );
 
 let canalNFC = null;
+let escuchando = false;
+let ultimoUID = null;
 let ultimoTiempo = 0;
-let activo = false;
 
-const COOLDOWN_MS = 500;
+const COOLDOWN_MS = 400;
 
-/* ===============================
-   ===== INICIAR NFC =====
-=============================== */
 function iniciarNFCControlado({ onUID } = {}) {
-  detenerNFC(); // 🔥 limpieza total
+  if (escuchando && canalNFC) return;
 
-  activo = true;
+  detenerNFC();
+  escuchando = true;
+  ultimoUID = null;
   ultimoTiempo = 0;
 
   canalNFC = supabaseClient
-    .channel("nfc-events-global")
+    .channel("nfc-events")
     .on(
       "postgres_changes",
       {
@@ -35,31 +35,39 @@ function iniciarNFCControlado({ onUID } = {}) {
         table: "nfc_events"
       },
       payload => {
-        if (!activo) return;
+        if (!escuchando) return;
 
         const uid = payload.new?.uid;
         if (!uid) return;
 
         const ahora = Date.now();
-        if (ahora - ultimoTiempo < COOLDOWN_MS) return;
+        if (uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) return;
 
+        ultimoUID = uid;
         ultimoTiempo = ahora;
-        onUID && onUID(uid);
+
+        onUID?.(uid);
       }
     )
     .subscribe();
 }
 
-/* ===============================
-   ===== DETENER NFC =====
-=============================== */
 function detenerNFC() {
   if (canalNFC) {
-    try {
-      supabaseClient.removeChannel(canalNFC);
-    } catch {}
+    supabaseClient.removeChannel(canalNFC);
     canalNFC = null;
   }
-  activo = false;
+  escuchando = false;
+  ultimoUID = null;
   ultimoTiempo = 0;
+}
+
+/* 🔧 DEBUG (renombrado, NO choca) */
+function debugEstadoNFC() {
+  return {
+    escuchando,
+    canalActivo: !!canalNFC,
+    ultimoUID,
+    ultimoTiempo
+  };
 }
