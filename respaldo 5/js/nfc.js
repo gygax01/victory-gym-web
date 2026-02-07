@@ -20,13 +20,13 @@ const COOLDOWN_MS = 500;
    ===== INICIAR NFC =====
 =============================== */
 function iniciarNFCControlado({ onUID } = {}) {
-  detenerNFC(); // 🔥 SIEMPRE limpiar antes
+  detenerNFC(); // 🔥 limpieza total
 
   activo = true;
   ultimoTiempo = 0;
 
   canalNFC = supabaseClient
-    .channel("nfc-events-login")
+    .channel("nfc-events-global")
     .on(
       "postgres_changes",
       {
