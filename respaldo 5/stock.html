@@ -16,24 +16,32 @@
   <button onclick="location.href='index.html'">← Inicio</button>
 </header>
 
+<!-- ===== NUEVO PRODUCTO ===== -->
 <div class="card stock-nuevo">
   <h3>Nuevo producto</h3>
   <div class="stock-form">
-    <input id="nNombre" placeholder="Nombre">
-    <input id="nPrecio" type="number" min="0" step="0.01" placeholder="Precio">
-    <input id="nStock" type="number" min="0" step="1" placeholder="Stock inicial">
-    <button data-permission="products_create" onclick="nuevo()">Agregar</button>
+    <input id="inputNombre" placeholder="Nombre">
+    <input id="inputPrecio" type="number" min="0" step="0.01" placeholder="Precio">
+    <input id="inputStock" type="number" min="0" step="1" placeholder="Stock inicial">
+    <button id="btnAgregar" data-permission="products_create">
+      Agregar
+    </button>
   </div>
 </div>
 
+<!-- ===== BUSCADOR ===== -->
 <div class="search-bar">
-  <input id="buscadorStock" placeholder="Buscar..." oninput="filtrarStock()">
+  <input id="buscadorStock" placeholder="Buscar...">
 </div>
 
-<div class="stock-grid" id="lista"></div>
+<!-- ===== LISTA ===== -->
+<div class="stock-grid" id="listaStock"></div>
 
+<!-- ===== FOOTER ===== -->
 <div class="stock-footer">
-  <button data-permission="stock_add" onclick="guardar()">💾 Guardar</button>
+  <button id="btnGuardar" data-permission="stock_add">
+    💾 Guardar
+  </button>
 </div>
 
 <!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
@@ -42,55 +50,97 @@
 
 <script>
 /* ===============================
-   ===== INIT =====
-   =============================== */
-document.addEventListener("DOMContentLoaded", () => {
-  if (!verificarSesion()) return;
-  if (!requirePermission("stock_view")) return;
-  cargar();
-  applyPermissions();
-});
+   ===== DOM =====
+=============================== */
+const inputNombre = document.getElementById("inputNombre");
+const inputPrecio = document.getElementById("inputPrecio");
+const inputStock = document.getElementById("inputStock");
+const btnAgregar = document.getElementById("btnAgregar");
+const buscadorStock = document.getElementById("buscadorStock");
+const listaStock = document.getElementById("listaStock");
+const btnGuardar = document.getElementById("btnGuardar");
 
 /* ===============================
    ===== ESTADO =====
-   =============================== */
+=============================== */
 let productos = [];
 let productosFiltrados = [];
 
 /* ===============================
+   ===== INIT =====
+=============================== */
+window.addEventListener("load", initStock);
+
+function initStock() {
+  if (!verificarSesion()) return;
+  if (!requirePermission("stock_view")) return;
+
+  btnAgregar.addEventListener("click", nuevoProducto);
+  btnGuardar.addEventListener("click", guardarStock);
+  buscadorStock.addEventListener("input", filtrarStock);
+
+  cargarStock();
+  applyPermissions();
+}
+
+/* ===============================
    ===== CARGAR / RENDER =====
-   =============================== */
-function cargar() {
+=============================== */
+function cargarStock() {
   productos = obtenerProductos().filter(
     p => p && typeof p.nombre === "string"
   );
   productosFiltrados = [...productos];
-  render();
+  renderStock();
 }
 
-function render() {
-  lista.innerHTML = "";
+function renderStock() {
+  listaStock.innerHTML = "";
+
+  if (productosFiltrados.length === 0) {
+    const p = document.createElement("p");
+    p.textContent = "No hay productos";
+    listaStock.appendChild(p);
+    return;
+  }
 
   productosFiltrados.forEach((p, idx) => {
-    const d = document.createElement("div");
-    d.className = "stock-card";
+    const card = document.createElement("div");
+    card.className = "stock-card";
 
-    d.innerHTML = `
-      <div class="stock-header">
-        <h4>${p.nombre}</h4>
-        <button data-permission="stock_delete"
-                onclick="eliminar(${idx})">
-          Eliminar
-        </button>
-      </div>
-      <div>$${Number(p.precio).toFixed(2)}</div>
-      <div>Stock: ${Number(p.stock) || 0}</div>
+    const header = document.createElement("div");
+    header.className = "stock-header";
 
-      <button data-permission="stock_add" onclick="sumar(${idx}, 1)">+1</button>
-      <button data-permission="stock_add" onclick="sumar(${idx}, 10)">+10</button>
-    `;
+    const nombre = document.createElement("h4");
+    nombre.textContent = p.nombre;
 
-    lista.appendChild(d);
+    const btnEliminar = document.createElement("button");
+    btnEliminar.textContent = "Eliminar";
+    btnEliminar.setAttribute("data-permission", "stock_delete");
+    btnEliminar.addEventListener("click", () =>
+      eliminarProducto(p)
+    );
+
+    header.append(nombre, btnEliminar);
+
+    const precio = document.createElement("div");
+    precio.textContent = "$" + Number(p.precio).toFixed(2);
+
+    const stock = document.createElement("div");
+    stock.textContent = "Stock: " + (Number(p.stock) || 0);
+
+    const btnMas1 = document.createElement("button");
+    btnMas1.textContent = "+1";
+    btnMas1.setAttribute("data-permission", "stock_add");
+    btnMas1.addEventListener("click", () => sumarStock(p, 1));
+
+    const btnMas10 = document.createElement("button");
+    btnMas10.textContent = "+10";
+    btnMas10.setAttribute("data-permission", "stock_add");
+    btnMas10.addEventListener("click", () => sumarStock(p, 10));
+
+    card.append(header, precio, stock, btnMas1, btnMas10);
+    listaStock.appendChild(card);
   });
 
   applyPermissions();
@@ -98,27 +148,21 @@ function render() {
 
 /* ===============================
    ===== OPERACIONES =====
-   =============================== */
-function sumar(i, c) {
+=============================== */
+function sumarStock(producto, cantidad) {
   if (!requirePermission("stock_add")) return;
-  const p = productosFiltrados[i];
-  if (!p) return;
-
-  p.stock = (Number(p.stock) || 0) + c;
-  render();
+  producto.stock = (Number(producto.stock) || 0) + cantidad;
+  renderStock();
 }
 
-function eliminar(i) {
+function eliminarProducto(producto) {
   if (!requirePermission("stock_delete")) return;
-  const p = productosFiltrados[i];
-  if (!p) return;
-
-  productos = productos.filter(x => x !== p);
-  productosFiltrados = productosFiltrados.filter(x => x !== p);
-  guardar();
+  productos = productos.filter(p => p !== producto);
+  productosFiltrados = productosFiltrados.filter(p => p !== producto);
+  guardarStock();
 }
 
-function guardar() {
+function guardarStock() {
   if (!requirePermission("stock_add")) return;
   guardarProductos(productos);
   alert("Stock guardado");
@@ -126,44 +170,40 @@ function guardar() {
 
 /* ===============================
    ===== NUEVO PRODUCTO =====
-   =============================== */
-function nuevo() {
+=============================== */
+function nuevoProducto() {
   if (!requirePermission("products_create")) return;
 
-  const nombre = nNombre.value.trim();
-  const precio = Number(nPrecio.value);
-  const stock = Number(nStock.value);
+  const nombre = inputNombre.value.trim();
+  const precio = Number(inputPrecio.value);
+  const stock = Number(inputStock.value);
 
   if (!nombre || isNaN(precio) || isNaN(stock)) {
     alert("Datos inválidos");
     return;
   }
 
-  productos.push({
-    nombre,
-    precio,
-    stock
-  });
+  productos.push({ nombre, precio, stock });
+  inputNombre.value = "";
+  inputPrecio.value = "";
+  inputStock.value = "";
 
-  nNombre.value = "";
-  nPrecio.value = "";
-  nStock.value = "";
-
-  guardar();
+  guardarStock();
 }
 
 /* ===============================
    ===== FILTRO =====
-   =============================== */
+=============================== */
 function filtrarStock() {
   const q = buscadorStock.value.toLowerCase();
   productosFiltrados = productos.filter(
     p => p.nombre.toLowerCase().includes(q)
   );
-  render();
+  renderStock();
 }
 </script>
 
 </body>
 </html>
+
 
