@@ -2,8 +2,9 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Registro de Cliente</title>
+  <title>Registro de Usuario</title>
   <link rel="stylesheet" href="css/styles.css">
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -11,23 +12,43 @@
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png">
-    <h2>Registro de Cliente</h2>
+    <img src="img/logo.png" alt="Victory Pro Fitness">
+    <h2>Registro de Usuario</h2>
   </div>
-  <button onclick="location.href='login.html'">← Volver</button>
+
+  <button class="btn-volver" onclick="location.href='login.html'">
+    ← Volver
+  </button>
 </header>
 
 <div class="card registro-pc">
-  <input id="inputNombre" placeholder="Nombre completo">
-  <input id="inputTelefono" placeholder="Teléfono">
 
-  <button id="btnAsignar">Asignar tarjeta</button>
-  <button id="btnFinalizar" disabled>Registrar cliente</button>
+  <div class="registro-col">
+    <h3>Datos del usuario</h3>
+
+    <input id="inputNombre" placeholder="Nombre completo">
+    <input id="inputUsuario" placeholder="Usuario">
+    <input id="inputPassword" type="password" placeholder="Contraseña">
+
+    <select id="inputRol">
+      <option value="employee">Empleado</option>
+      <option value="admin">Administrador</option>
+    </select>
+
+    <button class="nfc" id="btnAsignar">
+      Asignar tarjeta
+    </button>
+
+    <button id="btnGuardar">
+      Registrar usuario
+    </button>
+  </div>
 </div>
 
 <div class="overlay" id="overlay" style="display:none">
   <div class="popup">
-    <div id="estadoNFC">Esperando tarjeta…</div>
+    <h2>Acerque la tarjeta</h2>
+    <div id="estadoNFC" class="estado amarillo">Esperando tarjeta…</div>
   </div>
 </div>
 
@@ -36,39 +57,81 @@
 <script src="js/nfc.js"></script>
 
 <script>
-if (!verificarSesion()) return;
-if (!requirePermission("clients_create")) return;
+const inputNombre = document.getElementById("inputNombre");
+const inputUsuario = document.getElementById("inputUsuario");
+const inputPassword = document.getElementById("inputPassword");
+const inputRol = document.getElementById("inputRol");
+const btnAsignar = document.getElementById("btnAsignar");
+const btnGuardar = document.getElementById("btnGuardar");
+
+const overlay = document.getElementById("overlay");
+const estadoNFC = document.getElementById("estadoNFC");
 
 let tarjetaUID = null;
+let leyendoNFC = false;
 
-btnAsignar.onclick = () => {
+window.addEventListener("load", () => {
+  if (!verificarSesion()) return;
+  if (!requirePermission("employees_create")) return;
+
+  btnAsignar.addEventListener("click", asignarTarjeta);
+  btnGuardar.addEventListener("click", registrarUsuario);
+});
+
+function asignarTarjeta() {
+  if (leyendoNFC) return;
+
+  leyendoNFC = true;
+  tarjetaUID = null;
+
   overlay.style.display = "flex";
+  estadoNFC.className = "estado amarillo";
+  estadoNFC.textContent = "Esperando tarjeta…";
+
   iniciarNFCControlado({
     onUID: uid => {
       if (uidYaRegistrada(uid)) {
+        estadoNFC.className = "estado rojo";
         estadoNFC.textContent = "Tarjeta ya registrada";
-        setTimeout(() => overlay.style.display = "none", 1500);
+        setTimeout(cerrarNFC, 1500);
         return;
       }
+
       tarjetaUID = uid;
-      btnFinalizar.disabled = false;
-      overlay.style.display = "none";
-      detenerNFC();
+      estadoNFC.className = "estado verde";
+      estadoNFC.textContent = "Tarjeta asignada";
+
+      setTimeout(cerrarNFC, 1200);
     }
   });
-};
+}
 
-btnFinalizar.onclick = () => {
-  const clientes = obtenerClientes();
-  clientes.push({
+function cerrarNFC() {
+  detenerNFC();
+  leyendoNFC = false;
+  overlay.style.display = "none";
+}
+
+function registrarUsuario() {
+  if (!inputNombre.value || !inputUsuario.value || !inputPassword.value) {
+    alert("Completa todos los campos");
+    return;
+  }
+
+  const empleados = obtenerEmpleados();
+
+  empleados.push({
     nombre: inputNombre.value.trim(),
-    telefono: inputTelefono.value.trim(),
-    tarjetaUID,
-    fechaRegistro: hoy()
+    usuario: inputUsuario.value.trim(),
+    password: inputPassword.value,
+    rol: inputRol.value,
+    tarjetaUID
   });
-  guardarClientes(clientes);
-  location.href = "index.html";
-};
+
+  guardarEmpleados(empleados);
+  alert("Usuario registrado correctamente");
+  location.href = "login.html";
+}
 </script>
 
 </body>
