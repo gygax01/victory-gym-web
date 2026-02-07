@@ -19,7 +19,7 @@
 </header>
 
 <div class="search-bar">
-  <input id="busqueda" placeholder="Buscar cliente..." oninput="filtrar()">
+  <input id="busqueda" placeholder="Buscar cliente...">
 </div>
 
 <div class="historial-container" id="listaHistorial"></div>
@@ -30,22 +30,35 @@
 
 <script>
 /* ===============================
-   ===== INIT =====
-   =============================== */
-document.addEventListener("DOMContentLoaded", () => {
-  if (!verificarSesion()) return;
-  cargarHistorial();
-});
+   ===== DOM =====
+=============================== */
+const listaHistorial = document.getElementById("listaHistorial");
+const busqueda = document.getElementById("busqueda");
 
 /* ===============================
    ===== ESTADO =====
-   =============================== */
+=============================== */
 let clientes = [];
 let asistencias = [];
 
 /* ===============================
+   ===== INIT =====
+=============================== */
+window.addEventListener("load", initHistorial);
+
+function initHistorial() {
+  if (!verificarSesion()) return;
+  if (typeof requirePermission === "function") {
+    requirePermission("history_view");
+  }
+
+  busqueda.addEventListener("input", filtrar);
+  cargarHistorial();
+}
+
+/* ===============================
    ===== UTIL =====
-   =============================== */
+=============================== */
 function diasEntre(a, b) {
   return Math.round(
     (new Date(b) - new Date(a)) / 86400000
@@ -62,7 +75,7 @@ function ultimaVisita(uid) {
 
 /* ===============================
    ===== RACHAS =====
-   =============================== */
+=============================== */
 function calcularRachas(uid) {
   const fechas = [...new Set(
     asistencias
@@ -71,7 +84,6 @@ function calcularRachas(uid) {
   )].sort();
 
   let max = 0;
-  let actual = 0;
   let temp = fechas.length ? 1 : 0;
 
   for (let i = 1; i < fechas.length; i++) {
@@ -84,6 +96,7 @@ function calcularRachas(uid) {
   }
   max = Math.max(max, temp);
 
+  let actual = 0;
   for (let i = fechas.length - 1; i > 0; i--) {
     if (diasEntre(fechas[i - 1], fechas[i]) === 1) actual++;
     else break;
@@ -94,8 +107,8 @@ function calcularRachas(uid) {
 }
 
 /* ===============================
-   ===== CARGAR HISTORIAL =====
-   =============================== */
+   ===== CARGAR =====
+=============================== */
 function cargarHistorial() {
   clientes = obtenerClientes().filter(
     c => c && typeof c.nombre === "string"
@@ -112,10 +125,16 @@ function cargarHistorial() {
 
 /* ===============================
    ===== RENDER =====
-   =============================== */
+=============================== */
 function render(lista) {
-  const cont = document.getElementById("listaHistorial");
-  cont.innerHTML = "";
+  listaHistorial.innerHTML = "";
+
+  if (lista.length === 0) {
+    const p = document.createElement("p");
+    p.textContent = "No hay historial disponible";
+    listaHistorial.appendChild(p);
+    return;
+  }
 
   lista.forEach(c => {
     const registros = asistencias
@@ -129,48 +148,71 @@ function render(lista) {
     const card = document.createElement("div");
     card.className = "cliente";
 
-    card.innerHTML = `
-      <div class="cliente-header" aria-expanded="false">
-        <div class="info-wrapper">
-          <div class="info-bloque">
-            <h3>${c.nombre}</h3>
-            <div class="meta">
-              Última visita: ${ultima} · Registro: ${registro}<br>
-              <span class="racha actual">Racha actual: ${actual} días</span>
-              &nbsp; · &nbsp;
-              <span class="racha maxima">Racha máxima: ${max} días</span>
-            </div>
-          </div>
-        </div>
-        <div class="flecha">▾</div>
-      </div>
+    const header = document.createElement("div");
+    header.className = "cliente-header";
+    header.setAttribute("aria-expanded", "false");
 
-      <div class="historial">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Entrada</th>
-              <th>Salida</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              registros.map((r, i) => `
-                <tr class="${i % 2 ? 'alt' : ''}">
-                  <td>${r.fecha}</td>
-                  <td>${r.entrada}</td>
-                  <td>${r.salida ?? "-"}</td>
-                </tr>
-              `).join("")
-            }
-          </tbody>
-        </table>
-      </div>
+    const info = document.createElement("div");
+    info.className = "info-wrapper";
+
+    const bloque = document.createElement("div");
+    bloque.className = "info-bloque";
+
+    const nombre = document.createElement("h3");
+    nombre.textContent = c.nombre;
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.innerHTML = `
+      Última visita: ${ultima} · Registro: ${registro}<br>
+      <span class="racha actual">Racha actual: ${actual} días</span>
+      &nbsp; · &nbsp;
+      <span class="racha maxima">Racha máxima: ${max} días</span>
     `;
 
-    const header = card.querySelector(".cliente-header");
-    const panel = card.querySelector(".historial");
+    const flecha = document.createElement("div");
+    flecha.className = "flecha";
+    flecha.textContent = "▾";
+
+    bloque.append(nombre, meta);
+    info.appendChild(bloque);
+    header.append(info, flecha);
+
+    const panel = document.createElement("div");
+    panel.className = "historial";
+
+    const table = document.createElement("table");
+
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+      <tr>
+        <th>Fecha</th>
+        <th>Entrada</th>
+        <th>Salida</th>
+      </tr>
+    `;
+
+    const tbody = document.createElement("tbody");
+
+    registros.forEach((r, i) => {
+      const tr = document.createElement("tr");
+      if (i % 2) tr.className = "alt";
+
+      const tdFecha = document.createElement("td");
+      tdFecha.textContent = r.fecha;
+
+      const tdEntrada = document.createElement("td");
+      tdEntrada.textContent = r.entrada;
+
+      const tdSalida = document.createElement("td");
+      tdSalida.textContent = r.salida ?? "-";
+
+      tr.append(tdFecha, tdEntrada, tdSalida);
+      tbody.appendChild(tr);
+    });
+
+    table.append(thead, tbody);
+    panel.appendChild(table);
 
     header.onclick = () => {
       document.querySelectorAll(".cliente.abierto").forEach(o => {
@@ -187,20 +229,19 @@ function render(lista) {
       header.setAttribute("aria-expanded", abierto);
     };
 
-    cont.appendChild(card);
+    card.append(header, panel);
+    listaHistorial.appendChild(card);
   });
 }
 
 /* ===============================
    ===== FILTRO =====
-   =============================== */
+=============================== */
 function filtrar() {
   const q = busqueda.value.toLowerCase();
-  render(
-    clientes.filter(c =>
-      c.nombre.toLowerCase().includes(q)
-    )
-  );
+  render(clientes.filter(c =>
+    c.nombre.toLowerCase().includes(q)
+  ));
 }
 </script>
 
