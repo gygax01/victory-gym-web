@@ -12,14 +12,14 @@ function cargarAsistencias() {
   const tbody = document.getElementById("tablaAsistencias");
   if (!tbody || !Array.isArray(asistencias)) return;
 
+  /* 🔥 FORZAR RE-RENDER COMPLETO */
   tbody.innerHTML = "";
 
   asistencias
     .filter(a =>
       a &&
       a.fecha === hoyFecha &&
-      typeof a.nombre === "string" &&
-      typeof a.entrada === "string"
+      typeof a.nombre === "string"
     )
     .forEach(a => {
       const tr = document.createElement("tr");
@@ -28,12 +28,15 @@ function cargarAsistencias() {
       tdNombre.textContent = a.nombre;
 
       const tdEntrada = document.createElement("td");
-      tdEntrada.textContent = a.entrada;
+      tdEntrada.textContent = a.entrada || "-";
 
       const tdSalida = document.createElement("td");
-      tdSalida.textContent = a.salida ?? "-";
+      tdSalida.textContent = a.salida || "-";
 
-      tr.append(tdNombre, tdEntrada, tdSalida);
+      tr.appendChild(tdNombre);
+      tr.appendChild(tdEntrada);
+      tr.appendChild(tdSalida);
+
       tbody.appendChild(tr);
     });
 }
@@ -63,5 +66,4 @@ function actualizarContador() {
     contador.textContent = `Dentro: ${dentro}`;
   }
 }
-
 
