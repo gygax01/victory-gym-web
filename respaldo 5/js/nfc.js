@@ -21,17 +21,21 @@ const supabaseClient = window.supabase.createClient(
 =============================== */
 let canalNFC = null;
 let escuchando = false;
+
+/*
+  Anti-rebote por UID (NO bloqueo permanente)
+*/
 let ultimoUID = null;
 let ultimoTiempo = 0;
 
 /* ===============================
    ===== CONFIG =====
 =============================== */
-const COOLDOWN_MS = 3000;
+const COOLDOWN_MS = 800; // ⏱️ solo anti-rebote real
 
 /* =========================================================
-   ===== INICIAR LECTURA NFC (CONTROLADA) =====
-   ========================================================= */
+   ===== INICIAR LECTURA NFC (CONTROLADA Y ESTABLE) =====
+========================================================= */
 function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
   detenerNFC();
 
@@ -55,6 +59,8 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
         if (!uid) return;
 
         const ahora = Date.now();
+
+        // 🔒 Anti-rebote (NO bloqueo permanente)
         if (uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) {
           return;
         }
@@ -64,6 +70,12 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
 
         if (typeof onUID === "function") {
           onUID(uid);
+
+          // 🔥 liberar UID después del cooldown
+          setTimeout(() => {
+            ultimoUID = null;
+            ultimoTiempo = 0;
+          }, COOLDOWN_MS);
         }
       }
     )
@@ -73,7 +85,7 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
       }
     });
 
-  // ⏱ Timeout de seguridad (10s)
+  /* ⏱ Timeout de seguridad (10s) */
   if (typeof onTimeout === "function") {
     setTimeout(() => {
       if (escuchando) {
@@ -98,13 +110,18 @@ function detenerNFC() {
 }
 
 /* ===============================
-   ===== UTIL =====
+   ===== UTIL TARJETAS =====
 =============================== */
 function uidYaRegistrada(uid) {
   if (!uid) return false;
 
-  const clientes = obtenerClientes?.() || [];
-  const empleados = obtenerEmpleados?.() || [];
+  const clientes = typeof obtenerClientes === "function"
+    ? obtenerClientes()
+    : [];
+
+  const empleados = typeof obtenerEmpleados === "function"
+    ? obtenerEmpleados()
+    : [];
 
   return (
     clientes.some(c => c.tarjetaUID === uid) ||
@@ -123,4 +140,3 @@ function liberarTarjeta(uid) {
   });
   guardarEmpleados(empleados);
 }
-
