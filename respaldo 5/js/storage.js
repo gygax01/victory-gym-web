@@ -1,10 +1,10 @@
 /* ===============================
    ===== STORAGE BASE GYM (FINAL) =====
-   =============================== */
+=============================== */
 
 /* ======================================================
    ===== EMPLEADOS =====
-   ====================================================== */
+====================================================== */
 function obtenerEmpleados() {
   try {
     return JSON.parse(localStorage.getItem("empleados")) || [];
@@ -19,7 +19,7 @@ function guardarEmpleados(lista) {
 
 /* ======================================================
    ===== CLIENTES =====
-   ====================================================== */
+====================================================== */
 function obtenerClientes() {
   try {
     return JSON.parse(localStorage.getItem("clientes")) || [];
@@ -34,7 +34,7 @@ function guardarClientes(lista) {
 
 /* ======================================================
    ===== ASISTENCIAS =====
-   ====================================================== */
+====================================================== */
 function obtenerAsistencias() {
   try {
     return JSON.parse(localStorage.getItem("asistencias")) || [];
@@ -49,7 +49,7 @@ function guardarAsistencias(lista) {
 
 /* ======================================================
    ===== PRODUCTOS =====
-   ====================================================== */
+====================================================== */
 function obtenerProductos() {
   try {
     return JSON.parse(localStorage.getItem("productos")) || [];
@@ -64,7 +64,7 @@ function guardarProductos(lista) {
 
 /* ======================================================
    ===== VENTAS =====
-   ====================================================== */
+====================================================== */
 function obtenerVentas() {
   try {
     return JSON.parse(localStorage.getItem("ventas")) || [];
@@ -79,7 +79,7 @@ function guardarVentas(lista) {
 
 /* ======================================================
    ===== TARJETAS / PERSONAS =====
-   ====================================================== */
+====================================================== */
 
 /*
   Devuelve el empleado ACTIVO asociado a una tarjeta
@@ -87,9 +87,11 @@ function guardarVentas(lista) {
 function buscarEmpleadoPorTarjeta(uid) {
   if (!uid) return null;
 
-  return obtenerEmpleados().find(
-    e => e.tarjetaUID && e.tarjetaUID === uid
-  ) || null;
+  return (
+    obtenerEmpleados().find(
+      e => typeof e.tarjetaUID === "string" && e.tarjetaUID === uid
+    ) || null
+  );
 }
 
 /*
@@ -98,9 +100,11 @@ function buscarEmpleadoPorTarjeta(uid) {
 function buscarClientePorTarjeta(uid) {
   if (!uid) return null;
 
-  return obtenerClientes().find(
-    c => c.tarjetaUID && c.tarjetaUID === uid
-  ) || null;
+  return (
+    obtenerClientes().find(
+      c => typeof c.tarjetaUID === "string" && c.tarjetaUID === uid
+    ) || null
+  );
 }
 
 /*
@@ -124,6 +128,7 @@ function obtenerInfoTarjeta(uid) {
   Indica si la tarjeta está asignada actualmente
 */
 function uidYaRegistrada(uid) {
+  if (!uid) return false;
   return obtenerInfoTarjeta(uid).tipo !== null;
 }
 
@@ -135,14 +140,14 @@ function liberarTarjeta(uid) {
 
   const empleados = obtenerEmpleados().map(e => {
     if (e.tarjetaUID === uid) {
-      delete e.tarjetaUID;
+      e.tarjetaUID = null;
     }
     return e;
   });
 
   const clientes = obtenerClientes().map(c => {
     if (c.tarjetaUID === uid) {
-      delete c.tarjetaUID;
+      c.tarjetaUID = null;
     }
     return c;
   });
@@ -153,7 +158,7 @@ function liberarTarjeta(uid) {
 
 /* ======================================================
    ===== FECHAS / HORAS =====
-   ====================================================== */
+====================================================== */
 function hoy() {
   return new Date().toISOString().split("T")[0];
 }
@@ -163,3 +168,4 @@ function horaActual() {
     hour12: false
   });
 }
+
