@@ -51,10 +51,9 @@
 <!-- ===== CONFIRM / MENSAJES ===== -->
 <div class="confirmacion" id="confirmacion" style="display:none">
   <div class="box">
-    <h1 id="tituloConfirm">Acceso administrativo</h1>
-    <p id="mensajeConfirm">Ingrese la contraseña maestra</p>
-
-    <input id="claveInput" type="password" placeholder="Contraseña maestra">
+    <h1 id="tituloConfirm"></h1>
+    <p id="mensajeConfirm"></p>
+    <input id="claveInput" type="password" placeholder="Contraseña maestra" style="display:none">
     <button id="btnConfirmar">Confirmar</button>
   </div>
 </div>
@@ -99,10 +98,7 @@ window.addEventListener("load", () => {
   };
 
   btnAsignarTarjeta.onclick = asignarTarjeta;
-  btnRegistrar.onclick = () => {
-    confirmacion.style.display = "flex";
-    claveInput.value = "";
-  };
+  btnRegistrar.onclick = pedirClave;
 });
 
 /* ================= NFC ================= */
@@ -143,18 +139,27 @@ function cerrarNFC() {
 }
 
 /* ================= REGISTRO ================= */
-btnConfirmar.onclick = () => {
+function pedirClave() {
+  tituloConfirm.textContent = "Acceso administrativo";
+  mensajeConfirm.textContent = "Ingrese la contraseña maestra";
+  claveInput.style.display = "block";
+  claveInput.value = "";
+  confirmacion.style.display = "flex";
+
+  btnConfirmar.onclick = validarClave;
+}
+
+function validarClave() {
   if (claveInput.value !== CLAVE_MAESTRA) {
     mensajeConfirm.textContent = "Contraseña incorrecta";
     return;
   }
-
   registrarUsuario();
-};
+}
 
 function registrarUsuario() {
   if (!inputNombre.value || !inputUsuario.value || !inputPassword.value || !tarjetaUID) {
-    mensajeConfirm.textContent = "Complete todos los datos";
+    mensajeConfirm.textContent = "Datos incompletos";
     return;
   }
 
@@ -169,10 +174,10 @@ function registrarUsuario() {
 
   guardarEmpleados(empleados);
 
-  /* ✅ MENSAJE BONITO, MISMO OVERLAY */
+  // ✅ MENSAJE BONITO (NO ALERT)
+  claveInput.style.display = "none";
   tituloConfirm.textContent = "Registro completado";
   mensajeConfirm.textContent = "Usuario registrado correctamente";
-  claveInput.style.display = "none";
   btnConfirmar.style.display = "none";
 
   setTimeout(() => {
