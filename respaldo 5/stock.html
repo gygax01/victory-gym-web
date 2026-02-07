@@ -6,11 +6,11 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 
-<body onload="verificarSesion(); requirePermission('stock_view'); cargar(); applyPermissions();">
+<body>
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
     <h2>Stock</h2>
   </div>
   <button onclick="location.href='index.html'">← Inicio</button>
@@ -20,8 +20,8 @@
   <h3>Nuevo producto</h3>
   <div class="stock-form">
     <input id="nNombre" placeholder="Nombre">
-    <input id="nPrecio" type="number" placeholder="Precio">
-    <input id="nStock" type="number" placeholder="Stock inicial">
+    <input id="nPrecio" type="number" min="0" step="0.01" placeholder="Precio">
+    <input id="nStock" type="number" min="0" step="1" placeholder="Stock inicial">
     <button data-permission="products_create" onclick="nuevo()">Agregar</button>
   </div>
 </div>
@@ -36,74 +36,134 @@
   <button data-permission="stock_add" onclick="guardar()">💾 Guardar</button>
 </div>
 
+<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
 <script>
+/* ===============================
+   ===== INIT =====
+   =============================== */
+document.addEventListener("DOMContentLoaded", () => {
+  if (!verificarSesion()) return;
+  if (!requirePermission("stock_view")) return;
+  cargar();
+  applyPermissions();
+});
+
+/* ===============================
+   ===== ESTADO =====
+   =============================== */
 let productos = [];
 let productosFiltrados = [];
 
-function cargar(){
-  productos = obtenerProductos();
-  productosFiltrados = productos;
+/* ===============================
+   ===== CARGAR / RENDER =====
+   =============================== */
+function cargar() {
+  productos = obtenerProductos().filter(
+    p => p && typeof p.nombre === "string"
+  );
+  productosFiltrados = [...productos];
   render();
 }
 
-function render(){
+function render() {
   lista.innerHTML = "";
-  productosFiltrados.forEach((p,i)=>{
-    const d=document.createElement("div");
-    d.className="stock-card";
-    d.innerHTML=`
+
+  productosFiltrados.forEach((p, idx) => {
+    const d = document.createElement("div");
+    d.className = "stock-card";
+
+    d.innerHTML = `
       <div class="stock-header">
         <h4>${p.nombre}</h4>
         <button data-permission="stock_delete"
-          onclick="eliminar(${i})">Eliminar</button>
+                onclick="eliminar(${idx})">
+          Eliminar
+        </button>
       </div>
-      <div>$${p.precio}</div>
-      <div>Stock: ${p.stock}</div>
-      <button data-permission="stock_add" onclick="sumar(${i},1)">+1</button>
-      <button data-permission="stock_add" onclick="sumar(${i},10)">+10</button>
+      <div>$${Number(p.precio).toFixed(2)}</div>
+      <div>Stock: ${Number(p.stock) || 0}</div>
+
+      <button data-permission="stock_add" onclick="sumar(${idx}, 1)">+1</button>
+      <button data-permission="stock_add" onclick="sumar(${idx}, 10)">+10</button>
     `;
+
     lista.appendChild(d);
   });
+
   applyPermissions();
 }
 
-function sumar(i,c){
-  requirePermission("stock_add");
-  productosFiltrados[i].stock+=c;
+/* ===============================
+   ===== OPERACIONES =====
+   =============================== */
+function sumar(i, c) {
+  if (!requirePermission("stock_add")) return;
+  const p = productosFiltrados[i];
+  if (!p) return;
+
+  p.stock = (Number(p.stock) || 0) + c;
   render();
 }
 
-function eliminar(i){
-  requirePermission("stock_delete");
-  productos.splice(i,1);
+function eliminar(i) {
+  if (!requirePermission("stock_delete")) return;
+  const p = productosFiltrados[i];
+  if (!p) return;
+
+  productos = productos.filter(x => x !== p);
+  productosFiltrados = productosFiltrados.filter(x => x !== p);
   guardar();
 }
 
-function guardar(){
-  requirePermission("stock_add");
+function guardar() {
+  if (!requirePermission("stock_add")) return;
   guardarProductos(productos);
   alert("Stock guardado");
 }
 
-function nuevo(){
-  requirePermission("products_create");
+/* ===============================
+   ===== NUEVO PRODUCTO =====
+   =============================== */
+function nuevo() {
+  if (!requirePermission("products_create")) return;
+
+  const nombre = nNombre.value.trim();
+  const precio = Number(nPrecio.value);
+  const stock = Number(nStock.value);
+
+  if (!nombre || isNaN(precio) || isNaN(stock)) {
+    alert("Datos inválidos");
+    return;
+  }
+
   productos.push({
-    nombre:nNombre.value,
-    precio:Number(nPrecio.value),
-    stock:Number(nStock.value)
+    nombre,
+    precio,
+    stock
   });
+
+  nNombre.value = "";
+  nPrecio.value = "";
+  nStock.value = "";
+
   guardar();
 }
 
-function filtrarStock(){
-  const q=buscadorStock.value.toLowerCase();
-  productosFiltrados=productos.filter(p=>p.nombre.toLowerCase().includes(q));
+/* ===============================
+   ===== FILTRO =====
+   =============================== */
+function filtrarStock() {
+  const q = buscadorStock.value.toLowerCase();
+  productosFiltrados = productos.filter(
+    p => p.nombre.toLowerCase().includes(q)
+  );
   render();
 }
 </script>
 
 </body>
 </html>
+
