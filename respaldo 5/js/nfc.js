@@ -22,21 +22,19 @@ const supabaseClient = window.supabase.createClient(
 let canalNFC = null;
 let escuchando = false;
 
-/*
-  Anti-rebote por UID (NO bloqueo permanente)
-*/
+// anti-rebote
 let ultimoUID = null;
 let ultimoTiempo = 0;
 
 /* ===============================
    ===== CONFIG =====
 =============================== */
-const COOLDOWN_MS = 800; // ⏱️ solo anti-rebote real
+const COOLDOWN_MS = 800; // solo anti-rebote real
 
 /* =========================================================
-   ===== INICIAR LECTURA NFC (CONTROLADA Y ESTABLE) =====
+   ===== INICIAR LECTURA NFC (CONTINUA) =====
 ========================================================= */
-function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
+function iniciarNFCControlado({ onUID } = {}) {
   detenerNFC();
 
   escuchando = true;
@@ -60,7 +58,7 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
 
         const ahora = Date.now();
 
-        // 🔒 Anti-rebote (NO bloqueo permanente)
+        // 🔒 anti-rebote (NO bloqueo)
         if (uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) {
           return;
         }
@@ -71,7 +69,7 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
         if (typeof onUID === "function") {
           onUID(uid);
 
-          // 🔥 liberar UID después del cooldown
+          // liberar UID después del rebote
           setTimeout(() => {
             ultimoUID = null;
             ultimoTiempo = 0;
@@ -81,19 +79,9 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
     )
     .subscribe(status => {
       if (status === "SUBSCRIBED") {
-        console.log("🔵 NFC Realtime conectado");
+        console.log("🔵 NFC escuchando (modo continuo)");
       }
     });
-
-  /* ⏱ Timeout de seguridad (10s) */
-  if (typeof onTimeout === "function") {
-    setTimeout(() => {
-      if (escuchando) {
-        detenerNFC();
-        onTimeout();
-      }
-    }, 10000);
-  }
 }
 
 /* ===============================
@@ -107,36 +95,4 @@ function detenerNFC() {
   escuchando = false;
   ultimoUID = null;
   ultimoTiempo = 0;
-}
-
-/* ===============================
-   ===== UTIL TARJETAS =====
-=============================== */
-function uidYaRegistrada(uid) {
-  if (!uid) return false;
-
-  const clientes = typeof obtenerClientes === "function"
-    ? obtenerClientes()
-    : [];
-
-  const empleados = typeof obtenerEmpleados === "function"
-    ? obtenerEmpleados()
-    : [];
-
-  return (
-    clientes.some(c => c.tarjetaUID === uid) ||
-    empleados.some(e => e.tarjetaUID === uid)
-  );
-}
-
-function liberarTarjeta(uid) {
-  if (!uid) return;
-
-  const empleados = obtenerEmpleados();
-  empleados.forEach(e => {
-    if (e.tarjetaUID === uid) {
-      e.tarjetaUID = null;
-    }
-  });
-  guardarEmpleados(empleados);
 }
