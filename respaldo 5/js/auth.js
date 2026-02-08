@@ -3,11 +3,23 @@
 =============================== */
 
 const ROLE_PERMISSIONS = {
-  employee: { clients_create: true },
-  admin: { clients_create: true },
-  superadmin: { system_all: true }
+  employee: {
+    clients_view: true,
+    clients_create: true
+  },
+  admin: {
+    clients_view: true,
+    clients_create: true,
+    clients_delete: true
+  },
+  superadmin: {
+    system_all: true
+  }
 };
 
+/* ===============================
+   ===== LOGIN =====
+=============================== */
 function login(usuario, password, delay = 0) {
   const empleados = obtenerEmpleados();
 
@@ -20,21 +32,30 @@ function login(usuario, password, delay = 0) {
   return "OK";
 }
 
+/* ===============================
+   ===== INICIAR SESIÓN =====
+=============================== */
 function iniciarSesion(emp) {
   const permisos =
     emp.rol === "superadmin"
       ? { system_all: true }
       : (ROLE_PERMISSIONS[emp.rol] || {});
 
-  localStorage.setItem("session", JSON.stringify({
-    usuario: emp.usuario,
-    rol: emp.rol,
-    permisos
-  }));
+  localStorage.setItem(
+    "session",
+    JSON.stringify({
+      usuario: emp.usuario,
+      rol: emp.rol,
+      permisos
+    })
+  );
 
   location.href = "index.html";
 }
 
+/* ===============================
+   ===== SESIÓN =====
+=============================== */
 function verificarSesion() {
   const params = new URLSearchParams(window.location.search);
   const modoRegistro = params.get("modo") === "registro";
@@ -57,6 +78,9 @@ function obtenerSesion() {
   }
 }
 
+/* ===============================
+   ===== PERMISOS =====
+=============================== */
 function can(permission) {
   const s = obtenerSesion();
   if (!s || !s.permisos) return false;
@@ -64,6 +88,17 @@ function can(permission) {
   return s.permisos[permission] === true;
 }
 
+function requirePermission(permission) {
+  if (!can(permission)) {
+    location.href = "index.html";
+    return false;
+  }
+  return true;
+}
+
+/* ===============================
+   ===== LOGOUT =====
+=============================== */
 function logout() {
   localStorage.removeItem("session");
   location.href = "login.html";
