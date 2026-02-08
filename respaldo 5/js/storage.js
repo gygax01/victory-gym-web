@@ -196,3 +196,10 @@ function horaActual() {
     hour12: false
   });
 }
+/* ======================================================
+   ===== ESTADO DE CONEXIÓN =====
+====================================================== */
+function isOnline() {
+  return navigator.onLine === true;
+}
+
