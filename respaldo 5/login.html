@@ -32,8 +32,16 @@
 <!-- LOADER -->
 <div class="overlay" id="overlayLoader" style="display:none">
   <div class="popup">
-    <h2>Verificando acceso</h2>
-    <div class="estado amarillo">Espere…</div>
+    <h2>Ingresando</h2>
+    <div class="estado amarillo">Verificando credenciales…</div>
+  </div>
+</div>
+
+<!-- NFC -->
+<div class="overlay" id="overlayNFC" style="display:none">
+  <div class="popup">
+    <h2>Acerque la tarjeta</h2>
+    <div id="estadoNFC" class="estado amarillo">Esperando tarjeta…</div>
   </div>
 </div>
 
@@ -69,15 +77,20 @@
 const inputUser = document.getElementById("inputUser");
 const inputPass = document.getElementById("inputPass");
 const btnLogin = document.getElementById("btnLogin");
+const btnNFC = document.getElementById("btnNFC");
 
 const overlayLoader = document.getElementById("overlayLoader");
 const overlayUsuario = document.getElementById("overlayUsuario");
 const overlayPassword = document.getElementById("overlayPassword");
 const overlayBloqueo = document.getElementById("overlayBloqueo");
+const overlayNFC = document.getElementById("overlayNFC");
+const estadoNFC = document.getElementById("estadoNFC");
 
 let intentos = 0;
 let bloqueadoHasta = 0;
+let leyendoNFC = false;
 
+/* ===== LOGIN NORMAL ===== */
 btnLogin.onclick = () => {
   const ahora = Date.now();
 
@@ -90,9 +103,15 @@ btnLogin.onclick = () => {
   overlayLoader.style.display = "flex";
 
   setTimeout(() => {
-    const r = login(inputUser.value.trim(), inputPass.value, 200);
+    const r = login(inputUser.value.trim(), inputPass.value, 0);
 
-    if (r === "OK") return;
+    if (r === "OK") {
+      // ⏳ damos tiempo a que el loader se vea
+      setTimeout(() => {
+        // iniciarSesion ya redirige
+      }, 300);
+      return;
+    }
 
     overlayLoader.style.display = "none";
     intentos++;
@@ -114,8 +133,46 @@ btnLogin.onclick = () => {
       overlayPassword.style.display = "flex";
       setTimeout(() => overlayPassword.style.display = "none", 1500);
     }
-  }, 300);
+  }, 200);
 };
+
+/* ===== LOGIN NFC (RESTAURADO) ===== */
+btnNFC.onclick = () => {
+  if (leyendoNFC) return;
+  leyendoNFC = true;
+
+  overlayNFC.style.display = "flex";
+  estadoNFC.className = "estado amarillo";
+  estadoNFC.textContent = "Esperando tarjeta…";
+
+  iniciarNFCControlado({
+    onUID: uid => {
+      const emp = obtenerEmpleados().find(e => e.tarjetaUID === uid);
+
+      if (!emp) {
+        estadoNFC.className = "estado rojo";
+        estadoNFC.textContent = "Tarjeta no registrada";
+        setTimeout(resetNFC, 1500);
+        return;
+      }
+
+      estadoNFC.className = "estado verde";
+      estadoNFC.textContent = "Acceso correcto";
+
+      setTimeout(() => {
+        resetNFC();
+        overlayLoader.style.display = "flex";
+        setTimeout(() => login(emp.usuario, emp.password, 0), 300);
+      }, 800);
+    }
+  });
+};
+
+function resetNFC() {
+  detenerNFC();
+  leyendoNFC = false;
+  overlayNFC.style.display = "none";
+}
 </script>
 
 </body>
