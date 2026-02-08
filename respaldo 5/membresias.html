@@ -1,112 +1,62 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Membresías</title>
-  <link rel="stylesheet" href="css/styles.css">
+<meta charset="UTF-8">
+<title>Membresías</title>
+<link rel="stylesheet" href="css/styles.css">
 </head>
 
 <body>
-
 <header class="header-brand">
-  <div class="brand">
-    <img src="img/logo.png" alt="Victory Pro Fitness">
-    <h2>Membresías</h2>
-  </div>
+  <div class="brand"><img src="img/logo.png"><h2>Membresías</h2></div>
   <button onclick="location.href='index.html'">← Inicio</button>
 </header>
 
 <div class="historial-container" id="listaMembresias"></div>
 
-<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
 <script>
-/* ===============================
-   ===== DOM =====
-=============================== */
-const listaMembresias = document.getElementById("listaMembresias");
+const listaMembresias=document.getElementById("listaMembresias");
 
-/* ===============================
-   ===== INIT =====
-=============================== */
-window.addEventListener("load", initMembresias);
-
-function initMembresias() {
-  if (!verificarSesion()) return;
-  if (typeof requirePermission === "function") {
-    requirePermission("memberships_view");
-  }
-
+window.addEventListener("load",initMembresias);
+function initMembresias(){
+  if(!verificarSesion())return;
+  if(!requirePermission("memberships_view"))return;
   cargarMembresias();
   applyPermissions();
 }
 
-/* ===============================
-   ===== CARGAR MEMBRESÍAS =====
-=============================== */
-function cargarMembresias() {
-  const clientes = obtenerClientes()
-    .filter(c => c && typeof c.nombre === "string");
-
-  listaMembresias.innerHTML = "";
-
-  if (clientes.length === 0) {
-    const p = document.createElement("p");
-    p.textContent = "No hay clientes registrados";
-    listaMembresias.appendChild(p);
-    return;
-  }
-
-  clientes.forEach((c, index) => {
-    const card = document.createElement("div");
-    card.className = "cliente";
-
-    const nombre = document.createElement("h3");
-    nombre.textContent = c.nombre;
-
-    const pExpira = document.createElement("p");
-    const expira = c.membresiaExpira ?? "—";
-    pExpira.textContent = "Expira: " + expira;
-
-    const btn7 = document.createElement("button");
-    btn7.textContent = "+7 días";
-    btn7.setAttribute("data-permission", "memberships_extend");
-    btn7.onclick = () => extenderMembresia(index, 7);
-
-    const btn30 = document.createElement("button");
-    btn30.textContent = "+30 días";
-    btn30.setAttribute("data-permission", "memberships_extend");
-    btn30.onclick = () => extenderMembresia(index, 30);
-
-    card.append(nombre, pExpira, btn7, btn30);
+function cargarMembresias(){
+  const clientes=obtenerClientes().filter(c=>c&&typeof c.nombre==="string");
+  listaMembresias.innerHTML="";
+  if(!clientes.length){listaMembresias.textContent="No hay clientes registrados";return;}
+  clientes.forEach((c,i)=>{
+    const card=document.createElement("div");card.className="cliente";
+    card.innerHTML=`
+      <h3>${c.nombre}</h3>
+      <p>Expira: ${c.membresiaExpira ?? "—"}</p>
+      <button data-permission="memberships_extend">+7 días</button>
+      <button data-permission="memberships_extend">+30 días</button>`;
+    const btns=card.querySelectorAll("button");
+    btns[0].onclick=()=>extenderMembresia(i,7);
+    btns[1].onclick=()=>extenderMembresia(i,30);
     listaMembresias.appendChild(card);
   });
-
   applyPermissions();
 }
 
-/* ===============================
-   ===== EXTENDER MEMBRESÍA =====
-=============================== */
-function extenderMembresia(index, dias) {
-  if (!can("memberships_extend")) return;
-
-  const clientes = obtenerClientes();
-  const cliente = clientes[index];
-  if (!cliente) return;
-
-  const base = new Date(cliente.membresiaExpira || hoy());
-  base.setDate(base.getDate() + dias);
-
-  cliente.membresiaExpira = base.toISOString().split("T")[0];
-
+function extenderMembresia(i,dias){
+  if(!can("memberships_extend"))return;
+  const clientes=obtenerClientes();
+  const c=clientes[i]; if(!c)return;
+  const base=new Date(c.membresiaExpira||hoy());
+  base.setDate(base.getDate()+dias);
+  c.membresiaExpira=base.toISOString().split("T")[0];
   guardarClientes(clientes);
   cargarMembresias();
 }
 </script>
-
 </body>
 </html>
