@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -88,7 +87,6 @@ function initClientes() {
   btnCancelarReasignar.addEventListener("click", cancelarReasignacion);
 
   cargarClientes();
-  applyPermissions();
 }
 
 /* ===============================
@@ -125,23 +123,24 @@ function render(lista) {
     const acciones = document.createElement("div");
     acciones.className = "acciones";
 
+    /* ===== REASIGNAR (TODOS) ===== */
     const btnReasignar = document.createElement("button");
     btnReasignar.textContent = "Reasignar tarjeta";
     btnReasignar.onclick = () => iniciarReasignacion(c.tarjetaUID || "");
+    acciones.appendChild(btnReasignar);
 
-    const btnEliminar = document.createElement("button");
-    btnEliminar.textContent = "Eliminar";
-    btnEliminar.setAttribute("data-permission", "clients_delete");
-    btnEliminar.onclick = () => pedirConfirmacion(c.tarjetaUID || "");
+    /* ===== ELIMINAR (SOLO ADMIN / SUPERADMIN) ===== */
+    if (can("clients_delete")) {
+      const btnEliminar = document.createElement("button");
+      btnEliminar.textContent = "Eliminar";
+      btnEliminar.onclick = () => pedirConfirmacion(c.tarjetaUID || "");
+      acciones.appendChild(btnEliminar);
+    }
 
-    acciones.append(btnReasignar, btnEliminar);
     header.append(nombre, acciones);
     cont.appendChild(header);
-
     listaClientes.appendChild(cont);
   });
-
-  applyPermissions();
 }
 
 /* ===============================
@@ -216,18 +215,6 @@ function iniciarReasignacion(uidActual) {
         cancelarReasignacion();
         cargarClientes();
       }, 1200);
-    },
-
-    onTimeout: () => {
-      estadoTarjeta.className = "estado rojo";
-      estadoTarjeta.textContent = "Tiempo de lectura agotado";
-      setTimeout(cancelarReasignacion, 1500);
-    },
-
-    onError: () => {
-      estadoTarjeta.className = "estado rojo";
-      estadoTarjeta.textContent = "Error de lectura";
-      setTimeout(cancelarReasignacion, 1500);
     }
   });
 }
