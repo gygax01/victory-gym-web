@@ -19,44 +19,48 @@
   </button>
 </header>
 
-<!-- ================= REGISTRO ================= -->
-<div class="card registro-pc">
+<!-- 🔑 CONTENEDOR PRINCIPAL (CLAVE) -->
+<main class="main">
 
-  <!-- COLUMNA IZQUIERDA -->
-  <div class="registro-col">
-    <h3>Datos del cliente</h3>
+  <!-- ================= REGISTRO ================= -->
+  <div class="card registro-pc">
 
-    <input id="nombre" placeholder="Nombre completo">
-    <input id="peso" type="number" step="0.1" placeholder="Peso (kg)">
-    <input id="altura" type="number" step="0.01" placeholder="Altura (m)">
-    <input id="telefono" type="tel" placeholder="Teléfono">
-  </div>
+    <!-- COLUMNA IZQUIERDA -->
+    <div class="registro-col">
+      <h3>Datos del cliente</h3>
 
-  <!-- COLUMNA DERECHA -->
-  <div class="registro-col">
-    <h3>Membresía</h3>
-
-    <div class="membresias-grid">
-      <button onclick="setDias(7)">7 días</button>
-      <button onclick="setDias(15)">15 días</button>
-      <button onclick="setDias(30)">1 mes</button>
-      <button onclick="setDias(90)">3 meses</button>
+      <input id="nombre" placeholder="Nombre completo">
+      <input id="peso" type="number" step="0.1" placeholder="Peso (kg)">
+      <input id="altura" type="number" step="0.01" placeholder="Altura (m)">
+      <input id="telefono" type="tel" placeholder="Teléfono">
     </div>
 
-    <p id="expiraTexto"></p>
+    <!-- COLUMNA DERECHA -->
+    <div class="registro-col">
+      <h3>Membresía</h3>
 
-    <div class="registro-acciones">
-      <button class="nfc" id="btnAsignar" onclick="abrirPopup()">
-        Asignar tarjeta
-      </button>
+      <div class="membresias-grid">
+        <button onclick="setDias(7)">7 días</button>
+        <button onclick="setDias(15)">15 días</button>
+        <button onclick="setDias(30)">1 mes</button>
+        <button onclick="setDias(90)">3 meses</button>
+      </div>
 
-      <button id="finalizar" onclick="registrarCliente()" disabled>
-        Registrar cliente
-      </button>
+      <p id="expiraTexto"></p>
+
+      <div class="registro-acciones">
+        <button class="nfc" id="btnAsignar" onclick="abrirPopup()">
+          Asignar tarjeta
+        </button>
+
+        <button id="finalizar" onclick="registrarCliente()" disabled>
+          Registrar cliente
+        </button>
+      </div>
     </div>
-  </div>
 
-</div>
+  </div>
+</main>
 
 <!-- ================= POPUP NFC ================= -->
 <div class="overlay" id="overlay">
@@ -93,9 +97,7 @@ function setDias(d) {
     "Expira el: " + expira.toLocaleDateString();
 }
 
-/* ===============================
-   ===== NFC ASIGNACIÓN =====
-   =============================== */
+/* ===== NFC ASIGNACIÓN ===== */
 function abrirPopup() {
   if (leyendoNFC) return;
 
@@ -127,18 +129,6 @@ function abrirPopup() {
         cerrarPopup();
         finalizar.disabled = false;
       }, 1200);
-    },
-
-    onTimeout: () => {
-      estado.className = "estado rojo";
-      estado.innerText = "Tiempo de lectura agotado";
-      setTimeout(cerrarPopup, 1500);
-    },
-
-    onError: () => {
-      estado.className = "estado rojo";
-      estado.innerText = "Error de lectura";
-      setTimeout(cerrarPopup, 1500);
     }
   });
 }
@@ -149,9 +139,7 @@ function cerrarPopup() {
   leyendoNFC = false;
 }
 
-/* ===============================
-   ===== REGISTRO CLIENTE =====
-   =============================== */
+/* ===== REGISTRO CLIENTE ===== */
 function registrarCliente() {
   if (
     !nombre.value.trim() ||
@@ -162,14 +150,6 @@ function registrarCliente() {
     mostrarConfirm(
       "Datos incompletos",
       "Complete todos los campos antes de continuar"
-    );
-    return;
-  }
-
-  if (uidYaRegistrada(tarjetaUID)) {
-    mostrarConfirm(
-      "Tarjeta inválida",
-      "La tarjeta ya está registrada"
     );
     return;
   }
