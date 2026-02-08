@@ -12,17 +12,24 @@ const ROLE_PERMISSIONS = {
    ===== LOGIN =====
 =============================== */
 function login(usuario, password, delay = 0) {
-  const emp = obtenerEmpleados().find(
-    e => e.usuario === usuario && e.password === password
-  );
+  const empleados = obtenerEmpleados();
+  const emp = empleados.find(e => e.usuario === usuario);
 
   if (!emp) {
-    alert("Credenciales incorrectas");
-    return false;
+    return { ok: false, error: "usuario" };
   }
 
-  setTimeout(() => iniciarSesion(emp), delay);
-  return true;
+  if (emp.password !== password) {
+    return { ok: false, error: "password" };
+  }
+
+  if (delay > 0) {
+    setTimeout(() => iniciarSesion(emp), delay);
+  } else {
+    iniciarSesion(emp);
+  }
+
+  return { ok: true };
 }
 
 /* ===============================
@@ -53,7 +60,7 @@ function verificarSesion() {
   const pagina = location.pathname.split("/").pop();
 
   if (pagina === "usuarios.html" && modoRegistro) {
-    return true; // 👈 CLAVE
+    return true;
   }
 
   if (!localStorage.getItem("session")) {
@@ -83,7 +90,7 @@ function can(permission) {
 
 function requirePermission(permission) {
   if (!can(permission)) {
-    alert("Acceso no autorizado");
+    // ❌ SIN alert
     location.href = "index.html";
     return false;
   }
