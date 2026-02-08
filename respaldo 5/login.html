@@ -33,7 +33,7 @@
 <div class="overlay" id="overlayLoader" style="display:none">
   <div class="popup">
     <h2>Ingresando</h2>
-    <div class="estado amarillo">Verificando credenciales…</div>
+    <div id="estadoLoader" class="estado amarillo">Accediendo…</div>
   </div>
 </div>
 
@@ -80,9 +80,12 @@ const btnLogin = document.getElementById("btnLogin");
 const btnNFC = document.getElementById("btnNFC");
 
 const overlayLoader = document.getElementById("overlayLoader");
+const estadoLoader = document.getElementById("estadoLoader");
+
 const overlayUsuario = document.getElementById("overlayUsuario");
 const overlayPassword = document.getElementById("overlayPassword");
 const overlayBloqueo = document.getElementById("overlayBloqueo");
+
 const overlayNFC = document.getElementById("overlayNFC");
 const estadoNFC = document.getElementById("estadoNFC");
 
@@ -90,53 +93,49 @@ let intentos = 0;
 let bloqueadoHasta = 0;
 let leyendoNFC = false;
 
-/* ===== LOGIN NORMAL ===== */
+/* ========= LOGIN NORMAL ========= */
 btnLogin.onclick = () => {
   const ahora = Date.now();
-
   if (ahora < bloqueadoHasta) {
     overlayBloqueo.style.display = "flex";
     setTimeout(() => overlayBloqueo.style.display = "none", 1500);
     return;
   }
 
-  overlayLoader.style.display = "flex";
+  const r = login(inputUser.value.trim(), inputPass.value, 0);
 
-  setTimeout(() => {
-    const r = login(inputUser.value.trim(), inputPass.value, 0);
-
-    if (r === "OK") {
-      // ⏳ damos tiempo a que el loader se vea
-      setTimeout(() => {
-        // iniciarSesion ya redirige
-      }, 300);
-      return;
-    }
-
-    overlayLoader.style.display = "none";
+  if (r === "NO_USER") {
     intentos++;
+    overlayUsuario.style.display = "flex";
+    setTimeout(() => overlayUsuario.style.display = "none", 1500);
+    return;
+  }
 
-    if (intentos >= 3) {
-      intentos = 0;
-      bloqueadoHasta = Date.now() + 30000;
-      overlayBloqueo.style.display = "flex";
-      setTimeout(() => overlayBloqueo.style.display = "none", 2000);
-      return;
-    }
+  if (r === "BAD_PASS") {
+    intentos++;
+    overlayPassword.style.display = "flex";
+    setTimeout(() => overlayPassword.style.display = "none", 1500);
+    return;
+  }
 
-    if (r === "NO_USER") {
-      overlayUsuario.style.display = "flex";
-      setTimeout(() => overlayUsuario.style.display = "none", 1500);
-    }
+  if (r === "OK") {
+    overlayLoader.style.display = "flex";
+    estadoLoader.className = "estado amarillo";
+    estadoLoader.textContent = "Accediendo…";
 
-    if (r === "BAD_PASS") {
-      overlayPassword.style.display = "flex";
-      setTimeout(() => overlayPassword.style.display = "none", 1500);
-    }
-  }, 200);
+    setTimeout(() => {
+      estadoLoader.className = "estado verde";
+      estadoLoader.textContent = "Acceso correcto";
+    }, 400);
+  }
+
+  if (intentos >= 3) {
+    intentos = 0;
+    bloqueadoHasta = Date.now() + 30000;
+  }
 };
 
-/* ===== LOGIN NFC (RESTAURADO) ===== */
+/* ========= LOGIN NFC ========= */
 btnNFC.onclick = () => {
   if (leyendoNFC) return;
   leyendoNFC = true;
@@ -162,8 +161,10 @@ btnNFC.onclick = () => {
       setTimeout(() => {
         resetNFC();
         overlayLoader.style.display = "flex";
-        setTimeout(() => login(emp.usuario, emp.password, 0), 300);
-      }, 800);
+        estadoLoader.className = "estado verde";
+        estadoLoader.textContent = "Acceso correcto";
+        login(emp.usuario, emp.password, 0);
+      }, 700);
     }
   });
 };
