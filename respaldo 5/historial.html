@@ -7,50 +7,202 @@
 </head>
 
 <body>
+
 <header class="header-brand">
-  <div class="brand"><img src="img/logo.png"><h2>Historial de clientes</h2></div>
+  <div class="brand">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
+    <h2>Historial de clientes</h2>
+  </div>
   <button onclick="location.href='index.html'">← Inicio</button>
 </header>
 
-<div class="search-bar"><input id="busqueda" placeholder="Buscar cliente..."></div>
+<div class="search-bar">
+  <input id="busqueda" placeholder="Buscar cliente...">
+</div>
+
 <div class="historial-container" id="listaHistorial"></div>
 
+<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/auth.js?v=4"></script>
 
 <script>
-const listaHistorial=document.getElementById("listaHistorial");
-const busqueda=document.getElementById("busqueda");
-let clientes=[],asistencias=[];
+/* ===============================
+   ===== ESTADO =====
+=============================== */
+const listaHistorial = document.getElementById("listaHistorial");
+const busqueda = document.getElementById("busqueda");
 
-window.addEventListener("load",initHistorial);
-function initHistorial(){
-  if(!verificarSesion())return;
-  if(!requirePermission("history_view"))return;
-  busqueda.addEventListener("input",filtrar);
+let clientes = [];
+let asistencias = [];
+
+/* ===============================
+   ===== INIT =====
+=============================== */
+window.addEventListener("load", initHistorial);
+
+function initHistorial() {
+  if (!verificarSesion()) return;
+  if (!requirePermission("history_view")) return;
+
+  busqueda.addEventListener("input", filtrar);
   cargarHistorial();
 }
 
-function cargarHistorial(){
-  clientes=obtenerClientes().filter(c=>c&&typeof c.nombre==="string");
-  asistencias=obtenerAsistencias();
+/* ===============================
+   ===== UTILIDADES =====
+=============================== */
+function diasEntre(a, b) {
+  return Math.round((new Date(b) - new Date(a)) / 86400000);
+}
+
+function ultimaVisita(uid) {
+  return asistencias
+    .filter(a => a.tarjetaUID === uid)
+    .map(a => a.fecha)
+    .sort()
+    .reverse()[0] ?? "—";
+}
+
+function calcularRachas(uid) {
+  const fechas = [...new Set(
+    asistencias
+      .filter(a => a.tarjetaUID === uid)
+      .map(a => a.fecha)
+  )].sort();
+
+  let max = 0;
+  let actual = 0;
+  let temp = fechas.length ? 1 : 0;
+
+  for (let i = 1; i < fechas.length; i++) {
+    if (diasEntre(fechas[i - 1], fechas[i]) === 1) temp++;
+    else {
+      max = Math.max(max, temp);
+      temp = 1;
+    }
+  }
+  max = Math.max(max, temp);
+
+  for (let i = fechas.length - 1; i > 0; i--) {
+    if (diasEntre(fechas[i - 1], fechas[i]) === 1) actual++;
+    else break;
+  }
+  actual = fechas.length ? actual + 1 : 0;
+
+  return { actual, max };
+}
+
+/* ===============================
+   ===== CARGA =====
+=============================== */
+function cargarHistorial() {
+  clientes = obtenerClientes().filter(c => c && typeof c.nombre === "string");
+  asistencias = obtenerAsistencias();
+
+  clientes.sort((a, b) =>
+    ultimaVisita(b.tarjetaUID)
+      .localeCompare(ultimaVisita(a.tarjetaUID))
+  );
+
   render(clientes);
 }
 
-function render(lista){
-  listaHistorial.innerHTML="";
-  if(!lista.length){listaHistorial.textContent="No hay historial disponible";return;}
-  lista.forEach(c=>{
-    const card=document.createElement("div");card.className="cliente";
-    card.innerHTML=`<h3>${c.nombre}</h3>`;
+/* ===============================
+   ===== RENDER =====
+=============================== */
+function render(lista) {
+  listaHistorial.innerHTML = "";
+
+  if (!lista.length) {
+    listaHistorial.innerHTML = "<p>No hay historial disponible</p>";
+    return;
+  }
+
+  lista.forEach(c => {
+    const registros = asistencias
+      .filter(a => a.tarjetaUID === c.tarjetaUID)
+      .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+    const ultima = ultimaVisita(c.tarjetaUID);
+    const registro = c.fechaRegistro ?? "—";
+    const { actual, max } = calcularRachas(c.tarjetaUID);
+
+    const card = document.createElement("div");
+    card.className = "cliente";
+
+    card.innerHTML = `
+      <div class="cliente-header" aria-expanded="false">
+        <div class="info-wrapper">
+          <div class="info-bloque">
+            <h3>${c.nombre}</h3>
+            <div class="meta">
+              Última visita: ${ultima} · Registro: ${registro}<br>
+              <span class="racha actual">Racha actual: ${actual} días</span>
+              &nbsp; · &nbsp;
+              <span class="racha maxima">Racha máxima: ${max} días</span>
+            </div>
+          </div>
+        </div>
+        <div class="flecha">▾</div>
+      </div>
+
+      <div class="historial">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Entrada</th>
+              <th>Salida</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              registros.map((r, i) => `
+                <tr class="${i % 2 ? 'alt' : ''}">
+                  <td>${r.fecha}</td>
+                  <td>${r.entrada}</td>
+                  <td>${r.salida ?? "-"}</td>
+                </tr>
+              `).join("")
+            }
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    const header = card.querySelector(".cliente-header");
+    const panel = card.querySelector(".historial");
+
+    header.onclick = () => {
+      document.querySelectorAll(".cliente.abierto").forEach(o => {
+        if (o !== card) {
+          o.classList.remove("abierto");
+          o.querySelector(".historial")?.classList.remove("abierto");
+          o.querySelector(".cliente-header")
+            ?.setAttribute("aria-expanded", "false");
+        }
+      });
+
+      const abierto = card.classList.toggle("abierto");
+      panel.classList.toggle("abierto");
+      header.setAttribute("aria-expanded", abierto);
+    };
+
     listaHistorial.appendChild(card);
   });
 }
 
-function filtrar(){
-  const q=busqueda.value.toLowerCase();
-  render(clientes.filter(c=>c.nombre.toLowerCase().includes(q)));
+/* ===============================
+   ===== FILTRO =====
+=============================== */
+function filtrar() {
+  const q = busqueda.value.toLowerCase();
+  render(clientes.filter(c =>
+    c.nombre.toLowerCase().includes(q)
+  ));
 }
 </script>
+
 </body>
 </html>
