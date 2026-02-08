@@ -14,23 +14,13 @@ const ROLE_PERMISSIONS = {
 function login(usuario, password, delay = 0) {
   const empleados = obtenerEmpleados();
 
-  const empUsuario = empleados.find(e => e.usuario === usuario);
-  if (!empUsuario) {
-    if (typeof mostrarUsuarioNoExiste === "function") {
-      mostrarUsuarioNoExiste();
-    }
-    return false;
-  }
+  const emp = empleados.find(e => e.usuario === usuario);
+  if (!emp) return "NO_USER";
 
-  if (empUsuario.password !== password) {
-    if (typeof mostrarPasswordIncorrecta === "function") {
-      mostrarPasswordIncorrecta();
-    }
-    return false;
-  }
+  if (emp.password !== password) return "BAD_PASS";
 
-  setTimeout(() => iniciarSesion(empUsuario), delay);
-  return true;
+  setTimeout(() => iniciarSesion(emp), delay);
+  return "OK";
 }
 
 /* ===============================
