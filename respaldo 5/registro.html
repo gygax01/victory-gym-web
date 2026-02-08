@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <title>Registro de Cliente</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- 🔑 CLAVE: SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body onload="verificarSesion()">
@@ -19,7 +22,7 @@
   </button>
 </header>
 
-<!-- 🔑 CONTENEDOR PRINCIPAL (CLAVE) -->
+<!-- CONTENEDOR PRINCIPAL -->
 <main class="main">
 
   <!-- ================= REGISTRO ================= -->
@@ -81,6 +84,8 @@
 
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
+
+<!-- NFC SIEMPRE DESPUÉS DE SUPABASE -->
 <script src="js/nfc.js"></script>
 
 <script>
