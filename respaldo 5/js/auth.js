@@ -13,23 +13,24 @@ const ROLE_PERMISSIONS = {
 =============================== */
 function login(usuario, password, delay = 0) {
   const empleados = obtenerEmpleados();
-  const emp = empleados.find(e => e.usuario === usuario);
 
-  if (!emp) {
-    return { ok: false, error: "usuario" };
+  const empUsuario = empleados.find(e => e.usuario === usuario);
+  if (!empUsuario) {
+    if (typeof mostrarUsuarioNoExiste === "function") {
+      mostrarUsuarioNoExiste();
+    }
+    return false;
   }
 
-  if (emp.password !== password) {
-    return { ok: false, error: "password" };
+  if (empUsuario.password !== password) {
+    if (typeof mostrarPasswordIncorrecta === "function") {
+      mostrarPasswordIncorrecta();
+    }
+    return false;
   }
 
-  if (delay > 0) {
-    setTimeout(() => iniciarSesion(emp), delay);
-  } else {
-    iniciarSesion(emp);
-  }
-
-  return { ok: true };
+  setTimeout(() => iniciarSesion(empUsuario), delay);
+  return true;
 }
 
 /* ===============================
@@ -54,7 +55,6 @@ function iniciarSesion(emp) {
    ===== SESIÓN =====
 =============================== */
 function verificarSesion() {
-  // ✅ PERMITIR REGISTRO SIN SESIÓN
   const params = new URLSearchParams(window.location.search);
   const modoRegistro = params.get("modo") === "registro";
   const pagina = location.pathname.split("/").pop();
@@ -90,7 +90,6 @@ function can(permission) {
 
 function requirePermission(permission) {
   if (!can(permission)) {
-    // ❌ SIN alert
     location.href = "index.html";
     return false;
   }
