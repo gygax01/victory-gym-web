@@ -30,10 +30,27 @@
   <p class="small muted">Acceso exclusivo para personal autorizado</p>
 </div>
 
+<!-- OVERLAY NFC (NO TOCADO) -->
 <div class="overlay" id="overlay" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
     <div id="estadoNFC" class="estado amarillo">Esperando tarjeta…</div>
+  </div>
+</div>
+
+<!-- ✅ OVERLAY USUARIO NO EXISTE -->
+<div class="overlay" id="overlayUsuario" style="display:none">
+  <div class="popup">
+    <h2>Usuario no encontrado</h2>
+    <div class="estado rojo">El usuario ingresado no existe</div>
+  </div>
+</div>
+
+<!-- ✅ OVERLAY CONTRASEÑA INCORRECTA -->
+<div class="overlay" id="overlayPassword" style="display:none">
+  <div class="popup">
+    <h2>Error de acceso</h2>
+    <div class="estado rojo">La contraseña es incorrecta</div>
   </div>
 </div>
 
@@ -46,8 +63,12 @@ const inputUser = document.getElementById("inputUser");
 const inputPass = document.getElementById("inputPass");
 const btnLogin = document.getElementById("btnLogin");
 const btnNFC = document.getElementById("btnNFC");
+
 const overlay = document.getElementById("overlay");
 const estadoNFC = document.getElementById("estadoNFC");
+
+const overlayUsuario = document.getElementById("overlayUsuario");
+const overlayPassword = document.getElementById("overlayPassword");
 
 (function crearSuperAdminSiNoExiste() {
   const emps = obtenerEmpleados();
@@ -97,6 +118,17 @@ function resetNFC() {
   detenerNFC();
   leyendoNFC = false;
   overlay.style.display = "none";
+}
+
+/* ===== overlays de error login ===== */
+function mostrarUsuarioNoExiste() {
+  overlayUsuario.style.display = "flex";
+  setTimeout(() => overlayUsuario.style.display = "none", 1500);
+}
+
+function mostrarPasswordIncorrecta() {
+  overlayPassword.style.display = "flex";
+  setTimeout(() => overlayPassword.style.display = "none", 1500);
 }
 </script>
 
