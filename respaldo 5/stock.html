@@ -40,8 +40,11 @@
   <button id="btnGuardar">💾 Guardar</button>
 </div>
 
+<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
-<script src="js/auth.js"></script>
+
+<!-- 🔥 CACHE BUSTING PARA GITHUB PAGES -->
+<script src="js/auth.js?v=4"></script>
 
 <script>
 const inputNombre = document.getElementById("inputNombre");
@@ -58,7 +61,7 @@ let productosFiltrados = [];
 window.addEventListener("load", () => {
   if (!verificarSesion()) return;
 
-  // ✅ ACCESO A PÁGINA (SIN requirePermission)
+  // ✅ acceso permitido a empleados y admin
   if (!can("stock_view")) {
     location.href = "index.html";
     return;
