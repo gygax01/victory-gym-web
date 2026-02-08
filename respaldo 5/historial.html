@@ -22,7 +22,6 @@
 
 <div class="historial-container" id="listaHistorial"></div>
 
-<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js?v=4"></script>
 
@@ -173,6 +172,13 @@ function render(lista) {
 
     const header = card.querySelector(".cliente-header");
     const panel = card.querySelector(".historial");
+
+    // 🔥 ABRIR AUTOMÁTICAMENTE SI TIENE ASISTENCIAS
+    if (registros.length > 0) {
+      card.classList.add("abierto");
+      panel.classList.add("abierto");
+      header.setAttribute("aria-expanded", "true");
+    }
 
     header.onclick = () => {
       document.querySelectorAll(".cliente.abierto").forEach(o => {
