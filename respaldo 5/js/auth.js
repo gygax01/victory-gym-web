@@ -8,9 +8,6 @@ const ROLE_PERMISSIONS = {
   superadmin: { system_all: true }
 };
 
-/* ===============================
-   ===== LOGIN =====
-=============================== */
 function login(usuario, password, delay = 0) {
   const empleados = obtenerEmpleados();
 
@@ -23,9 +20,6 @@ function login(usuario, password, delay = 0) {
   return "OK";
 }
 
-/* ===============================
-   ===== INICIAR SESIÓN =====
-=============================== */
 function iniciarSesion(emp) {
   const permisos =
     emp.rol === "superadmin"
@@ -41,17 +35,12 @@ function iniciarSesion(emp) {
   location.href = "index.html";
 }
 
-/* ===============================
-   ===== SESIÓN =====
-=============================== */
 function verificarSesion() {
   const params = new URLSearchParams(window.location.search);
   const modoRegistro = params.get("modo") === "registro";
   const pagina = location.pathname.split("/").pop();
 
-  if (pagina === "usuarios.html" && modoRegistro) {
-    return true;
-  }
+  if (pagina === "usuarios.html" && modoRegistro) return true;
 
   if (!localStorage.getItem("session")) {
     location.href = "login.html";
@@ -68,9 +57,6 @@ function obtenerSesion() {
   }
 }
 
-/* ===============================
-   ===== PERMISOS =====
-=============================== */
 function can(permission) {
   const s = obtenerSesion();
   if (!s || !s.permisos) return false;
@@ -78,17 +64,6 @@ function can(permission) {
   return s.permisos[permission] === true;
 }
 
-function requirePermission(permission) {
-  if (!can(permission)) {
-    location.href = "index.html";
-    return false;
-  }
-  return true;
-}
-
-/* ===============================
-   ===== LOGOUT =====
-=============================== */
 function logout() {
   localStorage.removeItem("session");
   location.href = "login.html";
