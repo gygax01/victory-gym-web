@@ -19,14 +19,16 @@
   <button class="btn-login" id="btnLogin">Ingresar</button>
   <hr>
   <button class="nfc btn-nfc" id="btnNFC">Ingresar con tarjeta</button>
+
   <button class="btn-sec" onclick="location.href='usuarios.html?modo=registro'">
     Registrar usuario
   </button>
+
   <p class="small muted">Acceso exclusivo para personal autorizado</p>
 </div>
 
 <!-- LOADER -->
-<div class="overlay" id="overlayLoader">
+<div class="overlay" id="overlayLoader" style="display:none">
   <div class="popup">
     <h2>Ingresando</h2>
     <div id="estadoLoader" class="estado amarillo">Accediendo…</div>
@@ -34,7 +36,7 @@
 </div>
 
 <!-- NFC -->
-<div class="overlay" id="overlayNFC">
+<div class="overlay" id="overlayNFC" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
     <div id="estadoNFC" class="estado amarillo">Esperando tarjeta…</div>
@@ -42,24 +44,17 @@
 </div>
 
 <!-- ERRORES -->
-<div class="overlay" id="overlayUsuario">
+<div class="overlay" id="overlayUsuario" style="display:none">
   <div class="popup">
     <h2>Usuario no encontrado</h2>
     <div class="estado rojo">El usuario ingresado no existe</div>
   </div>
 </div>
 
-<div class="overlay" id="overlayPassword">
+<div class="overlay" id="overlayPassword" style="display:none">
   <div class="popup">
     <h2>Error de acceso</h2>
     <div class="estado rojo">La contraseña es incorrecta</div>
-  </div>
-</div>
-
-<div class="overlay" id="overlayBloqueo">
-  <div class="popup">
-    <h2>Acceso bloqueado</h2>
-    <div class="estado rojo">Demasiados intentos. Espera 30 segundos</div>
   </div>
 </div>
 
@@ -68,54 +63,41 @@
 <script src="js/nfc.js"></script>
 
 <script>
-/* ===== UTILIDAD CLAVE ===== */
+/* ===== util ===== */
 function ocultarOverlays() {
-  document.querySelectorAll(".overlay").forEach(o => {
-    o.style.display = "none";
-  });
+  document.querySelectorAll(".overlay").forEach(o => o.style.display = "none");
 }
 
-const inputUser = document.getElementById("inputUser");
-const inputPass = document.getElementById("inputPass");
+/* ===== refs ===== */
 const btnLogin = document.getElementById("btnLogin");
 const btnNFC = document.getElementById("btnNFC");
+const inputUser = document.getElementById("inputUser");
+const inputPass = document.getElementById("inputPass");
 
 const overlayLoader = document.getElementById("overlayLoader");
 const estadoLoader = document.getElementById("estadoLoader");
 
 const overlayUsuario = document.getElementById("overlayUsuario");
 const overlayPassword = document.getElementById("overlayPassword");
-const overlayBloqueo = document.getElementById("overlayBloqueo");
 
 const overlayNFC = document.getElementById("overlayNFC");
 const estadoNFC = document.getElementById("estadoNFC");
 
-let intentos = 0;
-let bloqueadoHasta = 0;
 let leyendoNFC = false;
+let timeoutNFC = null;
 
 /* ===== LOGIN NORMAL ===== */
 btnLogin.onclick = () => {
   ocultarOverlays();
-
-  const ahora = Date.now();
-  if (ahora < bloqueadoHasta) {
-    overlayBloqueo.style.display = "flex";
-    setTimeout(ocultarOverlays, 1500);
-    return;
-  }
-
   const r = login(inputUser.value.trim(), inputPass.value, 0);
 
   if (r === "NO_USER") {
-    intentos++;
     overlayUsuario.style.display = "flex";
     setTimeout(ocultarOverlays, 1500);
     return;
   }
 
   if (r === "BAD_PASS") {
-    intentos++;
     overlayPassword.style.display = "flex";
     setTimeout(ocultarOverlays, 1500);
     return;
@@ -131,37 +113,38 @@ btnLogin.onclick = () => {
       estadoLoader.textContent = "Acceso correcto";
     }, 400);
   }
-
-  if (intentos >= 3) {
-    intentos = 0;
-    bloqueadoHasta = Date.now() + 30000;
-  }
 };
 
-/* ===== LOGIN NFC ===== */
+/* ===== LOGIN NFC CON TIMEOUT ===== */
 btnNFC.onclick = () => {
-  ocultarOverlays();
-
   if (leyendoNFC) return;
   leyendoNFC = true;
 
-  detenerNFC(); // 🔑 CLAVE: limpiar estado previo
+  ocultarOverlays();
+  detenerNFC();
 
   overlayNFC.style.display = "flex";
   estadoNFC.className = "estado amarillo";
   estadoNFC.textContent = "Esperando tarjeta…";
 
+  // ⏱ timeout de 10 segundos
+  timeoutNFC = setTimeout(() => {
+    estadoNFC.className = "estado rojo";
+    estadoNFC.textContent = "Tiempo excedido para lectura";
+
+    setTimeout(resetNFC, 1500);
+  }, 10000);
+
   iniciarNFCControlado({
     onUID: uid => {
+      clearTimeout(timeoutNFC);
+
       const emp = obtenerEmpleados().find(e => e.tarjetaUID === uid);
 
       if (!emp) {
         estadoNFC.className = "estado rojo";
         estadoNFC.textContent = "Tarjeta no registrada";
-        setTimeout(() => {
-          ocultarOverlays();
-          resetNFC();
-        }, 1500);
+        setTimeout(resetNFC, 1500);
         return;
       }
 
@@ -170,7 +153,6 @@ btnNFC.onclick = () => {
 
       setTimeout(() => {
         resetNFC();
-        ocultarOverlays();
         overlayLoader.style.display = "flex";
         estadoLoader.className = "estado verde";
         estadoLoader.textContent = "Acceso correcto";
@@ -181,9 +163,10 @@ btnNFC.onclick = () => {
 };
 
 function resetNFC() {
+  clearTimeout(timeoutNFC);
   detenerNFC();
   leyendoNFC = false;
-  overlayNFC.style.display = "none";
+  ocultarOverlays();
 }
 </script>
 
