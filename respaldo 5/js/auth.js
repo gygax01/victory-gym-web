@@ -103,23 +103,19 @@ function logout() {
   localStorage.removeItem("session");
   location.href = "login.html";
 }
+
 /* ===============================
    ===== APLICAR PERMISOS UI =====
-   Oculta elementos según permisos
 =============================== */
 function applyPermissions() {
-  const elementos = document.querySelectorAll("[data-permission]");
-
-  elementos.forEach(el => {
+  document.querySelectorAll("[data-permission]").forEach(el => {
     const permiso = el.getAttribute("data-permission");
 
-    // superadmin ve todo
     if (can("system_all")) {
       el.style.display = "";
       return;
     }
 
-    // si no tiene el permiso, se oculta
     if (!can(permiso)) {
       el.style.display = "none";
     } else {
@@ -127,4 +123,3 @@ function applyPermissions() {
     }
   });
 }
-
