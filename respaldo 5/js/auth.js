@@ -5,7 +5,8 @@
 /*
   employee:
     - clientes: ver, crear
-    - stock: ver
+    - stock: ver, agregar
+    - productos: crear
     - ventas
     - membresías: ver
     - historial: ver
@@ -30,6 +31,10 @@ const ROLE_PERMISSIONS = {
 
     // stock
     stock_view: true,
+    stock_add: true,          // ✅ puede aumentar stock
+
+    // productos
+    products_create: true,    // ✅ puede crear producto
 
     // ventas
     sales_do: true,
@@ -138,6 +143,9 @@ function can(permission) {
   return s.permisos[permission] === true;
 }
 
+/*
+  Para proteger páginas completas
+*/
 function requirePermission(permission) {
   if (!can(permission)) {
     location.href = "index.html";
