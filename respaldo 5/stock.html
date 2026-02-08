@@ -17,15 +17,13 @@
 </header>
 
 <!-- ===== NUEVO PRODUCTO ===== -->
-<div class="card stock-nuevo">
+<div class="card stock-nuevo" data-permission="products_create">
   <h3>Nuevo producto</h3>
   <div class="stock-form">
     <input id="inputNombre" placeholder="Nombre">
     <input id="inputPrecio" type="number" min="0" step="0.01" placeholder="Precio">
     <input id="inputStock" type="number" min="0" step="1" placeholder="Stock inicial">
-    <button id="btnAgregar" data-permission="products_create">
-      Agregar
-    </button>
+    <button id="btnAgregar">Agregar</button>
   </div>
 </div>
 
@@ -38,20 +36,15 @@
 <div class="stock-grid" id="listaStock"></div>
 
 <!-- ===== FOOTER ===== -->
-<div class="stock-footer">
-  <button id="btnGuardar" data-permission="stock_add">
-    💾 Guardar
-  </button>
+<div class="stock-footer" data-permission="stock_add">
+  <button id="btnGuardar">💾 Guardar</button>
 </div>
 
-<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
+<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
 <script>
-/* ===============================
-   ===== DOM =====
-=============================== */
 const inputNombre = document.getElementById("inputNombre");
 const inputPrecio = document.getElementById("inputPrecio");
 const inputStock = document.getElementById("inputStock");
@@ -60,36 +53,25 @@ const buscadorStock = document.getElementById("buscadorStock");
 const listaStock = document.getElementById("listaStock");
 const btnGuardar = document.getElementById("btnGuardar");
 
-/* ===============================
-   ===== ESTADO =====
-=============================== */
 let productos = [];
 let productosFiltrados = [];
 
-/* ===============================
-   ===== INIT =====
-=============================== */
 window.addEventListener("load", initStock);
 
 function initStock() {
   if (!verificarSesion()) return;
   if (!requirePermission("stock_view")) return;
 
-  btnAgregar.addEventListener("click", nuevoProducto);
-  btnGuardar.addEventListener("click", guardarStock);
+  btnAgregar?.addEventListener("click", nuevoProducto);
+  btnGuardar?.addEventListener("click", guardarStock);
   buscadorStock.addEventListener("input", filtrarStock);
 
   cargarStock();
   applyPermissions();
 }
 
-/* ===============================
-   ===== CARGAR / RENDER =====
-=============================== */
 function cargarStock() {
-  productos = obtenerProductos().filter(
-    p => p && typeof p.nombre === "string"
-  );
+  productos = obtenerProductos().filter(p => p && p.nombre);
   productosFiltrados = [...productos];
   renderStock();
 }
@@ -97,93 +79,72 @@ function cargarStock() {
 function renderStock() {
   listaStock.innerHTML = "";
 
-  if (productosFiltrados.length === 0) {
-    const p = document.createElement("p");
-    p.textContent = "No hay productos";
-    listaStock.appendChild(p);
+  if (!productosFiltrados.length) {
+    listaStock.innerHTML = "<p>No hay productos</p>";
     return;
   }
 
-  productosFiltrados.forEach((p, idx) => {
+  productosFiltrados.forEach(p => {
     const card = document.createElement("div");
     card.className = "stock-card";
 
-    const header = document.createElement("div");
-    header.className = "stock-header";
-
     const nombre = document.createElement("h4");
     nombre.textContent = p.nombre;
-
-    const btnEliminar = document.createElement("button");
-    btnEliminar.textContent = "Eliminar";
-    btnEliminar.setAttribute("data-permission", "stock_delete");
-    btnEliminar.addEventListener("click", () =>
-      eliminarProducto(p)
-    );
-
-    header.append(nombre, btnEliminar);
 
     const precio = document.createElement("div");
     precio.textContent = "$" + Number(p.precio).toFixed(2);
 
     const stock = document.createElement("div");
-    stock.textContent = "Stock: " + (Number(p.stock) || 0);
+    stock.textContent = "Stock: " + p.stock;
 
     const btnMas1 = document.createElement("button");
     btnMas1.textContent = "+1";
     btnMas1.setAttribute("data-permission", "stock_add");
-    btnMas1.addEventListener("click", () => sumarStock(p, 1));
+    btnMas1.onclick = () => modificarStock(p, 1);
 
     const btnMas10 = document.createElement("button");
     btnMas10.textContent = "+10";
     btnMas10.setAttribute("data-permission", "stock_add");
-    btnMas10.addEventListener("click", () => sumarStock(p, 10));
+    btnMas10.onclick = () => modificarStock(p, 10);
 
-    card.append(header, precio, stock, btnMas1, btnMas10);
+    const btnEliminar = document.createElement("button");
+    btnEliminar.textContent = "Eliminar";
+    btnEliminar.setAttribute("data-permission", "stock_delete");
+    btnEliminar.onclick = () => eliminarProducto(p);
+
+    card.append(nombre, precio, stock, btnMas1, btnMas10, btnEliminar);
     listaStock.appendChild(card);
   });
 
   applyPermissions();
 }
 
-/* ===============================
-   ===== OPERACIONES =====
-=============================== */
-function sumarStock(producto, cantidad) {
-  if (!requirePermission("stock_add")) return;
-  producto.stock = (Number(producto.stock) || 0) + cantidad;
+function modificarStock(p, cant) {
+  if (!can("stock_add")) return;
+  p.stock += cant;
   renderStock();
 }
 
-function eliminarProducto(producto) {
-  if (!requirePermission("stock_delete")) return;
-  productos = productos.filter(p => p !== producto);
-  productosFiltrados = productosFiltrados.filter(p => p !== producto);
+function eliminarProducto(p) {
+  if (!can("stock_delete")) return;
+  productos = productos.filter(x => x !== p);
   guardarStock();
 }
 
 function guardarStock() {
-  if (!requirePermission("stock_add")) return;
+  if (!can("stock_add")) return;
   guardarProductos(productos);
-  alert("Stock guardado");
 }
 
-/* ===============================
-   ===== NUEVO PRODUCTO =====
-=============================== */
 function nuevoProducto() {
-  if (!requirePermission("products_create")) return;
+  if (!can("products_create")) return;
 
-  const nombre = inputNombre.value.trim();
-  const precio = Number(inputPrecio.value);
-  const stock = Number(inputStock.value);
+  productos.push({
+    nombre: inputNombre.value,
+    precio: Number(inputPrecio.value),
+    stock: Number(inputStock.value)
+  });
 
-  if (!nombre || isNaN(precio) || isNaN(stock)) {
-    alert("Datos inválidos");
-    return;
-  }
-
-  productos.push({ nombre, precio, stock });
   inputNombre.value = "";
   inputPrecio.value = "";
   inputStock.value = "";
@@ -191,13 +152,10 @@ function nuevoProducto() {
   guardarStock();
 }
 
-/* ===============================
-   ===== FILTRO =====
-=============================== */
 function filtrarStock() {
   const q = buscadorStock.value.toLowerCase();
-  productosFiltrados = productos.filter(
-    p => p.nombre.toLowerCase().includes(q)
+  productosFiltrados = productos.filter(p =>
+    p.nombre.toLowerCase().includes(q)
   );
   renderStock();
 }
@@ -205,5 +163,3 @@ function filtrarStock() {
 
 </body>
 </html>
-
-
