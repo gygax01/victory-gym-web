@@ -5,7 +5,7 @@
   <title>Login - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- 🔑 CLAVE: SUPABASE -->
+  <!-- SUPABASE PRIMERO -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -116,18 +116,19 @@ btnLogin.onclick = () => {
   }
 };
 
-/* ===== LOGIN NFC ===== */
+/* ===== LOGIN NFC (FIX REAL) ===== */
 btnNFC.onclick = () => {
+
   if (leyendoNFC) return;
   leyendoNFC = true;
 
   ocultarOverlays();
-  detenerNFC();
 
   overlayNFC.style.display = "flex";
   estadoNFC.className = "estado amarillo";
   estadoNFC.textContent = "Esperando tarjeta…";
 
+  // ⏱ timeout 10s
   timeoutNFC = setTimeout(() => {
     estadoNFC.className = "estado rojo";
     estadoNFC.textContent = "Tiempo excedido para lectura";
@@ -139,7 +140,6 @@ btnNFC.onclick = () => {
       clearTimeout(timeoutNFC);
 
       const emp = obtenerEmpleados().find(e => e.tarjetaUID === uid);
-
       if (!emp) {
         estadoNFC.className = "estado rojo";
         estadoNFC.textContent = "Tarjeta no registrada";
@@ -163,7 +163,7 @@ btnNFC.onclick = () => {
 
 function resetNFC() {
   clearTimeout(timeoutNFC);
-  detenerNFC();
+  detenerNFC();     // ✅ ahora sí, porque ya se inició
   leyendoNFC = false;
   ocultarOverlays();
 }
