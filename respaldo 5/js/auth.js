@@ -6,14 +6,17 @@
   employee:
     - clientes: ver, crear
     - stock: ver
-    - NO puede agregar / eliminar stock directo
-    - NO puede eliminar clientes
+    - ventas
+    - membresías: ver
+    - historial: ver
 
   admin:
     - clientes: ver, crear, eliminar
-    - stock: ver, agregar
+    - stock: ver, agregar, eliminar
     - productos: crear
-    - puede eliminar stock
+    - ventas
+    - membresías: ver, extender
+    - historial: ver
 
   superadmin:
     - acceso total
@@ -26,10 +29,16 @@ const ROLE_PERMISSIONS = {
     clients_create: true,
 
     // stock
-    stock_view: true
-    // ↓ NO stock_add
-    // ↓ NO stock_delete
-    // ↓ NO products_create
+    stock_view: true,
+
+    // ventas
+    sales_do: true,
+
+    // membresías
+    memberships_view: true,
+
+    // historial
+    history_view: true
   },
 
   admin: {
@@ -44,7 +53,17 @@ const ROLE_PERMISSIONS = {
     stock_delete: true,
 
     // productos
-    products_create: true
+    products_create: true,
+
+    // ventas
+    sales_do: true,
+
+    // membresías
+    memberships_view: true,
+    memberships_extend: true,
+
+    // historial
+    history_view: true
   },
 
   superadmin: {
@@ -119,10 +138,6 @@ function can(permission) {
   return s.permisos[permission] === true;
 }
 
-/*
-  Para proteger páginas completas
-  (NO usar en botones pequeños)
-*/
 function requirePermission(permission) {
   if (!can(permission)) {
     location.href = "index.html";
