@@ -1,5 +1,5 @@
 /* ===============================
-   ===== STORAGE BASE GYM (OFFLINE-FIRST) =====
+   ===== STORAGE BASE GYM (OFFLINE-FIRST PRO) =====
 =============================== */
 
 /* ======================================================
@@ -18,7 +18,14 @@ function safeSet(key, value) {
 }
 
 /* ======================================================
-   ===== COLA OFFLINE (🔥 CLAVE) =====
+   ===== ESTADO ONLINE =====
+====================================================== */
+function isOnline() {
+  return navigator.onLine === true;
+}
+
+/* ======================================================
+   ===== COLA OFFLINE (EVENTOS) =====
 ====================================================== */
 function obtenerColaOffline() {
   return safeGet("offline_queue", []);
@@ -28,32 +35,37 @@ function guardarColaOffline(lista) {
   safeSet("offline_queue", lista);
 }
 
-function agregarACola(tipo, payload) {
+function agregarEvento(tipo, accion, payload) {
   const cola = obtenerColaOffline();
   cola.push({
+    id: crypto.randomUUID(),
     tipo,
+    accion,
     payload,
-    ts: Date.now()
+    ts: Date.now(),
+    synced: false
   });
   guardarColaOffline(cola);
 }
 
 /* ======================================================
-   ===== SINCRONIZACIÓN =====
+   ===== SINCRONIZACIÓN (PLACEHOLDER) =====
 ====================================================== */
 async function syncOfflineQueue() {
-  if (!navigator.onLine) return;
+  if (!isOnline()) return;
 
   const cola = obtenerColaOffline();
-  if (cola.length === 0) return;
+  const pendientes = cola.filter(e => !e.synced);
 
-  console.log("🔄 Sincronizando offline queue:", cola.length);
+  if (!pendientes.length) return;
 
-  // ⚠️ aquí NO hacemos POST directo
-  // Supabase se entera por los flujos normales (ESP / UI)
-  // Esto es para futuras extensiones
+  console.log("🔄 Sync pendiente:", pendientes.length);
 
-  guardarColaOffline([]);
+  // ⚠️ Aquí después irá Supabase / Bluetooth
+  // Por ahora SOLO marcamos como sincronizado
+
+  pendientes.forEach(e => e.synced = true);
+  guardarColaOffline(cola);
 }
 
 window.addEventListener("online", syncOfflineQueue);
@@ -67,6 +79,7 @@ function obtenerEmpleados() {
 
 function guardarEmpleados(lista) {
   safeSet("empleados", lista || []);
+  agregarEvento("empleados", "set", lista);
 }
 
 /* ======================================================
@@ -78,7 +91,7 @@ function obtenerClientes() {
 
 function guardarClientes(lista) {
   safeSet("clientes", lista || []);
-  agregarACola("clientes", lista);
+  agregarEvento("clientes", "set", lista);
 }
 
 /* ======================================================
@@ -88,9 +101,11 @@ function obtenerAsistencias() {
   return safeGet("asistencias", []);
 }
 
-function guardarAsistencias(lista) {
-  safeSet("asistencias", lista || []);
-  agregarACola("asistencias", lista);
+function registrarAsistencia(asistencia) {
+  const lista = obtenerAsistencias();
+  lista.push(asistencia);
+  safeSet("asistencias", lista);
+  agregarEvento("asistencias", "add", asistencia);
 }
 
 /* ======================================================
@@ -102,7 +117,7 @@ function obtenerProductos() {
 
 function guardarProductos(lista) {
   safeSet("productos", lista || []);
-  agregarACola("productos", lista);
+  agregarEvento("productos", "set", lista);
 }
 
 /* ======================================================
@@ -112,9 +127,11 @@ function obtenerVentas() {
   return safeGet("ventas", []);
 }
 
-function guardarVentas(lista) {
-  safeSet("ventas", lista || []);
-  agregarACola("ventas", lista);
+function registrarVenta(venta) {
+  const lista = obtenerVentas();
+  lista.push(venta);
+  safeSet("ventas", lista);
+  agregarEvento("ventas", "add", venta);
 }
 
 /* ======================================================
