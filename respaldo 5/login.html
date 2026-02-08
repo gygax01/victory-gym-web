@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Login - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body class="centered login-bg">
@@ -30,11 +29,11 @@
   <p class="small muted">Acceso exclusivo para personal autorizado</p>
 </div>
 
-<!-- NFC -->
-<div class="overlay" id="overlay" style="display:none">
+<!-- LOADER -->
+<div class="overlay" id="overlayLoader" style="display:none">
   <div class="popup">
-    <h2>Acerque la tarjeta</h2>
-    <div id="estadoNFC" class="estado amarillo">Esperando tarjeta…</div>
+    <h2>Verificando acceso</h2>
+    <div class="estado amarillo">Espere…</div>
   </div>
 </div>
 
@@ -54,6 +53,14 @@
   </div>
 </div>
 
+<!-- BLOQUEO -->
+<div class="overlay" id="overlayBloqueo" style="display:none">
+  <div class="popup">
+    <h2>Acceso bloqueado</h2>
+    <div class="estado rojo">Demasiados intentos. Espera 30 segundos</div>
+  </div>
+</div>
+
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
@@ -63,21 +70,51 @@ const inputUser = document.getElementById("inputUser");
 const inputPass = document.getElementById("inputPass");
 const btnLogin = document.getElementById("btnLogin");
 
+const overlayLoader = document.getElementById("overlayLoader");
 const overlayUsuario = document.getElementById("overlayUsuario");
 const overlayPassword = document.getElementById("overlayPassword");
+const overlayBloqueo = document.getElementById("overlayBloqueo");
+
+let intentos = 0;
+let bloqueadoHasta = 0;
 
 btnLogin.onclick = () => {
-  const r = login(inputUser.value.trim(), inputPass.value, 200);
+  const ahora = Date.now();
 
-  if (r === "NO_USER") {
-    overlayUsuario.style.display = "flex";
-    setTimeout(() => overlayUsuario.style.display = "none", 1500);
+  if (ahora < bloqueadoHasta) {
+    overlayBloqueo.style.display = "flex";
+    setTimeout(() => overlayBloqueo.style.display = "none", 1500);
+    return;
   }
 
-  if (r === "BAD_PASS") {
-    overlayPassword.style.display = "flex";
-    setTimeout(() => overlayPassword.style.display = "none", 1500);
-  }
+  overlayLoader.style.display = "flex";
+
+  setTimeout(() => {
+    const r = login(inputUser.value.trim(), inputPass.value, 200);
+
+    if (r === "OK") return;
+
+    overlayLoader.style.display = "none";
+    intentos++;
+
+    if (intentos >= 3) {
+      intentos = 0;
+      bloqueadoHasta = Date.now() + 30000;
+      overlayBloqueo.style.display = "flex";
+      setTimeout(() => overlayBloqueo.style.display = "none", 2000);
+      return;
+    }
+
+    if (r === "NO_USER") {
+      overlayUsuario.style.display = "flex";
+      setTimeout(() => overlayUsuario.style.display = "none", 1500);
+    }
+
+    if (r === "BAD_PASS") {
+      overlayPassword.style.display = "flex";
+      setTimeout(() => overlayPassword.style.display = "none", 1500);
+    }
+  }, 300);
 };
 </script>
 
