@@ -14,8 +14,8 @@
     <img src="img/logo.png" alt="Victory Pro Fitness">
   </div>
 
-  <input id="inputUser" placeholder="Usuario" autocomplete="username">
-  <input id="inputPass" type="password" placeholder="Contraseña" autocomplete="current-password">
+  <input id="inputUser" placeholder="Usuario">
+  <input id="inputPass" type="password" placeholder="Contraseña">
 
   <button class="btn-login" id="btnLogin">Ingresar</button>
 
@@ -30,7 +30,7 @@
   <p class="small muted">Acceso exclusivo para personal autorizado</p>
 </div>
 
-<!-- OVERLAY NFC (NO TOCADO) -->
+<!-- NFC -->
 <div class="overlay" id="overlay" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
@@ -38,7 +38,7 @@
   </div>
 </div>
 
-<!-- ✅ OVERLAY USUARIO NO EXISTE -->
+<!-- USUARIO -->
 <div class="overlay" id="overlayUsuario" style="display:none">
   <div class="popup">
     <h2>Usuario no encontrado</h2>
@@ -46,7 +46,7 @@
   </div>
 </div>
 
-<!-- ✅ OVERLAY CONTRASEÑA INCORRECTA -->
+<!-- PASSWORD -->
 <div class="overlay" id="overlayPassword" style="display:none">
   <div class="popup">
     <h2>Error de acceso</h2>
@@ -62,74 +62,23 @@
 const inputUser = document.getElementById("inputUser");
 const inputPass = document.getElementById("inputPass");
 const btnLogin = document.getElementById("btnLogin");
-const btnNFC = document.getElementById("btnNFC");
-
-const overlay = document.getElementById("overlay");
-const estadoNFC = document.getElementById("estadoNFC");
 
 const overlayUsuario = document.getElementById("overlayUsuario");
 const overlayPassword = document.getElementById("overlayPassword");
 
-(function crearSuperAdminSiNoExiste() {
-  const emps = obtenerEmpleados();
-  if (emps.some(e => e.rol === "superadmin")) return;
-
-  emps.push({
-    nombre: "Sistema",
-    usuario: "gygax",
-    password: "admin(1234)",
-    rol: "superadmin"
-  });
-  guardarEmpleados(emps);
-})();
-
-let leyendoNFC = false;
-
 btnLogin.onclick = () => {
-  if (leyendoNFC) return;
-  login(inputUser.value.trim(), inputPass.value, 200);
+  const r = login(inputUser.value.trim(), inputPass.value, 200);
+
+  if (r === "NO_USER") {
+    overlayUsuario.style.display = "flex";
+    setTimeout(() => overlayUsuario.style.display = "none", 1500);
+  }
+
+  if (r === "BAD_PASS") {
+    overlayPassword.style.display = "flex";
+    setTimeout(() => overlayPassword.style.display = "none", 1500);
+  }
 };
-
-btnNFC.onclick = () => {
-  if (leyendoNFC) return;
-  leyendoNFC = true;
-  overlay.style.display = "flex";
-
-  iniciarNFCControlado({
-    onUID: uid => {
-      const emp = obtenerEmpleados().find(e => e.tarjetaUID === uid);
-      if (!emp) {
-        estadoNFC.className = "estado rojo";
-        estadoNFC.textContent = "Tarjeta no registrada";
-        setTimeout(resetNFC, 1500);
-        return;
-      }
-      estadoNFC.className = "estado verde";
-      estadoNFC.textContent = "Acceso correcto";
-      setTimeout(() => {
-        resetNFC();
-        login(emp.usuario, emp.password, 0);
-      }, 800);
-    }
-  });
-};
-
-function resetNFC() {
-  detenerNFC();
-  leyendoNFC = false;
-  overlay.style.display = "none";
-}
-
-/* ===== overlays de error login ===== */
-function mostrarUsuarioNoExiste() {
-  overlayUsuario.style.display = "flex";
-  setTimeout(() => overlayUsuario.style.display = "none", 1500);
-}
-
-function mostrarPasswordIncorrecta() {
-  overlayPassword.style.display = "flex";
-  setTimeout(() => overlayPassword.style.display = "none", 1500);
-}
 </script>
 
 </body>
