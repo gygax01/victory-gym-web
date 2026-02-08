@@ -2,6 +2,23 @@
    ===== AUTH + SESIÓN =====
 =============================== */
 
+/*
+  employee:
+    - clientes: ver, crear
+    - stock: ver
+    - NO puede agregar / eliminar stock directo
+    - NO puede eliminar clientes
+
+  admin:
+    - clientes: ver, crear, eliminar
+    - stock: ver, agregar
+    - productos: crear
+    - puede eliminar stock
+
+  superadmin:
+    - acceso total
+*/
+
 const ROLE_PERMISSIONS = {
   employee: {
     // clientes
@@ -9,9 +26,10 @@ const ROLE_PERMISSIONS = {
     clients_create: true,
 
     // stock
-    stock_view: true,
-    // NO puede agregar ni eliminar stock directo
-    // solo baja stock desde ventas
+    stock_view: true
+    // ↓ NO stock_add
+    // ↓ NO stock_delete
+    // ↓ NO products_create
   },
 
   admin: {
@@ -24,6 +42,8 @@ const ROLE_PERMISSIONS = {
     stock_view: true,
     stock_add: true,
     stock_delete: true,
+
+    // productos
     products_create: true
   },
 
@@ -38,8 +58,10 @@ const ROLE_PERMISSIONS = {
 function login(usuario, password, delay = 0) {
   const empleados = obtenerEmpleados();
   const emp = empleados.find(e => e.usuario === usuario);
+
   if (!emp) return "NO_USER";
   if (emp.password !== password) return "BAD_PASS";
+
   setTimeout(() => iniciarSesion(emp), delay);
   return "OK";
 }
@@ -53,11 +75,14 @@ function iniciarSesion(emp) {
       ? { system_all: true }
       : { ...(ROLE_PERMISSIONS[emp.rol] || {}) };
 
-  localStorage.setItem("session", JSON.stringify({
-    usuario: emp.usuario,
-    rol: emp.rol,
-    permisos
-  }));
+  localStorage.setItem(
+    "session",
+    JSON.stringify({
+      usuario: emp.usuario,
+      rol: emp.rol,
+      permisos
+    })
+  );
 
   location.href = "index.html";
 }
@@ -87,10 +112,17 @@ function obtenerSesion() {
 function can(permission) {
   const s = obtenerSesion();
   if (!s || !s.permisos) return false;
+
+  // superadmin = todo
   if (s.permisos.system_all) return true;
+
   return s.permisos[permission] === true;
 }
 
+/*
+  Para proteger páginas completas
+  (NO usar en botones pequeños)
+*/
 function requirePermission(permission) {
   if (!can(permission)) {
     location.href = "index.html";
@@ -100,15 +132,7 @@ function requirePermission(permission) {
 }
 
 /* ===============================
-   ===== LOGOUT =====
-=============================== */
-function logout() {
-  localStorage.removeItem("session");
-  location.href = "login.html";
-}
-
-/* ===============================
-   ===== APLICAR PERMISOS UI =====
+   ===== UI: APLICAR PERMISOS =====
 =============================== */
 function applyPermissions() {
   document.querySelectorAll("[data-permission]").forEach(el => {
@@ -120,4 +144,12 @@ function applyPermissions() {
       el.style.display = "none";
     }
   });
+}
+
+/* ===============================
+   ===== LOGOUT =====
+=============================== */
+function logout() {
+  localStorage.removeItem("session");
+  location.href = "login.html";
 }
