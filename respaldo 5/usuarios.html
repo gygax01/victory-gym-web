@@ -65,7 +65,8 @@
   </div>
 </div>
 
-<script src="js/storage.js?v=6"></script>
+<!-- ===== JS BASE ===== -->
+<script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
 
@@ -97,11 +98,42 @@ let tarjetaUID = null;
 let leyendoNFC = false;
 
 /* ================= INIT ================= */
-window.addEventListener("load", () => {
-  btnVolver.onclick = () => location.href = "login.html";
+window.addEventListener("load", initUsuarios);
+
+function initUsuarios() {
+  if (!verificarSesion()) return;
+
+  // 🔒 solo admin / superadmin
+  if (!can("system_all") && !can("clients_delete")) {
+    location.href = "index.html";
+    return;
+  }
+
+  btnVolver.onclick = () => location.href = "index.html";
   btnAsignarTarjeta.onclick = asignarTarjeta;
   btnRegistrar.onclick = () => overlayClave.style.display = "flex";
-});
+
+  iniciarSyncUsuarios();
+}
+
+/* ================= SYNC ================= */
+function iniciarSyncUsuarios() {
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "empleados") {
+      console.log("🔄 Usuarios actualizados desde otro dispositivo");
+    }
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "empleados") {
+      console.log("🔄 Usuarios sincronizados");
+    }
+  });
+
+  window.addEventListener("online", syncOfflineQueue);
+}
 
 /* ================= NFC ================= */
 function asignarTarjeta() {
@@ -146,7 +178,6 @@ function cerrarNFC() {
 /* ================= REGISTRO ================= */
 btnConfirmarClave.onclick = () => {
   if (claveInput.value !== CLAVE_MAESTRA) return;
-
   overlayClave.style.display = "none";
   registrarUsuario();
 };
@@ -155,6 +186,7 @@ function registrarUsuario() {
   if (!inputNombre.value || !inputUsuario.value || !inputPassword.value || !tarjetaUID) return;
 
   const empleados = obtenerEmpleados();
+
   empleados.push({
     nombre: inputNombre.value.trim(),
     usuario: inputUsuario.value.trim(),
@@ -165,14 +197,16 @@ function registrarUsuario() {
 
   guardarEmpleados(empleados);
 
+  // 🔔 notificar a todo el sistema
+  new BroadcastChannel("victory-data").postMessage("empleados");
+
   overlayExito.style.display = "flex";
 
   setTimeout(() => {
-    location.href = "login.html";
-  }, 2000);
+    location.href = "index.html";
+  }, 1800);
 }
 </script>
 
 </body>
 </html>
-
