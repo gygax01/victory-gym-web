@@ -5,7 +5,7 @@
   <title>Registro de Cliente</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- 🔑 SUPABASE (GLOBAL) -->
+  <!-- SUPABASE -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 
   <!-- CORE -->
@@ -13,7 +13,7 @@
   <script src="js/auth.js" defer></script>
   <script src="js/realtime.js" defer></script>
 
-  <!-- NFC (DESPUÉS DE SUPABASE) -->
+  <!-- NFC -->
   <script src="js/nfc.js" defer></script>
 </head>
 
@@ -54,11 +54,11 @@
       <p id="expiraTexto"></p>
 
       <div class="registro-acciones">
-        <button class="nfc" id="btnAsignar" onclick="abrirPopup()">
+        <button class="nfc" id="btnAsignar">
           Asignar tarjeta
         </button>
 
-        <button id="finalizar" onclick="registrarCliente()" disabled>
+        <button id="finalizar" disabled>
           Registrar cliente
         </button>
       </div>
@@ -85,101 +85,105 @@
 </div>
 
 <script>
-let tarjetaUID = null;
-let diasMembresia = 0;
-let leyendoNFC = false;
+document.addEventListener("DOMContentLoaded", () => {
 
-function setDias(d) {
-  diasMembresia = d;
-  const expira = new Date();
-  expira.setDate(expira.getDate() + d);
-  expiraTexto.innerText =
-    "Expira el: " + expira.toLocaleDateString();
-}
+  let tarjetaUID = null;
+  let diasMembresia = 0;
+  let leyendoNFC = false;
 
-function abrirPopup() {
-  if (leyendoNFC) return;
+  window.setDias = function (d) {
+    diasMembresia = d;
+    const expira = new Date();
+    expira.setDate(expira.getDate() + d);
+    expiraTexto.innerText =
+      "Expira el: " + expira.toLocaleDateString();
+  };
 
-  tarjetaUID = null;
-  leyendoNFC = true;
-  finalizar.disabled = true;
+  btnAsignar.onclick = () => {
+    if (leyendoNFC) return;
 
-  overlay.style.display = "flex";
-  estado.className = "estado amarillo";
-  estado.innerText = "Esperando tarjeta…";
-  uidTexto.innerText = "";
+    tarjetaUID = null;
+    leyendoNFC = true;
+    finalizar.disabled = true;
 
-  iniciarNFCControlado({
-    onUID: uid => {
-      if (uidYaRegistrada(uid)) {
-        estado.className = "estado rojo";
-        estado.innerText = "Tarjeta ya registrada";
+    overlay.style.display = "flex";
+    estado.className = "estado amarillo";
+    estado.innerText = "Esperando tarjeta…";
+    uidTexto.innerText = "";
+
+    iniciarNFCControlado({
+      onUID: uid => {
+        if (uidYaRegistrada(uid)) {
+          estado.className = "estado rojo";
+          estado.innerText = "Tarjeta ya registrada";
+          uidTexto.innerText = "UID: " + uid;
+          setTimeout(cerrarPopup, 1500);
+          return;
+        }
+
+        tarjetaUID = uid;
+        estado.className = "estado verde";
+        estado.innerText = "Tarjeta asignada";
         uidTexto.innerText = "UID: " + uid;
-        setTimeout(cerrarPopup, 1500);
-        return;
+
+        setTimeout(() => {
+          cerrarPopup();
+          finalizar.disabled = false;
+        }, 1200);
       }
+    });
+  };
 
-      tarjetaUID = uid;
-      estado.className = "estado verde";
-      estado.innerText = "Tarjeta asignada";
-      uidTexto.innerText = "UID: " + uid;
-
-      setTimeout(() => {
-        cerrarPopup();
-        finalizar.disabled = false;
-      }, 1200);
-    }
-  });
-}
-
-function cerrarPopup() {
-  overlay.style.display = "none";
-  detenerNFC();
-  leyendoNFC = false;
-}
-
-function registrarCliente() {
-  if (
-    !nombre.value.trim() ||
-    !telefono.value.trim() ||
-    !tarjetaUID ||
-    diasMembresia === 0
-  ) {
-    mostrarConfirm(
-      "Datos incompletos",
-      "Complete todos los campos antes de continuar"
-    );
-    return;
+  function cerrarPopup() {
+    overlay.style.display = "none";
+    detenerNFC();
+    leyendoNFC = false;
   }
 
-  const clientes = obtenerClientes();
-  const expira = new Date();
-  expira.setDate(expira.getDate() + diasMembresia);
+  finalizar.onclick = () => {
+    if (
+      !nombre.value.trim() ||
+      !telefono.value.trim() ||
+      !tarjetaUID ||
+      diasMembresia === 0
+    ) {
+      mostrarConfirm(
+        "Datos incompletos",
+        "Complete todos los campos antes de continuar"
+      );
+      return;
+    }
 
-  clientes.push({
-    nombre: nombre.value.trim(),
-    peso: peso.value,
-    altura: altura.value,
-    telefono: telefono.value,
-    tarjetaUID,
-    membresiaExpira: expira.toISOString().split("T")[0]
-  });
+    const clientes = obtenerClientes();
+    const expira = new Date();
+    expira.setDate(expira.getDate() + diasMembresia);
 
-  guardarClientes(clientes);
+    clientes.push({
+      nombre: nombre.value.trim(),
+      peso: peso.value,
+      altura: altura.value,
+      telefono: telefono.value,
+      tarjetaUID,
+      membresiaExpira: expira.toISOString().split("T")[0]
+    });
 
-  mostrarConfirm(
-    "Registro completado",
-    "Cliente registrado correctamente"
-  );
+    guardarClientes(clientes);
 
-  setTimeout(() => location.href = "index.html", 2000);
-}
+    mostrarConfirm(
+      "Registro completado",
+      "Cliente registrado correctamente"
+    );
 
-function mostrarConfirm(t, m) {
-  confirmacion.style.display = "flex";
-  tituloConfirm.innerText = t;
-  mensajeConfirm.innerText = m;
-}
+    setTimeout(() => location.href = "index.html", 2000);
+  };
+
+  function mostrarConfirm(t, m) {
+    confirmacion.style.display = "flex";
+    tituloConfirm.innerText = t;
+    mensajeConfirm.innerText = m;
+  }
+
+});
 </script>
 
 </body>
