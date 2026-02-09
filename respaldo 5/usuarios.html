@@ -32,10 +32,10 @@
     <input id="usuario" placeholder="Usuario">
     <input id="password" type="password" placeholder="Contraseña">
 
+    <!-- ❌ SUPERADMIN NO SE CREA DESDE UI -->
     <select id="rol">
       <option value="employee">Empleado</option>
       <option value="admin">Administrador</option>
-      <option value="superadmin">Super Admin</option>
     </select>
 
     <button class="nfc" onclick="asignarTarjeta()">Asignar tarjeta</button>
@@ -178,11 +178,13 @@ function registrarUsuario() {
   const empleados = obtenerEmpleados();
 
   empleados.push({
+    id: crypto.randomUUID(),
     nombre: nombre.value.trim(),
     usuario: usuario.value.trim(),
     password: password.value,
     rol: rol.value,
-    tarjetaUID
+    tarjetaUID,
+    oculto: false
   });
 
   guardarEmpleados(empleados);
@@ -201,7 +203,9 @@ function renderUsuarios() {
   if (!busqueda) return;
 
   const q = busqueda.value.toLowerCase();
+
   const empleados = obtenerEmpleados()
+    .filter(e => !e.oculto) // 🔥 OCULTA SUPERADMIN
     .filter(e =>
       e.nombre.toLowerCase().includes(q) ||
       e.usuario.toLowerCase().includes(q)
@@ -231,7 +235,7 @@ function renderUsuarios() {
       <p class="meta">${e.usuario} · ${e.rol}</p>
     `;
 
-    if (e.rol === "admin" || e.rol === "superadmin")
+    if (e.rol === "admin")
       listaAdmins.appendChild(d);
     else
       listaEmpleados.appendChild(d);
@@ -242,6 +246,8 @@ function renderUsuarios() {
    ===== REASIGNAR TARJETA =====
 =============================== */
 function iniciarReasignacion(usuario) {
+  if (usuario === "gygax") return;
+
   usuarioAReasignar = usuario;
 
   overlay.style.display = "flex";
@@ -281,6 +287,11 @@ function iniciarReasignacion(usuario) {
    ===== ELIMINAR =====
 =============================== */
 function confirmarEliminar(usuario) {
+  if (usuario === "gygax") {
+    alert("Este usuario no se puede eliminar");
+    return;
+  }
+
   usuarioAEliminar = usuario;
 
   mostrarConfirm(
@@ -311,8 +322,9 @@ function eliminarUsuario() {
     return;
   }
 
-  let empleados = obtenerEmpleados();
-  empleados = empleados.filter(e => e.usuario !== usuarioAEliminar);
+  let empleados = obtenerEmpleados()
+    .filter(e => e.usuario !== usuarioAEliminar);
+
   guardarEmpleados(empleados);
 
   mostrarConfirm(
