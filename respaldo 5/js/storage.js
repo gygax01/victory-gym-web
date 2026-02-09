@@ -208,3 +208,53 @@ function hoy() {
 function horaActual() {
   return new Date().toLocaleTimeString("es-MX", { hour12: false });
 }
+/* ======================================================
+   ===== SYNC OFFLINE → SUPABASE (REAL)
+====================================================== */
+async function subirEventoASupabase(e) {
+  if (!window.supabase) return false;
+
+  try {
+    if (e.tipo === "clientes") {
+      await supabase.from("clientes").upsert(e.payload);
+    }
+
+    if (e.tipo === "productos") {
+      await supabase.from("productos").upsert(e.payload);
+    }
+
+    if (e.tipo === "asistencias") {
+      await supabase.from("asistencias").insert(e.payload);
+    }
+
+    if (e.tipo === "ventas") {
+      await supabase.from("ventas").insert(e.payload);
+    }
+
+    return true;
+  } catch (err) {
+    console.error("❌ Sync error:", err);
+    return false;
+  }
+}
+
+async function syncOfflineQueue() {
+  if (!navigator.onLine) return;
+
+  const cola = obtenerColaOffline();
+  if (!cola.length) return;
+
+  console.log("🔄 Subiendo offline:", cola.length);
+
+  const pendientes = [];
+
+  for (const e of cola) {
+    const ok = await subirEventoASupabase(e);
+    if (!ok) pendientes.push(e);
+  }
+
+  guardarColaOffline(pendientes);
+}
+
+window.addEventListener("online", syncOfflineQueue);
+
