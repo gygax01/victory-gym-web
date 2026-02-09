@@ -17,7 +17,7 @@
   <script src="js/nfc.js" defer></script>
 </head>
 
-<body onload="verificarSesion()">
+<body>
 
 <header class="header-brand">
   <div class="brand">
@@ -33,6 +33,7 @@
 <main class="main">
   <div class="card registro-pc">
 
+    <!-- COLUMNA IZQUIERDA -->
     <div class="registro-col">
       <h3>Datos del cliente</h3>
       <input id="nombre" placeholder="Nombre completo">
@@ -41,6 +42,7 @@
       <input id="telefono" type="tel" placeholder="Teléfono">
     </div>
 
+    <!-- COLUMNA DERECHA -->
     <div class="registro-col">
       <h3>Membresía</h3>
 
@@ -87,10 +89,16 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
+  /* ===============================
+     ===== SESIÓN (AQUÍ CORRECTO)
+  =============================== */
+  verificarSesion();
+
   let tarjetaUID = null;
   let diasMembresia = 0;
   let leyendoNFC = false;
 
+  /* ===== MEMBRESÍA ===== */
   window.setDias = function (d) {
     diasMembresia = d;
     const expira = new Date();
@@ -99,6 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "Expira el: " + expira.toLocaleDateString();
   };
 
+  /* ===== NFC ===== */
   btnAsignar.onclick = () => {
     if (leyendoNFC) return;
 
@@ -140,6 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
     leyendoNFC = false;
   }
 
+  /* ===== REGISTRO CLIENTE ===== */
   finalizar.onclick = () => {
     if (
       !nombre.value.trim() ||
