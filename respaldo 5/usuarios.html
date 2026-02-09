@@ -8,8 +8,9 @@
   <!-- SUPABASE (solo NFC / realtime) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- CORE (SIN AUTH) -->
+  <!-- CORE -->
   <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/nfc.js"></script>
 </head>
 
@@ -32,18 +33,22 @@
     <input id="usuario" placeholder="Usuario">
     <input id="password" type="password" placeholder="Contraseña">
 
-    <!-- ❌ SUPERADMIN NO SE CREA DESDE UI -->
+    <!-- 🔒 SELECTOR SIN SUPERADMIN -->
     <select id="rol">
       <option value="employee">Empleado</option>
       <option value="admin">Administrador</option>
     </select>
 
-    <button class="nfc" onclick="asignarTarjeta()">Asignar tarjeta</button>
+    <button class="nfc" onclick="asignarTarjeta()">
+      Asignar tarjeta
+    </button>
     <p id="uidTexto" class="uid"></p>
   </div>
 
   <div class="usuarios-col">
-    <button id="btnRegistrar" onclick="pedirClaveRegistro()" disabled>
+    <button id="btnRegistrar"
+            onclick="pedirClaveRegistro()"
+            disabled>
       Registrar usuario
     </button>
   </div>
@@ -51,7 +56,9 @@
 
 <!-- ================= BUSCADOR / LISTAS ================= -->
 <div class="search-bar" id="buscador">
-  <input id="busqueda" placeholder="Buscar usuario..." oninput="renderUsuarios()">
+  <input id="busqueda"
+         placeholder="Buscar usuario..."
+         oninput="renderUsuarios()">
 </div>
 
 <div class="historial-container" id="listasUsuarios">
@@ -66,7 +73,9 @@
 <div class="overlay" id="overlay">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
-    <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
+    <div id="estado" class="estado amarillo">
+      Esperando tarjeta…
+    </div>
   </div>
 </div>
 
@@ -88,12 +97,13 @@ let usuarioAReasignar = null;
 
 /* ===== INIT ===== */
 function initUsuarios() {
-  const params = new URLSearchParams(location.search);
-  const modoRegistro = params.get("modo") === "registro";
+  verificarSesion();
 
-  if (modoRegistro) {
-    buscador.remove();
-    listasUsuarios.remove();
+  const s = obtenerSesion();
+  if (!s || !["admin","superadmin"].includes(s.rol)) {
+    alert("Acceso no autorizado");
+    location.href = "index.html";
+    return;
   }
 
   renderUsuarios();
@@ -101,12 +111,10 @@ function initUsuarios() {
 
 /* ===== VOLVER ===== */
 function volver() {
-  location.href = "login.html";
+  location.href = "index.html";
 }
 
-/* ===============================
-   ===== NFC REGISTRO USUARIO =====
-=============================== */
+/* ================= NFC ================= */
 function asignarTarjeta() {
   tarjetaUID = null;
   btnRegistrar.disabled = true;
@@ -143,9 +151,7 @@ function cerrarPopup() {
   detenerNFC();
 }
 
-/* ===============================
-   ===== REGISTRO =====
-=============================== */
+/* ================= REGISTRO ================= */
 function pedirClaveRegistro() {
   if (!tarjetaUID) return alert("Asigne una tarjeta primero");
 
@@ -182,9 +188,8 @@ function registrarUsuario() {
     nombre: nombre.value.trim(),
     usuario: usuario.value.trim(),
     password: password.value,
-    rol: rol.value,
-    tarjetaUID,
-    oculto: false
+    rol: rol.value, // 👈 nunca superadmin
+    tarjetaUID
   });
 
   guardarEmpleados(empleados);
@@ -196,21 +201,17 @@ function registrarUsuario() {
   );
 }
 
-/* ===============================
-   ===== LISTA =====
-=============================== */
+/* ================= LISTA ================= */
 function renderUsuarios() {
-  if (!busqueda) return;
-
   const q = busqueda.value.toLowerCase();
-
   const empleados = obtenerEmpleados()
-    .filter(e => !e.oculto) // 🔥 OCULTA SUPERADMIN
     .filter(e =>
-      e.nombre.toLowerCase().includes(q) ||
-      e.usuario.toLowerCase().includes(q)
-    )
-    .sort((a,b)=>a.nombre.localeCompare(b.nombre));
+      e.rol !== "superadmin" && // 🔒 OCULTO TOTAL
+      (
+        e.nombre.toLowerCase().includes(q) ||
+        e.usuario.toLowerCase().includes(q)
+      )
+    );
 
   listaAdmins.innerHTML = "";
   listaEmpleados.innerHTML = "";
@@ -218,127 +219,19 @@ function renderUsuarios() {
   empleados.forEach(e => {
     const d = document.createElement("div");
     d.className = "cliente";
-
     d.innerHTML = `
       <div class="cliente-header">
         <h3>${e.nombre}</h3>
-        <div class="acciones">
-          <button onclick="iniciarReasignacion('${e.usuario}')">
-            Reasignar tarjeta
-          </button>
-          <button class="btn-borrar"
-                  onclick="confirmarEliminar('${e.usuario}')">
-            Eliminar
-          </button>
-        </div>
       </div>
       <p class="meta">${e.usuario} · ${e.rol}</p>
     `;
 
-    if (e.rol === "admin")
-      listaAdmins.appendChild(d);
-    else
-      listaEmpleados.appendChild(d);
+    if (e.rol === "admin") listaAdmins.appendChild(d);
+    else listaEmpleados.appendChild(d);
   });
 }
 
-/* ===============================
-   ===== REASIGNAR TARJETA =====
-=============================== */
-function iniciarReasignacion(usuario) {
-  if (usuario === "gygax") return;
-
-  usuarioAReasignar = usuario;
-
-  overlay.style.display = "flex";
-  estado.className = "estado amarillo";
-  estado.innerText = "Esperando tarjeta…";
-
-  iniciarNFCControlado({
-    onUID: uid => {
-      if (uidYaRegistrada(uid)) {
-        estado.className = "estado rojo";
-        estado.innerText = "Tarjeta ya registrada";
-        setTimeout(cerrarPopup, 1500);
-        return;
-      }
-
-      let empleados = obtenerEmpleados().map(e => {
-        if (e.usuario === usuarioAReasignar) {
-          e.tarjetaUID = uid;
-        }
-        return e;
-      });
-
-      guardarEmpleados(empleados);
-
-      estado.className = "estado verde";
-      estado.innerText = "Tarjeta reasignada";
-
-      setTimeout(() => {
-        cerrarPopup();
-        renderUsuarios();
-      }, 1200);
-    }
-  });
-}
-
-/* ===============================
-   ===== ELIMINAR =====
-=============================== */
-function confirmarEliminar(usuario) {
-  if (usuario === "gygax") {
-    alert("Este usuario no se puede eliminar");
-    return;
-  }
-
-  usuarioAEliminar = usuario;
-
-  mostrarConfirm(
-    "¿Eliminar usuario?",
-    "Esta acción no se puede revertir",
-    `
-      <button onclick="pedirClaveEliminar()">Sí</button>
-      <button onclick="cerrarConfirm()">No</button>
-    `
-  );
-}
-
-function pedirClaveEliminar() {
-  mostrarConfirm(
-    "Confirmación final",
-    "Ingrese la contraseña maestra",
-    `
-      <input id="claveInput" type="password">
-      <button onclick="eliminarUsuario()">Confirmar</button>
-      <button onclick="cerrarConfirm()">Cancelar</button>
-    `
-  );
-}
-
-function eliminarUsuario() {
-  if (claveInput.value !== CLAVE_MAESTRA) {
-    alert("Contraseña incorrecta");
-    return;
-  }
-
-  let empleados = obtenerEmpleados()
-    .filter(e => e.usuario !== usuarioAEliminar);
-
-  guardarEmpleados(empleados);
-
-  mostrarConfirm(
-    "Correcto",
-    "Usuario eliminado correctamente",
-    `<button onclick="cerrarConfirm()">Aceptar</button>`
-  );
-
-  renderUsuarios();
-}
-
-/* ===============================
-   ===== CONFIRM =====
-=============================== */
+/* ================= CONFIRM ================= */
 function mostrarConfirm(t, m, a) {
   confirmacion.style.display = "flex";
   tituloConfirm.innerText = t;
