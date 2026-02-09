@@ -41,12 +41,13 @@
 </div>
 
 <!-- ===== JS BASE ===== -->
-<script src="js/storage.js?v=6"></script>
-
-<!-- 🔥 CACHE BUSTING PARA GITHUB PAGES -->
-<script src="js/auth.js?v=4"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
 
 <script>
+/* ===============================
+   ===== DOM =====
+=============================== */
 const inputNombre = document.getElementById("inputNombre");
 const inputPrecio = document.getElementById("inputPrecio");
 const inputStock = document.getElementById("inputStock");
@@ -55,13 +56,20 @@ const buscadorStock = document.getElementById("buscadorStock");
 const listaStock = document.getElementById("listaStock");
 const btnGuardar = document.getElementById("btnGuardar");
 
+/* ===============================
+   ===== ESTADO =====
+=============================== */
 let productos = [];
 let productosFiltrados = [];
 
-window.addEventListener("load", () => {
+/* ===============================
+   ===== INIT =====
+=============================== */
+window.addEventListener("load", initStock);
+
+function initStock() {
   if (!verificarSesion()) return;
 
-  // ✅ acceso permitido a empleados y admin
   if (!can("stock_view")) {
     location.href = "index.html";
     return;
@@ -71,16 +79,47 @@ window.addEventListener("load", () => {
   btnGuardar?.addEventListener("click", guardarStock);
   buscadorStock.addEventListener("input", filtrarStock);
 
+  iniciarSyncStock();
   cargarStock();
   applyPermissions();
-});
+}
 
+/* ===============================
+   ===== SINCRONIZACIÓN =====
+=============================== */
+function iniciarSyncStock() {
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "productos") {
+      cargarStock();
+    }
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "productos") {
+      cargarStock();
+    }
+  });
+
+  window.addEventListener("online", () => {
+    syncOfflineQueue();
+    cargarStock();
+  });
+}
+
+/* ===============================
+   ===== CARGA =====
+=============================== */
 function cargarStock() {
   productos = obtenerProductos().filter(p => p && p.nombre);
   productosFiltrados = [...productos];
   renderStock();
 }
 
+/* ===============================
+   ===== RENDER =====
+=============================== */
 function renderStock() {
   listaStock.innerHTML = "";
 
@@ -95,11 +134,14 @@ function renderStock() {
 
     card.innerHTML = `
       <h4>${p.nombre}</h4>
-      <div>$${Number(p.precio).toFixed(2)}</div>
-      <div>Stock: ${p.stock}</div>
-      <button data-permission="stock_add">+1</button>
-      <button data-permission="stock_add">+10</button>
-      <button data-permission="stock_delete">Eliminar</button>
+      <div class="precio">$${Number(p.precio).toFixed(2)}</div>
+      <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
+
+      <div class="stock-botones">
+        <button data-permission="stock_add">+1</button>
+        <button data-permission="stock_add">+10</button>
+        <button data-permission="stock_delete">Eliminar</button>
+      </div>
     `;
 
     const [b1, b10, bDel] = card.querySelectorAll("button");
@@ -114,6 +156,9 @@ function renderStock() {
   applyPermissions();
 }
 
+/* ===============================
+   ===== ACCIONES =====
+=============================== */
 function modificarStock(p, cant) {
   if (!can("stock_add")) return;
   p.stock += cant;
@@ -122,20 +167,25 @@ function modificarStock(p, cant) {
 
 function eliminarProducto(p) {
   if (!can("stock_delete")) return;
+
   productos = productos.filter(x => x !== p);
   guardarStock();
 }
 
 function guardarStock() {
   if (!can("stock_add")) return;
+
   guardarProductos(productos);
+
+  // 🔔 notifica a otras vistas / dispositivos
+  new BroadcastChannel("victory-data").postMessage("productos");
 }
 
 function nuevoProducto() {
   if (!can("products_create")) return;
 
   productos.push({
-    nombre: inputNombre.value,
+    nombre: inputNombre.value.trim(),
     precio: Number(inputPrecio.value),
     stock: Number(inputStock.value)
   });
@@ -147,6 +197,9 @@ function nuevoProducto() {
   guardarStock();
 }
 
+/* ===============================
+   ===== FILTRO =====
+=============================== */
 function filtrarStock() {
   const q = buscadorStock.value.toLowerCase();
   productosFiltrados = productos.filter(p =>
@@ -158,4 +211,3 @@ function filtrarStock() {
 
 </body>
 </html>
-
