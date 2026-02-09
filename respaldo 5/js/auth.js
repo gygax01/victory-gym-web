@@ -2,27 +2,6 @@
    ===== AUTH + SESIÓN (OFFLINE + REALTIME READY) =====
 ====================================================== */
 
-/*
-  employee:
-    - clientes: ver, crear
-    - stock: ver, agregar
-    - productos: crear
-    - ventas
-    - membresías: ver
-    - historial: ver
-
-  admin:
-    - clientes: ver, crear, eliminar
-    - stock: ver, agregar, eliminar
-    - productos: crear
-    - ventas
-    - membresías: ver, extender
-    - historial: ver
-
-  superadmin:
-    - acceso total
-*/
-
 /* ======================================================
    ===== PERMISOS POR ROL =====
 ====================================================== */
@@ -30,16 +9,11 @@ const ROLE_PERMISSIONS = {
   employee: {
     clients_view: true,
     clients_create: true,
-
     stock_view: true,
     stock_add: true,
-
     products_create: true,
-
     sales_do: true,
-
     memberships_view: true,
-
     history_view: true
   },
 
@@ -47,18 +21,13 @@ const ROLE_PERMISSIONS = {
     clients_view: true,
     clients_create: true,
     clients_delete: true,
-
     stock_view: true,
     stock_add: true,
     stock_delete: true,
-
     products_create: true,
-
     sales_do: true,
-
     memberships_view: true,
     memberships_extend: true,
-
     history_view: true
   },
 
@@ -98,8 +67,6 @@ function iniciarSesion(emp) {
   };
 
   localStorage.setItem("session", JSON.stringify(session));
-
-  // 🔥 notifica a otras pestañas
   broadcastAuth({ type: "login", session });
 
   location.href = "index.html";
@@ -109,10 +76,15 @@ function iniciarSesion(emp) {
    ===== SESIÓN =====
 ====================================================== */
 function verificarSesion() {
-  if (!localStorage.getItem("session")) {
-    location.href = "login.html";
+  const s = localStorage.getItem("session");
+
+  if (!s) {
+    if (!location.pathname.endsWith("login.html")) {
+      location.href = "login.html";
+    }
     return false;
   }
+
   return true;
 }
 
@@ -130,15 +102,10 @@ function obtenerSesion() {
 function can(permission) {
   const s = obtenerSesion();
   if (!s || !s.permisos) return false;
-
   if (s.permisos.system_all) return true;
-
   return s.permisos[permission] === true;
 }
 
-/*
-  Protección de páginas completas
-*/
 function requirePermission(permission) {
   if (!can(permission)) {
     location.href = "index.html";
@@ -153,12 +120,8 @@ function requirePermission(permission) {
 function applyPermissions() {
   document.querySelectorAll("[data-permission]").forEach(el => {
     const permiso = el.dataset.permission;
-
-    if (can("system_all") || can(permiso)) {
-      el.style.display = "";
-    } else {
-      el.style.display = "none";
-    }
+    el.style.display =
+      can("system_all") || can(permiso) ? "" : "none";
   });
 }
 
@@ -167,15 +130,12 @@ function applyPermissions() {
 ====================================================== */
 function logout() {
   localStorage.removeItem("session");
-
-  // 🔥 logout global
   broadcastAuth({ type: "logout" });
-
   location.href = "login.html";
 }
 
 /* ======================================================
-   ===== REALTIME: SINCRONIZACIÓN ENTRE PESTAÑAS =====
+   ===== REALTIME AUTH MULTI-TAB =====
 ====================================================== */
 const AUTH_CHANNEL = new BroadcastChannel("victory-auth");
 
@@ -188,7 +148,9 @@ AUTH_CHANNEL.onmessage = e => {
 
   if (type === "logout") {
     localStorage.removeItem("session");
-    location.href = "login.html";
+    if (!location.pathname.endsWith("login.html")) {
+      location.href = "login.html";
+    }
   }
 
   if (type === "login") {
@@ -198,10 +160,15 @@ AUTH_CHANNEL.onmessage = e => {
 };
 
 /* ======================================================
-   ===== CAMBIOS EXTERNOS (localStorage) =====
+   ===== STORAGE (SEGURO) =====
 ====================================================== */
 window.addEventListener("storage", e => {
-  if (e.key === "session" && !e.newValue) {
+  if (e.key !== "session") return;
+
+  // 🔒 VALIDACIÓN REAL
+  const existeSesion = !!localStorage.getItem("session");
+
+  if (!existeSesion && !location.pathname.endsWith("login.html")) {
     location.href = "login.html";
   }
 });
