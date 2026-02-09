@@ -4,9 +4,6 @@
   <meta charset="UTF-8">
   <title>Usuarios</title>
   <link rel="stylesheet" href="css/styles.css">
-
-  <!-- Supabase (solo por realtime / nfc.js si lo usa) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
@@ -50,7 +47,7 @@
   </div>
 </div>
 
-<!-- ===== CONFIRM CLAVE ===== -->
+<!-- ===== CLAVE MAESTRA ===== -->
 <div class="overlay" id="overlayClave" style="display:none">
   <div class="popup">
     <h2>Acceso administrativo</h2>
@@ -59,7 +56,7 @@
   </div>
 </div>
 
-<!-- ===== CONFIRM ÉXITO ===== -->
+<!-- ===== ÉXITO ===== -->
 <div class="overlay" id="overlayExito" style="display:none">
   <div class="popup">
     <h2>Registro completado</h2>
@@ -67,11 +64,8 @@
   </div>
 </div>
 
-<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
-<script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
-<script src="js/realtime.js"></script>
 
 <script>
 /* ================= CONFIG ================= */
@@ -93,25 +87,14 @@ const overlayClave = document.getElementById("overlayClave");
 const overlayExito = document.getElementById("overlayExito");
 
 const estadoNFC = document.getElementById("estadoNFC");
-const claveInput = document.getElementById("claveInput");
 const btnConfirmarClave = document.getElementById("btnConfirmarClave");
 
 /* ================= ESTADO ================= */
 let tarjetaUID = null;
 let leyendoNFC = false;
 
-/* ================= INIT ================= */
-window.addEventListener("load", () => {
-  // ❌ NO verificar sesión
-  // ❌ NO permisos
-  // ✔ cualquiera puede entrar
-
-  btnAsignarTarjeta.onclick = asignarTarjeta;
-  btnRegistrar.onclick = () => overlayClave.style.display = "flex";
-});
-
 /* ================= NFC ================= */
-function asignarTarjeta() {
+btnAsignarTarjeta.onclick = () => {
   if (leyendoNFC) return;
 
   leyendoNFC = true;
@@ -133,16 +116,17 @@ function asignarTarjeta() {
 
       tarjetaUID = uid;
       uidTexto.textContent = "UID: " + uid;
+
       estadoNFC.className = "estado verde";
       estadoNFC.textContent = "Tarjeta asignada";
 
       setTimeout(() => {
         cerrarNFC();
         btnRegistrar.disabled = false;
-      }, 1200);
+      }, 1000);
     }
   });
-}
+};
 
 function cerrarNFC() {
   detenerNFC();
@@ -151,11 +135,12 @@ function cerrarNFC() {
 }
 
 /* ================= REGISTRO ================= */
+btnRegistrar.onclick = () => {
+  overlayClave.style.display = "flex";
+};
+
 btnConfirmarClave.onclick = () => {
-  if (claveInput.value !== CLAVE_MAESTRA) {
-    alert("Clave maestra incorrecta");
-    return;
-  }
+  if (claveInput.value !== CLAVE_MAESTRA) return;
 
   overlayClave.style.display = "none";
   registrarUsuario();
@@ -163,7 +148,6 @@ btnConfirmarClave.onclick = () => {
 
 function registrarUsuario() {
   if (!inputNombre.value || !inputUsuario.value || !inputPassword.value || !tarjetaUID) {
-    alert("Faltan datos");
     return;
   }
 
@@ -178,9 +162,6 @@ function registrarUsuario() {
   });
 
   guardarEmpleados(empleados);
-
-  // 🔔 notificar a todo el sistema
-  new BroadcastChannel("victory-data").postMessage("empleados");
 
   overlayExito.style.display = "flex";
 
