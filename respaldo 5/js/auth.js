@@ -1,6 +1,6 @@
-/* ===============================
-   ===== AUTH + SESIÓN =====
-=============================== */
+/* ======================================================
+   ===== AUTH + SESIÓN (OFFLINE + REALTIME READY) =====
+====================================================== */
 
 /*
   employee:
@@ -23,51 +23,42 @@
     - acceso total
 */
 
+/* ======================================================
+   ===== PERMISOS POR ROL =====
+====================================================== */
 const ROLE_PERMISSIONS = {
   employee: {
-    // clientes
     clients_view: true,
     clients_create: true,
 
-    // stock
     stock_view: true,
-    stock_add: true,          // ✅ puede aumentar stock
+    stock_add: true,
 
-    // productos
-    products_create: true,    // ✅ puede crear producto
+    products_create: true,
 
-    // ventas
     sales_do: true,
 
-    // membresías
     memberships_view: true,
 
-    // historial
     history_view: true
   },
 
   admin: {
-    // clientes
     clients_view: true,
     clients_create: true,
     clients_delete: true,
 
-    // stock
     stock_view: true,
     stock_add: true,
     stock_delete: true,
 
-    // productos
     products_create: true,
 
-    // ventas
     sales_do: true,
 
-    // membresías
     memberships_view: true,
     memberships_extend: true,
 
-    // historial
     history_view: true
   },
 
@@ -76,9 +67,9 @@ const ROLE_PERMISSIONS = {
   }
 };
 
-/* ===============================
+/* ======================================================
    ===== LOGIN =====
-=============================== */
+====================================================== */
 function login(usuario, password, delay = 0) {
   const empleados = obtenerEmpleados();
   const emp = empleados.find(e => e.usuario === usuario);
@@ -90,30 +81,33 @@ function login(usuario, password, delay = 0) {
   return "OK";
 }
 
-/* ===============================
+/* ======================================================
    ===== INICIAR SESIÓN =====
-=============================== */
+====================================================== */
 function iniciarSesion(emp) {
   const permisos =
     emp.rol === "superadmin"
       ? { system_all: true }
       : { ...(ROLE_PERMISSIONS[emp.rol] || {}) };
 
-  localStorage.setItem(
-    "session",
-    JSON.stringify({
-      usuario: emp.usuario,
-      rol: emp.rol,
-      permisos
-    })
-  );
+  const session = {
+    usuario: emp.usuario,
+    rol: emp.rol,
+    permisos,
+    ts: Date.now()
+  };
+
+  localStorage.setItem("session", JSON.stringify(session));
+
+  // 🔥 notifica a otras pestañas
+  broadcastAuth({ type: "login", session });
 
   location.href = "index.html";
 }
 
-/* ===============================
+/* ======================================================
    ===== SESIÓN =====
-=============================== */
+====================================================== */
 function verificarSesion() {
   if (!localStorage.getItem("session")) {
     location.href = "login.html";
@@ -130,21 +124,20 @@ function obtenerSesion() {
   }
 }
 
-/* ===============================
+/* ======================================================
    ===== PERMISOS =====
-=============================== */
+====================================================== */
 function can(permission) {
   const s = obtenerSesion();
   if (!s || !s.permisos) return false;
 
-  // superadmin = todo
   if (s.permisos.system_all) return true;
 
   return s.permisos[permission] === true;
 }
 
 /*
-  Para proteger páginas completas
+  Protección de páginas completas
 */
 function requirePermission(permission) {
   if (!can(permission)) {
@@ -154,9 +147,9 @@ function requirePermission(permission) {
   return true;
 }
 
-/* ===============================
+/* ======================================================
    ===== UI: APLICAR PERMISOS =====
-=============================== */
+====================================================== */
 function applyPermissions() {
   document.querySelectorAll("[data-permission]").forEach(el => {
     const permiso = el.dataset.permission;
@@ -169,10 +162,46 @@ function applyPermissions() {
   });
 }
 
-/* ===============================
+/* ======================================================
    ===== LOGOUT =====
-=============================== */
+====================================================== */
 function logout() {
   localStorage.removeItem("session");
+
+  // 🔥 logout global
+  broadcastAuth({ type: "logout" });
+
   location.href = "login.html";
 }
+
+/* ======================================================
+   ===== REALTIME: SINCRONIZACIÓN ENTRE PESTAÑAS =====
+====================================================== */
+const AUTH_CHANNEL = new BroadcastChannel("victory-auth");
+
+function broadcastAuth(data) {
+  AUTH_CHANNEL.postMessage(data);
+}
+
+AUTH_CHANNEL.onmessage = e => {
+  const { type } = e.data || {};
+
+  if (type === "logout") {
+    localStorage.removeItem("session");
+    location.href = "login.html";
+  }
+
+  if (type === "login") {
+    localStorage.setItem("session", JSON.stringify(e.data.session));
+    applyPermissions();
+  }
+};
+
+/* ======================================================
+   ===== CAMBIOS EXTERNOS (localStorage) =====
+====================================================== */
+window.addEventListener("storage", e => {
+  if (e.key === "session" && !e.newValue) {
+    location.href = "login.html";
+  }
+});
