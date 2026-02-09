@@ -5,12 +5,11 @@
   <title>Registro de Usuario</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- SUPABASE -->
+  <!-- SUPABASE (solo para NFC / realtime) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 
-  <!-- CORE -->
+  <!-- CORE (SIN AUTH) -->
   <script src="js/storage.js" defer></script>
-  <script src="js/auth.js" defer></script>
   <script src="js/realtime.js" defer></script>
 
   <!-- NFC -->
@@ -143,8 +142,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // 🔐 VALIDACIÓN CONTRASEÑA MAESTRA
-    const MASTER_PASSWORD = "123456"; // ← cambia aquí
+    // 🔐 CONTRASEÑA MAESTRA
+    const MASTER_PASSWORD = "123456"; // ← cámbiala aquí
 
     if (passwordMaestra.value !== MASTER_PASSWORD) {
       alert("Contraseña maestra incorrecta");
