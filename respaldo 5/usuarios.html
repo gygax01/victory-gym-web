@@ -71,7 +71,6 @@
 <script src="js/nfc.js"></script>
 <script src="js/realtime.js"></script>
 
-
 <script>
 /* ================= CONFIG ================= */
 const CLAVE_MAESTRA = "victory(profitness)";
@@ -98,25 +97,34 @@ const btnConfirmarClave = document.getElementById("btnConfirmarClave");
 /* ================= ESTADO ================= */
 let tarjetaUID = null;
 let leyendoNFC = false;
+let modoRegistroInicial = false;
 
 /* ================= INIT ================= */
-window.addEventListener("load", initUsuarios);
+window.addEventListener("load", () => {
+  const params = new URLSearchParams(location.search);
+  modoRegistroInicial = params.get("modo") === "registro";
 
-function initUsuarios() {
-  if (!verificarSesion()) return;
+  if (!modoRegistroInicial) {
+    // 🔐 modo normal → requiere sesión
+    if (!verificarSesion()) return;
 
-  // 🔒 solo admin / superadmin
-  if (!can("system_all") && !can("clients_delete")) {
-    location.href = "index.html";
-    return;
+    // solo admin / superadmin
+    if (!can("system_all") && !can("clients_delete")) {
+      location.href = "index.html";
+      return;
+    }
+
+    btnVolver.onclick = () => location.href = "index.html";
+  } else {
+    // 🆕 registro inicial (sin sesión)
+    btnVolver.onclick = () => location.href = "login.html";
   }
 
-  btnVolver.onclick = () => location.href = "index.html";
   btnAsignarTarjeta.onclick = asignarTarjeta;
   btnRegistrar.onclick = () => overlayClave.style.display = "flex";
 
   iniciarSyncUsuarios();
-}
+});
 
 /* ================= SYNC ================= */
 function iniciarSyncUsuarios() {
@@ -205,11 +213,10 @@ function registrarUsuario() {
   overlayExito.style.display = "flex";
 
   setTimeout(() => {
-    location.href = "index.html";
+    location.href = modoRegistroInicial ? "login.html" : "index.html";
   }, 1800);
 }
 </script>
 
 </body>
 </html>
-
