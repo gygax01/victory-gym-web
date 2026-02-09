@@ -240,6 +240,7 @@ function procesarTarjeta(uid) {
   }
 
   guardarAsistencias(asistencias);
+  notificarCambioAsistencias();   // 👈 ESTA ES LA NUEVA LÍNEA
   cargarAsistencias();
   actualizarContador();
   autoScrollTabla();
@@ -251,3 +252,4 @@ function procesarTarjeta(uid) {
 
 </body>
 </html>
+
