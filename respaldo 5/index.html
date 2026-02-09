@@ -5,7 +5,7 @@
   <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- Supabase SOLO para nfc.js -->
+  <!-- Supabase SOLO para nfc.js / realtime -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -25,6 +25,10 @@
 
     <span id="estadoLector" class="lector off">
       Lector inactivo
+    </span>
+
+    <span id="estadoConexion" class="lector">
+      Offline
     </span>
 
     <button id="btnLogout">Salir</button>
@@ -79,6 +83,7 @@
    ===== DOM =====
 =============================== */
 const estadoLector = document.getElementById("estadoLector");
+const estadoConexion = document.getElementById("estadoConexion");
 const contenedorTabla = document.getElementById("contenedorTabla");
 const confirmacion = document.getElementById("confirmacion");
 const tituloConfirmacion = document.getElementById("tituloConfirmacion");
@@ -97,9 +102,13 @@ function initIndex() {
   aplicarRolIndex();
   btnLogout.addEventListener("click", logout);
 
+  actualizarEstadoConexion();
   cargarAsistencias();
   actualizarContador();
   iniciarLecturaNFCIndex();
+
+  // 🔥 sincronización entre pestañas
+  iniciarSyncLocal();
 }
 
 /* ===============================
@@ -115,28 +124,41 @@ function aplicarRolIndex() {
 }
 
 /* ===============================
-   ===== SONIDOS =====
+   ===== ESTADO CONEXIÓN =====
 =============================== */
-const sonidoCorrecto = new Audio("sounds/correct.mp3");
-const sonidoError = new Audio("sounds/error.mp3");
-
-document.addEventListener("click", () => {
-  sonidoCorrecto.play()
-    .then(() => {
-      sonidoCorrecto.pause();
-      sonidoCorrecto.currentTime = 0;
-    })
-    .catch(() => {});
-}, { once: true });
-
-function playCorrecto() {
-  sonidoCorrecto.currentTime = 0;
-  sonidoCorrecto.play().catch(()=>{});
+function actualizarEstadoConexion() {
+  if (isOnline()) {
+    estadoConexion.textContent = "Online";
+    estadoConexion.className = "lector on";
+    syncOfflineQueue();
+  } else {
+    estadoConexion.textContent = "Offline";
+    estadoConexion.className = "lector off";
+  }
 }
 
-function playError() {
-  sonidoError.currentTime = 0;
-  sonidoError.play().catch(()=>{});
+window.addEventListener("online", actualizarEstadoConexion);
+window.addEventListener("offline", actualizarEstadoConexion);
+
+/* ===============================
+   ===== SINCRONIZACIÓN LOCAL =====
+=============================== */
+function iniciarSyncLocal() {
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "asistencias") {
+      cargarAsistencias();
+      actualizarContador();
+    }
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "asistencias") {
+      cargarAsistencias();
+      actualizarContador();
+    }
+  });
 }
 
 /* ===============================
@@ -150,7 +172,7 @@ function autoScrollTabla() {
 }
 
 /* ===============================
-   ===== NFC (ÚNICO PUNTO) =====
+   ===== NFC =====
 =============================== */
 function iniciarLecturaNFCIndex() {
   estadoLector.className = "lector on";
@@ -178,26 +200,23 @@ function mostrarConfirmacion(tipo, titulo, mensaje) {
 }
 
 /* ===============================
-   ===== ENTRADA / SALIDA (FIX FINAL) =====
+   ===== ENTRADA / SALIDA =====
 =============================== */
 function procesarTarjeta(uid) {
   if (buscarEmpleadoPorTarjeta(uid)) {
     mostrarConfirmacion("error", "Tarjeta de personal", "Use el login");
-    playError();
     return;
   }
 
   const cliente = obtenerClientes().find(c => c.tarjetaUID === uid);
   if (!cliente) {
     mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepción");
-    playError();
     return;
   }
 
   const hoyFecha = hoy();
   const asistencias = obtenerAsistencias();
 
-  // 🔥 todas las asistencias del cliente hoy
   const delDia = asistencias
     .filter(a => a.tarjetaUID === uid && a.fecha === hoyFecha)
     .sort((a, b) => a.entrada.localeCompare(b.entrada));
@@ -205,8 +224,8 @@ function procesarTarjeta(uid) {
   const ultima = delDia[delDia.length - 1] || null;
 
   if (!ultima || ultima.salida !== null) {
-    // NUEVA ENTRADA
     asistencias.push({
+      id: crypto.randomUUID(),
       tarjetaUID: uid,
       nombre: cliente.nombre,
       entrada: horaActual(),
@@ -215,19 +234,18 @@ function procesarTarjeta(uid) {
     });
 
     mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
-    playCorrecto();
   } else {
-    // SALIDA
     ultima.salida = horaActual();
-
     mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
-    playCorrecto();
   }
 
   guardarAsistencias(asistencias);
   cargarAsistencias();
   actualizarContador();
   autoScrollTabla();
+
+  // 🔥 notifica a otras pestañas
+  new BroadcastChannel("victory-data").postMessage("asistencias");
 }
 </script>
 
