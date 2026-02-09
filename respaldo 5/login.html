@@ -5,7 +5,7 @@
   <title>Login - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- SUPABASE PRIMERO -->
+  <!-- Supabase SOLO para nfc.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -27,10 +27,10 @@
     Registrar usuario
   </button>
 
-  <p class="small muted">Acceso exclusivo para personal autorizado</p>
+  <p class="small muted" id="estadoConexion">Comprobando conexión…</p>
 </div>
 
-<!-- LOADER -->
+<!-- ===== LOADER ===== -->
 <div class="overlay" id="overlayLoader" style="display:none">
   <div class="popup">
     <h2>Ingresando</h2>
@@ -38,7 +38,7 @@
   </div>
 </div>
 
-<!-- NFC -->
+<!-- ===== NFC ===== -->
 <div class="overlay" id="overlayNFC" style="display:none">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
@@ -46,7 +46,7 @@
   </div>
 </div>
 
-<!-- ERRORES -->
+<!-- ===== ERRORES ===== -->
 <div class="overlay" id="overlayUsuario" style="display:none">
   <div class="popup">
     <h2>Usuario no encontrado</h2>
@@ -61,15 +61,15 @@
   </div>
 </div>
 
+<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
 
 <script>
-function ocultarOverlays() {
-  document.querySelectorAll(".overlay").forEach(o => o.style.display = "none");
-}
-
+/* ===============================
+   ===== DOM =====
+=============================== */
 const btnLogin = document.getElementById("btnLogin");
 const btnNFC = document.getElementById("btnNFC");
 const inputUser = document.getElementById("inputUser");
@@ -84,12 +84,56 @@ const overlayPassword = document.getElementById("overlayPassword");
 const overlayNFC = document.getElementById("overlayNFC");
 const estadoNFC = document.getElementById("estadoNFC");
 
+const estadoConexion = document.getElementById("estadoConexion");
+
+/* ===============================
+   ===== ESTADO =====
+=============================== */
 let leyendoNFC = false;
 let timeoutNFC = null;
 
-/* ===== LOGIN NORMAL ===== */
+/* ===============================
+   ===== INIT =====
+=============================== */
+window.addEventListener("load", () => {
+  // 🔒 si ya hay sesión activa, no permitir login
+  if (obtenerSesion()) {
+    location.href = "index.html";
+    return;
+  }
+
+  actualizarEstadoConexion();
+});
+
+/* ===============================
+   ===== CONEXIÓN =====
+=============================== */
+function actualizarEstadoConexion() {
+  if (navigator.onLine) {
+    estadoConexion.textContent = "Conectado";
+    estadoConexion.style.color = "#2ecc71";
+  } else {
+    estadoConexion.textContent = "Modo sin conexión";
+    estadoConexion.style.color = "#f1c40f";
+  }
+}
+
+window.addEventListener("online", actualizarEstadoConexion);
+window.addEventListener("offline", actualizarEstadoConexion);
+
+/* ===============================
+   ===== HELPERS =====
+=============================== */
+function ocultarOverlays() {
+  document.querySelectorAll(".overlay").forEach(o => o.style.display = "none");
+}
+
+/* ===============================
+   ===== LOGIN NORMAL =====
+=============================== */
 btnLogin.onclick = () => {
   ocultarOverlays();
+
   const r = login(inputUser.value.trim(), inputPass.value, 0);
 
   if (r === "NO_USER") {
@@ -116,9 +160,10 @@ btnLogin.onclick = () => {
   }
 };
 
-/* ===== LOGIN NFC (FIX REAL) ===== */
+/* ===============================
+   ===== LOGIN NFC =====
+=============================== */
 btnNFC.onclick = () => {
-
   if (leyendoNFC) return;
   leyendoNFC = true;
 
@@ -128,7 +173,6 @@ btnNFC.onclick = () => {
   estadoNFC.className = "estado amarillo";
   estadoNFC.textContent = "Esperando tarjeta…";
 
-  // ⏱ timeout 10s
   timeoutNFC = setTimeout(() => {
     estadoNFC.className = "estado rojo";
     estadoNFC.textContent = "Tiempo excedido para lectura";
@@ -163,7 +207,7 @@ btnNFC.onclick = () => {
 
 function resetNFC() {
   clearTimeout(timeoutNFC);
-  detenerNFC();     // ✅ ahora sí, porque ya se inició
+  detenerNFC();
   leyendoNFC = false;
   ocultarOverlays();
 }
