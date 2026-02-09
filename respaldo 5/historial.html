@@ -22,16 +22,20 @@
 
 <div class="historial-container" id="listaHistorial"></div>
 
-<script src="js/storage.js?v=6"></script>
-<script src="js/auth.js?v=4"></script>
+<!-- ===== JS BASE ===== -->
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
 
 <script>
 /* ===============================
-   ===== ESTADO =====
+   ===== DOM =====
 =============================== */
 const listaHistorial = document.getElementById("listaHistorial");
 const busqueda = document.getElementById("busqueda");
 
+/* ===============================
+   ===== ESTADO =====
+=============================== */
 let clientes = [];
 let asistencias = [];
 
@@ -45,7 +49,32 @@ function initHistorial() {
   if (!requirePermission("history_view")) return;
 
   busqueda.addEventListener("input", filtrar);
+  iniciarSyncHistorial();
   cargarHistorial();
+}
+
+/* ===============================
+   ===== SINCRONIZACIÓN =====
+=============================== */
+function iniciarSyncHistorial() {
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "asistencias" || e.data === "clientes") {
+      cargarHistorial();
+    }
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "asistencias" || e.key === "clientes") {
+      cargarHistorial();
+    }
+  });
+
+  window.addEventListener("online", () => {
+    syncOfflineQueue();
+    cargarHistorial();
+  });
 }
 
 /* ===============================
@@ -173,7 +202,6 @@ function render(lista) {
     const header = card.querySelector(".cliente-header");
     const panel = card.querySelector(".historial");
 
-    // 🔥 ABRIR AUTOMÁTICAMENTE SI TIENE ASISTENCIAS
     if (registros.length > 0) {
       card.classList.add("abierto");
       panel.classList.add("abierto");
@@ -212,4 +240,3 @@ function filtrar() {
 
 </body>
 </html>
-
