@@ -2,6 +2,12 @@
    ===== AUTH + SESIÓN (OFFLINE + REALTIME READY) =====
 ====================================================== */
 
+const PUBLIC_PAGES = ["login.html", "usuarios.html"];
+
+function esPaginaPublica() {
+  return PUBLIC_PAGES.some(p => location.pathname.endsWith(p));
+}
+
 /* ======================================================
    ===== PERMISOS POR ROL =====
 ====================================================== */
@@ -16,7 +22,6 @@ const ROLE_PERMISSIONS = {
     memberships_view: true,
     history_view: true
   },
-
   admin: {
     clients_view: true,
     clients_create: true,
@@ -30,7 +35,6 @@ const ROLE_PERMISSIONS = {
     memberships_extend: true,
     history_view: true
   },
-
   superadmin: {
     system_all: true
   }
@@ -68,7 +72,6 @@ function iniciarSesion(emp) {
 
   localStorage.setItem("session", JSON.stringify(session));
   broadcastAuth({ type: "login", session });
-
   location.href = "index.html";
 }
 
@@ -76,15 +79,12 @@ function iniciarSesion(emp) {
    ===== SESIÓN =====
 ====================================================== */
 function verificarSesion() {
-  const s = localStorage.getItem("session");
+  if (esPaginaPublica()) return true;
 
-  if (!s) {
-    if (!location.pathname.endsWith("login.html")) {
-      location.href = "login.html";
-    }
+  if (!localStorage.getItem("session")) {
+    location.href = "login.html";
     return false;
   }
-
   return true;
 }
 
@@ -106,25 +106,6 @@ function can(permission) {
   return s.permisos[permission] === true;
 }
 
-function requirePermission(permission) {
-  if (!can(permission)) {
-    location.href = "index.html";
-    return false;
-  }
-  return true;
-}
-
-/* ======================================================
-   ===== UI: APLICAR PERMISOS =====
-====================================================== */
-function applyPermissions() {
-  document.querySelectorAll("[data-permission]").forEach(el => {
-    const permiso = el.dataset.permission;
-    el.style.display =
-      can("system_all") || can(permiso) ? "" : "none";
-  });
-}
-
 /* ======================================================
    ===== LOGOUT =====
 ====================================================== */
@@ -135,7 +116,7 @@ function logout() {
 }
 
 /* ======================================================
-   ===== REALTIME AUTH MULTI-TAB =====
+   ===== REALTIME AUTH =====
 ====================================================== */
 const AUTH_CHANNEL = new BroadcastChannel("victory-auth");
 
@@ -144,31 +125,29 @@ function broadcastAuth(data) {
 }
 
 AUTH_CHANNEL.onmessage = e => {
+  if (esPaginaPublica()) return;
+
   const { type } = e.data || {};
 
   if (type === "logout") {
     localStorage.removeItem("session");
-    if (!location.pathname.endsWith("login.html")) {
-      location.href = "login.html";
-    }
+    location.href = "login.html";
   }
 
   if (type === "login") {
     localStorage.setItem("session", JSON.stringify(e.data.session));
-    applyPermissions();
   }
 };
 
 /* ======================================================
-   ===== STORAGE (SEGURO) =====
+   ===== STORAGE SYNC =====
 ====================================================== */
 window.addEventListener("storage", e => {
+  if (esPaginaPublica()) return;
   if (e.key !== "session") return;
 
-  // 🔒 VALIDACIÓN REAL
   const existeSesion = !!localStorage.getItem("session");
-
-  if (!existeSesion && !location.pathname.endsWith("login.html")) {
+  if (!existeSesion) {
     location.href = "login.html";
   }
 });
