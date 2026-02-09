@@ -1,6 +1,38 @@
 /* ===============================
-   ===== ASISTENCIAS GYM =====
+   ===== ASISTENCIAS GYM (PRO) =====
 =============================== */
+
+/* ===============================
+   ===== INIT SYNC =====
+=============================== */
+(function initAsistenciasSync() {
+
+  // 🔁 broadcast entre pestañas / dispositivos
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "asistencias") {
+      cargarAsistencias();
+      actualizarContador();
+    }
+  };
+
+  // 🔁 cambios directos en localStorage
+  window.addEventListener("storage", e => {
+    if (e.key === "asistencias") {
+      cargarAsistencias();
+      actualizarContador();
+    }
+  });
+
+  // 🌐 vuelve internet
+  window.addEventListener("online", () => {
+    syncOfflineQueue();
+    cargarAsistencias();
+    actualizarContador();
+  });
+
+})();
 
 /* ===============================
    ===== CARGAR TABLA =====
@@ -12,7 +44,7 @@ function cargarAsistencias() {
   const tbody = document.getElementById("tablaAsistencias");
   if (!tbody || !Array.isArray(asistencias)) return;
 
-  /* 🔥 FORZAR RE-RENDER COMPLETO */
+  // 🔥 render limpio
   tbody.innerHTML = "";
 
   asistencias
@@ -21,6 +53,7 @@ function cargarAsistencias() {
       a.fecha === hoyFecha &&
       typeof a.nombre === "string"
     )
+    .sort((a, b) => a.entrada.localeCompare(b.entrada))
     .forEach(a => {
       const tr = document.createElement("tr");
 
@@ -67,3 +100,10 @@ function actualizarContador() {
   }
 }
 
+/* ===============================
+   ===== NOTIFICADOR GLOBAL =====
+   (llamar cuando se modifica asistencia)
+=============================== */
+function notificarCambioAsistencias() {
+  new BroadcastChannel("victory-data").postMessage("asistencias");
+}
