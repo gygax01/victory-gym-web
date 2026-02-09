@@ -1,9 +1,9 @@
-/* ===============================
-   ===== STORAGE BASE GYM (OFFLINE-FIRST PRO) =====
-=============================== */
+/* ======================================================
+   ===== STORAGE BASE GYM (OFFLINE-FIRST + REALTIME) =====
+====================================================== */
 
 /* ======================================================
-   ===== UTIL BASE =====
+   ===== UTILIDADES BASE =====
 ====================================================== */
 function safeGet(key, def = []) {
   try {
@@ -17,6 +17,10 @@ function safeSet(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function uid() {
+  return crypto.randomUUID();
+}
+
 /* ======================================================
    ===== ESTADO ONLINE =====
 ====================================================== */
@@ -25,7 +29,7 @@ function isOnline() {
 }
 
 /* ======================================================
-   ===== COLA OFFLINE (EVENTOS) =====
+   ===== COLA OFFLINE (EVENTOS ATÓMICOS) =====
 ====================================================== */
 function obtenerColaOffline() {
   return safeGet("offline_queue", []);
@@ -35,21 +39,23 @@ function guardarColaOffline(lista) {
   safeSet("offline_queue", lista);
 }
 
-function agregarEvento(tipo, accion, payload) {
+function agregarEvento({ tabla, accion, data }) {
   const cola = obtenerColaOffline();
+
   cola.push({
-    id: crypto.randomUUID(),
-    tipo,
-    accion,
-    payload,
+    id: uid(),
+    tabla,          // clientes | asistencias | ventas | productos
+    accion,         // add | update | delete
+    data,
     ts: Date.now(),
     synced: false
   });
+
   guardarColaOffline(cola);
 }
 
 /* ======================================================
-   ===== SINCRONIZACIÓN (PLACEHOLDER) =====
+   ===== SINCRONIZACIÓN (LISTO PARA SUPABASE) =====
 ====================================================== */
 async function syncOfflineQueue() {
   if (!isOnline()) return;
@@ -59,12 +65,12 @@ async function syncOfflineQueue() {
 
   if (!pendientes.length) return;
 
-  console.log("🔄 Sync pendiente:", pendientes.length);
+  console.log("🔄 Sincronizando eventos:", pendientes.length);
 
-  // ⚠️ Aquí después irá Supabase / Bluetooth
-  // Por ahora SOLO marcamos como sincronizado
+  // 🔥 Aquí luego entra Supabase / API
+  // Por ahora solo marcamos como sincronizados
 
-  pendientes.forEach(e => e.synced = true);
+  pendientes.forEach(e => (e.synced = true));
   guardarColaOffline(cola);
 }
 
@@ -79,7 +85,6 @@ function obtenerEmpleados() {
 
 function guardarEmpleados(lista) {
   safeSet("empleados", lista || []);
-  agregarEvento("empleados", "set", lista);
 }
 
 /* ======================================================
@@ -89,9 +94,23 @@ function obtenerClientes() {
   return safeGet("clientes", []);
 }
 
-function guardarClientes(lista) {
-  safeSet("clientes", lista || []);
-  agregarEvento("clientes", "set", lista);
+function registrarCliente(cliente) {
+  const lista = obtenerClientes();
+
+  if (!cliente.id) cliente.id = uid();
+  lista.push(cliente);
+
+  safeSet("clientes", lista);
+  agregarEvento({ tabla: "clientes", accion: "add", data: cliente });
+}
+
+function actualizarCliente(cliente) {
+  const lista = obtenerClientes().map(c =>
+    c.id === cliente.id ? cliente : c
+  );
+
+  safeSet("clientes", lista);
+  agregarEvento({ tabla: "clientes", accion: "update", data: cliente });
 }
 
 /* ======================================================
@@ -103,9 +122,12 @@ function obtenerAsistencias() {
 
 function registrarAsistencia(asistencia) {
   const lista = obtenerAsistencias();
+
+  if (!asistencia.id) asistencia.id = uid();
   lista.push(asistencia);
+
   safeSet("asistencias", lista);
-  agregarEvento("asistencias", "add", asistencia);
+  agregarEvento({ tabla: "asistencias", accion: "add", data: asistencia });
 }
 
 /* ======================================================
@@ -115,9 +137,23 @@ function obtenerProductos() {
   return safeGet("productos", []);
 }
 
-function guardarProductos(lista) {
-  safeSet("productos", lista || []);
-  agregarEvento("productos", "set", lista);
+function registrarProducto(prod) {
+  const lista = obtenerProductos();
+
+  if (!prod.id) prod.id = uid();
+  lista.push(prod);
+
+  safeSet("productos", lista);
+  agregarEvento({ tabla: "productos", accion: "add", data: prod });
+}
+
+function actualizarProducto(prod) {
+  const lista = obtenerProductos().map(p =>
+    p.id === prod.id ? prod : p
+  );
+
+  safeSet("productos", lista);
+  agregarEvento({ tabla: "productos", accion: "update", data: prod });
 }
 
 /* ======================================================
@@ -129,59 +165,37 @@ function obtenerVentas() {
 
 function registrarVenta(venta) {
   const lista = obtenerVentas();
+
+  if (!venta.id) venta.id = uid();
   lista.push(venta);
+
   safeSet("ventas", lista);
-  agregarEvento("ventas", "add", venta);
+  agregarEvento({ tabla: "ventas", accion: "add", data: venta });
 }
 
 /* ======================================================
-   ===== TARJETAS / PERSONAS =====
+   ===== TARJETAS NFC =====
 ====================================================== */
-function buscarEmpleadoPorTarjeta(uid) {
-  if (!uid) return null;
-  return obtenerEmpleados().find(
-    e => typeof e.tarjetaUID === "string" && e.tarjetaUID === uid
-  ) || null;
+function buscarEmpleadoPorTarjeta(uidTarjeta) {
+  return obtenerEmpleados().find(e => e.tarjetaUID === uidTarjeta) || null;
 }
 
-function buscarClientePorTarjeta(uid) {
-  if (!uid) return null;
-  return obtenerClientes().find(
-    c => typeof c.tarjetaUID === "string" && c.tarjetaUID === uid
-  ) || null;
+function buscarClientePorTarjeta(uidTarjeta) {
+  return obtenerClientes().find(c => c.tarjetaUID === uidTarjeta) || null;
 }
 
-function obtenerInfoTarjeta(uid) {
-  const emp = buscarEmpleadoPorTarjeta(uid);
+function obtenerInfoTarjeta(uidTarjeta) {
+  const emp = buscarEmpleadoPorTarjeta(uidTarjeta);
   if (emp) return { tipo: "empleado", persona: emp };
 
-  const cli = buscarClientePorTarjeta(uid);
+  const cli = buscarClientePorTarjeta(uidTarjeta);
   if (cli) return { tipo: "cliente", persona: cli };
 
   return { tipo: null, persona: null };
 }
 
-function uidYaRegistrada(uid) {
-  if (!uid) return false;
-  return obtenerInfoTarjeta(uid).tipo !== null;
-}
-
-function liberarTarjeta(uid) {
-  if (!uid) return;
-
-  guardarEmpleados(
-    obtenerEmpleados().map(e => {
-      if (e.tarjetaUID === uid) e.tarjetaUID = null;
-      return e;
-    })
-  );
-
-  guardarClientes(
-    obtenerClientes().map(c => {
-      if (c.tarjetaUID === uid) c.tarjetaUID = null;
-      return c;
-    })
-  );
+function uidYaRegistrada(uidTarjeta) {
+  return obtenerInfoTarjeta(uidTarjeta).tipo !== null;
 }
 
 /* ======================================================
@@ -192,14 +206,5 @@ function hoy() {
 }
 
 function horaActual() {
-  return new Date().toLocaleTimeString("es-MX", {
-    hour12: false
-  });
+  return new Date().toLocaleTimeString("es-MX", { hour12: false });
 }
-/* ======================================================
-   ===== ESTADO DE CONEXIÓN =====
-====================================================== */
-function isOnline() {
-  return navigator.onLine === true;
-}
-
