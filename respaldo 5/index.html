@@ -5,13 +5,13 @@
   <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- Supabase SOLO para nfc.js / realtime -->
+  <!-- Supabase SOLO para realtime / nfc -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
 
-<!-- ===== HEADER BRANDING ===== -->
+<!-- ===== HEADER ===== -->
 <header class="header-brand">
   <div class="brand">
     <img src="img/logo.png" alt="Victory Pro Fitness">
@@ -23,19 +23,14 @@
       Dentro: <strong>0</strong>
     </span>
 
-    <span id="estadoLector" class="lector off">
-      Lector inactivo
-    </span>
-
-    <span id="estadoConexion" class="lector">
-      Offline
-    </span>
+    <span id="estadoLector" class="lector off">Lector inactivo</span>
+    <span id="estadoConexion" class="lector off">Offline</span>
 
     <button id="btnLogout">Salir</button>
   </div>
 </header>
 
-<!-- ===== PANEL DE ACCIONES ===== -->
+<!-- ===== ACCIONES ===== -->
 <div class="panel-acciones">
   <button class="destacado" onclick="location.href='registro.html'">Registro</button>
   <button onclick="location.href='pos.html'">Ventas</button>
@@ -50,7 +45,7 @@
   </button>
 </div>
 
-<!-- ===== TABLA ASISTENCIAS ===== -->
+<!-- ===== TABLA ===== -->
 <div id="contenedorTabla" style="max-height:70vh; overflow-y:auto;">
   <table>
     <thead>
@@ -72,18 +67,16 @@
   </div>
 </div>
 
-<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
+<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/asistencias.js"></script>
 <script src="js/nfc.js"></script>
 <script src="js/realtime.js"></script>
-
+<script src="js/bluetooth.js"></script>
 
 <script>
-/* ===============================
-   ===== DOM =====
-=============================== */
+/* ================= DOM ================= */
 const estadoLector = document.getElementById("estadoLector");
 const estadoConexion = document.getElementById("estadoConexion");
 const contenedorTabla = document.getElementById("contenedorTabla");
@@ -93,41 +86,36 @@ const mensajeConfirmacion = document.getElementById("mensajeConfirmacion");
 const btnUsuarios = document.getElementById("btnUsuarios");
 const btnLogout = document.getElementById("btnLogout");
 
-/* ===============================
-   ===== INIT =====
-=============================== */
+/* ================= INIT ================= */
 window.addEventListener("load", initIndex);
 
 function initIndex() {
   if (!verificarSesion()) return;
 
   aplicarRolIndex();
-  btnLogout.addEventListener("click", logout);
+  btnLogout.onclick = logout;
 
   actualizarEstadoConexion();
   cargarAsistencias();
   actualizarContador();
   iniciarLecturaNFCIndex();
-
-  // 🔥 sincronización entre pestañas
   iniciarSyncLocal();
+
+  // 🔥 Bluetooth automático si NO hay internet
+  if (!isOnline()) {
+    conectarBluetooth().catch(()=>{});
+  }
 }
 
-/* ===============================
-   ===== CONTROL DE ROL =====
-=============================== */
+/* ================= ROLES ================= */
 function aplicarRolIndex() {
   const s = obtenerSesion();
-  if (!s) return;
-
-  if (s.rol === "admin" || s.rol === "superadmin") {
+  if (s && (s.rol === "admin" || s.rol === "superadmin")) {
     btnUsuarios.style.display = "inline-block";
   }
 }
 
-/* ===============================
-   ===== ESTADO CONEXIÓN =====
-=============================== */
+/* ================= CONEXIÓN ================= */
 function actualizarEstadoConexion() {
   if (isOnline()) {
     estadoConexion.textContent = "Online";
@@ -139,12 +127,13 @@ function actualizarEstadoConexion() {
   }
 }
 
-window.addEventListener("online", actualizarEstadoConexion);
+window.addEventListener("online", () => {
+  actualizarEstadoConexion();
+  conectarBluetooth().catch(()=>{});
+});
 window.addEventListener("offline", actualizarEstadoConexion);
 
-/* ===============================
-   ===== SINCRONIZACIÓN LOCAL =====
-=============================== */
+/* ================= SYNC LOCAL ================= */
 function iniciarSyncLocal() {
   const bc = new BroadcastChannel("victory-data");
 
@@ -163,47 +152,28 @@ function iniciarSyncLocal() {
   });
 }
 
-/* ===============================
-   ===== AUTO SCROLL =====
-=============================== */
-function autoScrollTabla() {
-  contenedorTabla.scrollTo({
-    top: contenedorTabla.scrollHeight,
-    behavior: "smooth"
-  });
-}
-
-/* ===============================
-   ===== NFC =====
-=============================== */
+/* ================= NFC ================= */
 function iniciarLecturaNFCIndex() {
   estadoLector.className = "lector on";
   estadoLector.textContent = "Lector activo";
 
   iniciarNFCControlado({
     onUID: uid => procesarTarjeta(uid),
-    onTimeout: () => iniciarLecturaNFCIndex(),
+    onTimeout: iniciarLecturaNFCIndex,
     onError: () => setTimeout(iniciarLecturaNFCIndex, 2000)
   });
 }
 
-/* ===============================
-   ===== CONFIRMACIÓN =====
-=============================== */
+/* ================= CONFIRM ================= */
 function mostrarConfirmacion(tipo, titulo, mensaje) {
   confirmacion.className = "confirmacion " + tipo;
   tituloConfirmacion.textContent = titulo;
   mensajeConfirmacion.textContent = mensaje;
   confirmacion.style.display = "flex";
-
-  setTimeout(() => {
-    confirmacion.style.display = "none";
-  }, 2200);
+  setTimeout(() => confirmacion.style.display = "none", 2200);
 }
 
-/* ===============================
-   ===== ENTRADA / SALIDA =====
-=============================== */
+/* ================= ENTRADA / SALIDA ================= */
 function procesarTarjeta(uid) {
   if (buscarEmpleadoPorTarjeta(uid)) {
     mostrarConfirmacion("error", "Tarjeta de personal", "Use el login");
@@ -221,7 +191,7 @@ function procesarTarjeta(uid) {
 
   const delDia = asistencias
     .filter(a => a.tarjetaUID === uid && a.fecha === hoyFecha)
-    .sort((a, b) => a.entrada.localeCompare(b.entrada));
+    .sort((a,b)=>a.entrada.localeCompare(b.entrada));
 
   const ultima = delDia[delDia.length - 1] || null;
 
@@ -234,25 +204,20 @@ function procesarTarjeta(uid) {
       salida: null,
       fecha: hoyFecha
     });
-
-    mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
+    mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
   } else {
     ultima.salida = horaActual();
-    mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
+    mostrarConfirmacion("salida","Hasta luego",cliente.nombre);
   }
 
   guardarAsistencias(asistencias);
-  notificarCambioAsistencias();   // 👈 ESTA ES LA NUEVA LÍNEA
+  notificarCambioAsistencias();
   cargarAsistencias();
   actualizarContador();
-  autoScrollTabla();
 
-  // 🔥 notifica a otras pestañas
   new BroadcastChannel("victory-data").postMessage("asistencias");
 }
 </script>
 
 </body>
 </html>
-
-
