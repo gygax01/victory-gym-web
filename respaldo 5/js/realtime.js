@@ -1,5 +1,5 @@
 /* ======================================================
-   ===== SUPABASE REALTIME (SINGLETON) =================
+   ===== SUPABASE REALTIME (ULTRA FAST) =================
 ====================================================== */
 
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
@@ -7,16 +7,15 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkemZubXJreGZ5emh1c21rbGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MTQ2MTcsImV4cCI6MjA4NTk5MDYxN30.juvLQ83pjdckK1MqkKu0JsFjtpcTPNfEwG65op_5YEI";
 
 /* ================= CLIENT ================= */
-if (!window.supabase || !window.supabase.createClient) {
-  console.error("❌ Supabase JS no cargó");
-}
-
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
 );
 
-/* ================= CARGA INICIAL ================= */
+const bc = new BroadcastChannel("victory-data");
+let realtimeChannel = null;
+
+/* ================= CARGA INICIAL (1 SOLA VEZ) ================= */
 async function cargarProductosIniciales() {
   console.log("⬇️ Cargando productos iniciales...");
 
@@ -31,30 +30,8 @@ async function cargarProductosIniciales() {
 
   if (Array.isArray(data)) {
     guardarProductos(data);
-    new BroadcastChannel("victory-data").postMessage("productos");
-    console.log("✅ Productos iniciales cargados:", data.length);
-  }
-}
-
-/* ================= SUBIR EVENTOS ================= */
-async function subirEventoASupabase(e) {
-  try {
-    if (e.tabla === "productos") {
-      if (e.accion === "delete") {
-        await supabaseClient
-          .from("productos")
-          .delete()
-          .eq("id", e.data.id);
-      } else {
-        await supabaseClient
-          .from("productos")
-          .upsert(e.data, { onConflict: "id" });
-      }
-    }
-    return true;
-  } catch (err) {
-    console.error("❌ Error sync productos:", err);
-    return false;
+    bc.postMessage("productos");
+    console.log("✅ Productos iniciales:", data.length);
   }
 }
 
@@ -77,11 +54,9 @@ async function syncOfflineQueue() {
   guardarColaOffline(pendientes);
 }
 
-/* ================= REALTIME ================= */
-let realtimeChannel = null;
-
+/* ================= REALTIME (PAYLOAD DIRECTO) ================= */
 function iniciarRealtime() {
-  if (realtimeChannel) return; // evita duplicados
+  if (realtimeChannel) return;
 
   console.log("🟢 Realtime conectando...");
 
@@ -90,30 +65,32 @@ function iniciarRealtime() {
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "productos" },
-      async payload => {
-        console.log("📡 Realtime productos:", payload.eventType);
+      payload => {
+        console.log("📡 Realtime:", payload.eventType);
 
-        const { data, error } = await supabaseClient
-          .from("productos")
-          .select("*");
+        let productos = obtenerProductos();
 
-        if (error) {
-          console.error("❌ Error fetch productos:", error);
-          return;
+        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+          const nuevo = payload.new;
+          const idx = productos.findIndex(p => p.id === nuevo.id);
+
+          if (idx >= 0) productos[idx] = nuevo;
+          else productos.push(nuevo);
         }
 
-        if (Array.isArray(data)) {
-          guardarProductos(data);
-          new BroadcastChannel("victory-data").postMessage("productos");
+        if (payload.eventType === "DELETE") {
+          productos = productos.filter(p => p.id !== payload.old.id);
         }
+
+        guardarProductos(productos);
+
+        // 🔥 fuerza actualización inmediata en TODAS las pantallas
+        bc.postMessage("productos");
       }
     )
     .subscribe(status => {
       if (status === "SUBSCRIBED") {
-        console.log("✅ Realtime productos suscrito");
-      }
-      if (status === "CHANNEL_ERROR") {
-        console.error("❌ Error en canal realtime");
+        console.log("✅ Realtime productos activo");
       }
     });
 }
