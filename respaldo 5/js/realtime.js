@@ -1,10 +1,10 @@
 /* ======================================================
-   ===== SUPABASE REALTIME (FINAL CORRECTO) ============
+   ===== SUPABASE REALTIME (STOCK FINAL) ================
 ====================================================== */
 
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
 const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkemZubXJreGZ5emh1c21rbGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MTQ2MTcsImV4cCI6MjA4NTk5MDYxN30.juvLQ83pjdckK1MqkKu0JsFjtpcTPNfEwG65op_5YEI";
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkemZubXJreGZ5emh1c21rbGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MTQ2MTcsImV4cCI6MjA4NTk5MDYxN30.juvLQ83pjdckK1MqkKu0JsFjtpcTPNfEwG65op_5YEI";
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
@@ -25,11 +25,12 @@ async function cargarProductosIniciales() {
     return;
   }
 
-  guardarProductos(data || []);
+  localStorage.setItem("productos", JSON.stringify(data || []));
   bc.postMessage("productos");
+  console.log("✅ Productos iniciales:", data.length);
 }
 
-/* ================= UPDATE STOCK (CLAVE) ================= */
+/* ================= UPDATE STOCK ================= */
 async function actualizarStockSupabase(id, nuevoStock) {
   const { error } = await supabaseClient
     .from("productos")
@@ -43,13 +44,23 @@ async function actualizarStockSupabase(id, nuevoStock) {
   return true;
 }
 
-/* ================= INSERT / DELETE ================= */
-async function insertarProducto(prod) {
-  await supabaseClient.from("productos").insert(prod);
+/* ================= INSERT ================= */
+async function insertarProductoSupabase(prod) {
+  const { error } = await supabaseClient
+    .from("productos")
+    .insert(prod);
+
+  if (error) console.error("❌ Error insert:", error);
 }
 
-async function borrarProducto(id) {
-  await supabaseClient.from("productos").delete().eq("id", id);
+/* ================= DELETE ================= */
+async function borrarProductoSupabase(id) {
+  const { error } = await supabaseClient
+    .from("productos")
+    .delete()
+    .eq("id", id);
+
+  if (error) console.error("❌ Error delete:", error);
 }
 
 /* ================= REALTIME ================= */
@@ -62,7 +73,7 @@ function iniciarRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "productos" },
       payload => {
-        let productos = obtenerProductos();
+        let productos = JSON.parse(localStorage.getItem("productos") || "[]");
 
         if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
           const i = productos.findIndex(p => p.id === payload.new.id);
@@ -74,11 +85,13 @@ function iniciarRealtime() {
           productos = productos.filter(p => p.id !== payload.old.id);
         }
 
-        guardarProductos(productos);
+        localStorage.setItem("productos", JSON.stringify(productos));
         bc.postMessage("productos");
       }
     )
-    .subscribe();
+    .subscribe(() => {
+      console.log("✅ Realtime productos activo");
+    });
 }
 
 /* ================= INIT ================= */
