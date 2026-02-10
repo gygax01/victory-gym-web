@@ -108,29 +108,22 @@
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
-<!-- SUPABASE (ESTA ES LA BUENA) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@1.35.7/dist/umd/supabase.min.js"></script>
 
 <script src="js/realtime.js"></script>
-"js/realtime.js"></script>
 
 <script>
-/* ===== FIX DECLARACIONES ===== */
 function registrarVenta(){}
 
-/* ================= VARS ================= */
 let productos = [];
 let carrito = [];
 
-/* ================= INIT ================= */
 function initPOS(){
   if (!verificarSesion()) return;
-  // POS solo requiere sesión válida
   cargarProductos();
   iniciarSyncPOS();
 }
 
-/* ================= SYNC ================= */
 function iniciarSyncPOS(){
   const bc = new BroadcastChannel("victory-data");
 
@@ -141,16 +134,8 @@ function iniciarSyncPOS(){
   window.addEventListener("storage", e => {
     if (e.key === "productos") cargarProductos();
   });
-
-  window.addEventListener("online", () => {
-    if (typeof syncOfflineQueue === "function") {
-      syncOfflineQueue();
-    }
-    cargarProductos();
-  });
 }
 
-/* ================= PRODUCTOS ================= */
 function cargarProductos(){
   grid.innerHTML = "";
   productos = obtenerProductos().filter(p => p && p.stock > 0);
@@ -163,16 +148,12 @@ function cargarProductos(){
   productos.forEach(p=>{
     const d = document.createElement("div");
     d.className = "prod";
-    d.innerHTML = `
-      <b>${p.nombre}</b>
-      <span>$${Number(p.precio).toFixed(2)}</span>
-    `;
+    d.innerHTML = `<b>${p.nombre}</b><span>$${Number(p.precio).toFixed(2)}</span>`;
     d.onclick = () => agregar(p.id);
     grid.appendChild(d);
   });
 }
 
-/* ================= CARRITO ================= */
 function agregar(id){
   carrito.push(id);
   render();
@@ -185,24 +166,19 @@ function render(){
   carrito.forEach(id=>{
     const p = productos.find(x=>x.id===id);
     if (!p) return;
-
     totalVenta += Number(p.precio);
-    lista.innerHTML += `
-      <li>${p.nombre}<span>$${Number(p.precio).toFixed(2)}</span></li>
-    `;
+    lista.innerHTML += `<li>${p.nombre}<span>$${Number(p.precio).toFixed(2)}</span></li>`;
   });
 
   total.innerText = totalVenta.toFixed(2);
 }
 
 function cancelar(){
-  if (!confirm("¿Cancelar venta?")) return;
   carrito = [];
   pago.value = "";
   render();
 }
 
-/* ================= COBRAR ================= */
 function cobrar(){
   const totalVenta = Number(total.innerText);
   const paga = Number(pago.value);
@@ -212,27 +188,24 @@ function cobrar(){
 
   const stock = obtenerProductos();
 
-  carrito.forEach(id=>{
-    const p = stock.find(x=>x.id===id);
-    if (p) {
-      p.stock--;
+  const conteo = {};
+  carrito.forEach(id => conteo[id] = (conteo[id] || 0) + 1);
 
-      agregarEvento({
-        tabla: "productos",
-        accion: "update",
-        data: p
-      });
-    }
+  Object.keys(conteo).forEach(id => {
+    const p = stock.find(x => x.id === id);
+    if (!p) return;
+
+    p.stock -= conteo[id];
+
+    agregarEvento({
+      tabla: "productos",
+      accion: "update",
+      data: p
+    });
   });
 
   safeSet("productos", stock);
   new BroadcastChannel("victory-data").postMessage("productos");
-
-  registrarVenta({
-    fecha: hoy(),
-    hora: horaActual(),
-    total: totalVenta
-  });
 
   cambio.innerText = (paga - totalVenta).toFixed(2);
   overlay.style.display = "flex";
@@ -243,5 +216,3 @@ function cobrar(){
 
 </body>
 </html>
-
-
