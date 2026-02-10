@@ -66,7 +66,7 @@ function applyPermissions() {
   });
 }
 
-/* ================= LOGIN REAL ================= */
+/* ================= LOGIN ================= */
 function login(usuario, password) {
   const empleados = obtenerEmpleados();
   const emp = empleados.find(e => e.usuario === usuario);
@@ -114,18 +114,9 @@ window.addEventListener("load", () => {
   applyPermissions();
 });
 
-/* ======================================================
-   ===== CONTRASEÑA MAESTRA (FIJA / INMUTABLE) =====
-====================================================== */
-
+/* ================= MASTER PASSWORD ================= */
 const MASTER_PASSWORD = "victory(profitness)";
 
-/**
- * Valida la contraseña maestra.
- * NO usa alerts
- * NO usa prompt
- * NO usa localStorage
- */
 function validarPasswordMaestra(input) {
   return input === MASTER_PASSWORD;
 }
