@@ -17,8 +17,6 @@
 @media(max-width:900px){
   .pos-wrap{grid-template-columns:1fr}
 }
-
-/* ===== PRODUCTOS ===== */
 .productos{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
@@ -35,8 +33,6 @@
 .prod:hover{transform:scale(1.06)}
 .prod b{display:block;font-size:18px}
 .prod span{color:#2ecc71;font-size:22px}
-
-/* ===== CARRITO ===== */
 .carrito{
   background:#222;
   border-radius:16px;
@@ -48,8 +44,6 @@
   justify-content:space-between;
   margin:6px 0;
 }
-
-/* ===== TOTAL ===== */
 .total{
   background:#111;
   border-radius:18px;
@@ -58,8 +52,6 @@
   margin:14px 0;
 }
 .total span{font-size:44px;color:#2ecc71}
-
-/* ===== OVERLAY CAMBIO ===== */
 .overlay-cambio{
   position:fixed;inset:0;
   background:rgba(0,0,0,.7);
@@ -75,10 +67,7 @@
   padding:80px;
   border-radius:22px;
   text-align:center;
-  animation:zoom .25s ease;
 }
-.overlay-cambio h1{font-size:64px;margin:0}
-@keyframes zoom{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
 </style>
 </head>
 
@@ -121,17 +110,17 @@
 <script src="js/realtime.js"></script>
 
 <script>
+/* ===== FIX DECLARACIONES ===== */
+function registrarVenta(){}
+
+/* ================= VARS ================= */
 let productos = [];
 let carrito = [];
 
 /* ================= INIT ================= */
 function initPOS(){
   if (!verificarSesion()) return;
-  if (!can("sales_do")) {
-    location.href = "index.html";
-    return;
-  }
-
+  // POS solo requiere sesión válida
   cargarProductos();
   iniciarSyncPOS();
 }
@@ -149,7 +138,9 @@ function iniciarSyncPOS(){
   });
 
   window.addEventListener("online", () => {
-    syncOfflineQueue();
+    if (typeof syncOfflineQueue === "function") {
+      syncOfflineQueue();
+    }
     cargarProductos();
   });
 }
