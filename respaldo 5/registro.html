@@ -79,7 +79,11 @@
 <!-- CORE -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
+
+<!-- ESTE CREA window.supabaseClient -->
 <script src="js/realtime.js"></script>
+
+<!-- ESTE SOLO LO USA -->
 <script src="js/nfc.js"></script>
 
 <script>
@@ -167,8 +171,10 @@ function registrarCliente() {
 
   registrarClienteOffline(cliente);
 
-  mostrarConfirm("Registro completado",
-    "Cliente registrado correctamente");
+  mostrarConfirm(
+    "Registro completado",
+    "Cliente registrado correctamente"
+  );
 
   setTimeout(() => location.href = "index.html", 1800);
 }
@@ -179,6 +185,7 @@ function registrarClienteOffline(cliente) {
   lista.push(cliente);
 
   safeSet("clientes", lista);
+
   agregarEvento({
     tabla: "clientes",
     accion: "add",
@@ -186,6 +193,15 @@ function registrarClienteOffline(cliente) {
   });
 
   new BroadcastChannel("victory-data").postMessage("clientes");
+}
+
+/* ===== HELPERS FALTANTES (CRÍTICOS) ===== */
+function obtenerClientes() {
+  return safeGet("clientes");
+}
+
+function uidYaRegistrada(uid) {
+  return obtenerClientes().some(c => c.tarjetaUID === uid);
 }
 
 /* ===== CONFIRM ===== */
