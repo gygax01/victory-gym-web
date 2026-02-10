@@ -1,7 +1,8 @@
 /* ======================================================
    ===== STORAGE OFFLINE FIRST (SOURCE OF TRUTH) =====
-====================================================== */
+   ====================================================== */
 
+/* ================= UTIL BASE ================= */
 function safeGet(key) {
   try {
     return JSON.parse(localStorage.getItem(key)) || [];
@@ -32,23 +33,61 @@ function guardarProductos(data) {
   safeSet("productos", data);
 }
 
-function registrarProducto(prod) {
-  enqueueOffline({
-    tabla: "productos",
-    accion: "upsert",
-    data: prod
+/* ================= HISTORIAL DE STOCK ================= */
+/*
+  Cada evento representa UNA confirmación de cambios desde STOCK
+  NO desde POS
+*/
+
+const HISTORIAL_STOCK_KEY = "historial_stock";
+
+/**
+ * Guarda un evento completo de stock (offline first)
+ */
+function guardarEventoStock(evento) {
+  const historial = safeGet(HISTORIAL_STOCK_KEY);
+
+  historial.push({
+    id: evento.id || crypto.randomUUID(),
+    fecha: evento.fecha,            // YYYY-MM-DD
+    hora: evento.hora,              // HH:mm:ss
+    usuario: evento.usuario,        // username
+    rol: evento.rol,                // admin / superadmin
+    cambios: evento.cambios,        // array de cambios
+    ts: Date.now(),                 // timestamp técnico
+    synced: false                   // aún no sincronizado
   });
+
+  safeSet(HISTORIAL_STOCK_KEY, historial);
 }
 
-function eliminarProductoLocal(id) {
-  enqueueOffline({
-    tabla: "productos",
-    accion: "delete",
-    data: { id }
-  });
+/**
+ * Devuelve TODO el historial de stock
+ */
+function obtenerHistorialStock() {
+  return safeGet(HISTORIAL_STOCK_KEY);
 }
 
-/* ================= OFFLINE QUEUE ================= */
+/**
+ * Marca un evento como sincronizado
+ */
+function marcarEventoStockSincronizado(idEvento) {
+  const historial = safeGet(HISTORIAL_STOCK_KEY);
+  const idx = historial.findIndex(e => e.id === idEvento);
+  if (idx >= 0) {
+    historial[idx].synced = true;
+    safeSet(HISTORIAL_STOCK_KEY, historial);
+  }
+}
+
+/**
+ * Obtiene eventos pendientes de sincronizar
+ */
+function obtenerEventosStockPendientes() {
+  return safeGet(HISTORIAL_STOCK_KEY).filter(e => !e.synced);
+}
+
+/* ================= OFFLINE QUEUE (YA EXISTENTE) ================= */
 function obtenerColaOffline() {
   return safeGet("offlineQueue");
 }
@@ -61,4 +100,13 @@ function enqueueOffline(evento) {
   const cola = obtenerColaOffline();
   cola.push({ ...evento, ts: Date.now() });
   guardarColaOffline(cola);
+}
+
+/* ================= HELPERS DE TIEMPO ================= */
+function hoy() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function horaActual() {
+  return new Date().toTimeString().slice(0, 8);
 }
