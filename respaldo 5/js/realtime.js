@@ -4,14 +4,15 @@
 
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
 const SUPABASE_ANON_KEY =
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkemZubXJreGZ5emh1c21rbGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MTQ2MTcsImV4cCI6MjA4NTk5MDYxN30.juvLQ83pjdckK1MqkKu0JsFjtpcTPNfEwG65op_5YEI";
+  "sb_publishable_uV1OQab8AfWE3SzNkuleQw_W0xgyfER";
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
-  window.supabaseClient = supabaseClient;
-
 );
+
+// 👇 EXPONER GLOBAL (CLAVE PARA NFC)
+window.supabaseClient = supabaseClient;
 
 const bc = new BroadcastChannel("victory-data");
 let realtimeChannel = null;
@@ -103,14 +104,11 @@ window.addEventListener("load", () => {
     iniciarRealtime();
   }
 });
+
 /* ======================================================
    ===== HISTORIAL STOCK (AUDITORÍA PRO) =================
 ====================================================== */
 
-/**
- * Guarda un evento de historial de stock en Supabase
- * @param {Array} cambios - lista de productos modificados
- */
 async function pushHistorialStock(cambios) {
   try {
     const session = JSON.parse(localStorage.getItem("session"));
@@ -122,10 +120,8 @@ async function pushHistorialStock(cambios) {
       id: crypto.randomUUID(),
       fecha: now.toISOString().slice(0, 10),
       hora: now.toTimeString().slice(0, 8),
-
       usuario: session.nombre,
       rol: session.rol,
-
       cambios: cambios,
       ts: Date.now()
     };
