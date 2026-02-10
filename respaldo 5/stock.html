@@ -19,14 +19,17 @@
     <button onclick="abrirModalHistorial()" style="opacity:.85">
       Historial de Cambios
     </button>
-    <button onclick="location.href='index.html'">← Inicio</button>
+
+    <button onclick="location.href='index.html'">
+      ← Inicio
+    </button>
   </div>
 </header>
 
-<!-- ===== MODAL CONTRASEÑA MAESTRA ===== -->
+<!-- ================= MODAL CONTRASEÑA MAESTRA ================= -->
 <div id="modalMaster" class="modal-overlay" style="display:none;">
   <div class="modal-card">
-    <h3>🔐 Acceso restringido</h3>
+    <h3>🔒 Acceso restringido</h3>
     <p>Ingresa la contraseña maestra</p>
 
     <input
@@ -105,17 +108,14 @@ function abrirModalHistorial() {
 }
 
 function cerrarModalHistorial() {
-  const modal = document.getElementById("modalMaster");
-  modal.classList.remove("ok", "error");
-  modal.style.display = "none";
+  document.getElementById("modalMaster").style.display = "none";
 }
 
 function validarMaster() {
-  const input = document.getElementById("inputMaster");
+  const pass = document.getElementById("inputMaster").value;
   const msg = document.getElementById("msgMaster");
-  const modal = document.getElementById("modalMaster");
 
-  if (input.value === MASTER_PASSWORD) {
+  if (pass === MASTER_PASSWORD) {
     msg.textContent = "✔ Contraseña correcta";
     msg.className = "modal-msg ok";
 
