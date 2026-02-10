@@ -1,244 +1,128 @@
 /* ======================================================
-   ===== STORAGE BASE GYM (OFFLINE-FIRST + REALTIME) =====
-   ===== VERSIÓN ESTABLE / COMPATIBLE TOTAL ============
+   ===== SUPABASE REALTIME (OFFLINE-FIRST SAFE) =====
 ====================================================== */
 
-/* ======================================================
-   ===== UTILIDADES BASE =====
-====================================================== */
-function safeGet(key, def = []) {
-  try {
-    return JSON.parse(localStorage.getItem(key)) ?? def;
-  } catch {
-    return def;
-  }
-}
+const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkemZubXJreGZ5emh1c21rbGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MTQ2MTcsImV4cCI6MjA4NTk5MDYxN30.juvLQ83pjdckK1MqkKu0JsFjtpcTPNfEwG65op_5YEI";
 
-function safeSet(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function uid() {
-  return crypto.randomUUID();
-}
-
-/* ======================================================
-   ===== ESTADO ONLINE =====
-====================================================== */
-function isOnline() {
-  return navigator.onLine === true;
-}
-
-/* ======================================================
-   ===== COLA OFFLINE NORMALIZADA =====
-====================================================== */
-function obtenerColaOffline() {
-  return safeGet("offline_queue", []);
-}
-
-function guardarColaOffline(lista) {
-  safeSet("offline_queue", lista);
-}
-
-function agregarEvento({ tabla, accion, data }) {
-  const cola = obtenerColaOffline();
-
-  cola.push({
-    id: uid(),
-    tabla,          // clientes | productos | asistencias | ventas | empleados
-    accion,         // add | update | delete
-    data,           // payload real
-    ts: Date.now()
-  });
-
-  guardarColaOffline(cola);
-}
-
-/* ======================================================
-   ===== SYNC OFFLINE → SUPABASE (REAL) =====
-====================================================== */
-async function subirEventoASupabase(e) {
-  if (!window.supabase) return false;
-
-  try {
-    if (e.tabla === "clientes") {
-      await supabase.from("clientes").upsert(e.data);
-    }
-
-    if (e.tabla === "productos") {
-      await supabase.from("productos").upsert(e.data);
-    }
-
-    if (e.tabla === "asistencias") {
-      await supabase.from("asistencias").insert(e.data);
-    }
-
-    if (e.tabla === "ventas") {
-      await supabase.from("ventas").insert(e.data);
-    }
-
-    if (e.tabla === "empleados") {
-      await supabase.from("empleados").upsert(e.data);
-    }
-
-    return true;
-  } catch (err) {
-    console.error("❌ Error sync:", e.tabla, err);
-    return false;
-  }
-}
-
-async function syncOfflineQueue() {
-  if (!isOnline()) return;
-
-  const cola = obtenerColaOffline();
-  if (!cola.length) return;
-
-  console.log("🔄 Sincronizando offline:", cola.length);
-
-  const pendientes = [];
-
-  for (const e of cola) {
-    const ok = await subirEventoASupabase(e);
-    if (!ok) pendientes.push(e);
-  }
-
-  guardarColaOffline(pendientes);
-}
-
-window.addEventListener("online", syncOfflineQueue);
-
-/* ======================================================
-   ===== EMPLEADOS =====
-====================================================== */
-function obtenerEmpleados() {
-  return safeGet("empleados", []);
-}
-
-function guardarEmpleados(lista) {
-  safeSet("empleados", lista || []);
-  agregarEvento({ tabla: "empleados", accion: "update", data: lista });
-}
-
-/* ======================================================
-   ===== CLIENTES =====
-====================================================== */
-function obtenerClientes() {
-  return safeGet("clientes", []);
-}
-
-function guardarClientes(lista) {
-  safeSet("clientes", lista || []);
-  agregarEvento({ tabla: "clientes", accion: "update", data: lista });
-}
-
-/* ======================================================
-   ===== ASISTENCIAS =====
-====================================================== */
-function obtenerAsistencias() {
-  return safeGet("asistencias", []);
-}
-
-function guardarAsistencias(lista) {
-  safeSet("asistencias", lista || []);
-  agregarEvento({ tabla: "asistencias", accion: "add", data: lista });
-}
-
-/* ======================================================
-   ===== PRODUCTOS =====
-====================================================== */
-function obtenerProductos() {
-  return safeGet("productos", []);
-}
-
-function registrarProducto(prod) {
-  if (!prod.id) prod.id = uid();
-  const lista = obtenerProductos();
-  lista.push(prod);
-  safeSet("productos", lista);
-  agregarEvento({ tabla: "productos", accion: "add", data: prod });
-}
-
-function actualizarProducto(prod) {
-  const lista = obtenerProductos().map(p =>
-    p.id === prod.id ? prod : p
+if (window.supabase?.createClient) {
+  window.supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
   );
-  safeSet("productos", lista);
-  agregarEvento({ tabla: "productos", accion: "update", data: prod });
 }
 
 /* ======================================================
-   ===== VENTAS =====
+   ===== INIT REALTIME =====
 ====================================================== */
-function obtenerVentas() {
-  return safeGet("ventas", []);
-}
+function iniciarRealtime() {
+  if (!window.supabaseClient) return;
 
-function registrarVenta(venta) {
-  if (!venta.id) venta.id = uid();
-  const lista = obtenerVentas();
-  lista.push(venta);
-  safeSet("ventas", lista);
-  agregarEvento({ tabla: "ventas", accion: "add", data: venta });
+  console.log("🟢 Realtime conectado");
+
+  suscribirTabla("clientes", syncClientesDesdeSupabase);
+  suscribirTabla("productos", syncProductosDesdeSupabase);
+  suscribirTabla("asistencias", syncAsistenciasDesdeSupabase);
+  suscribirTabla("ventas", syncVentasDesdeSupabase);
+  suscribirTabla("empleados", syncEmpleadosDesdeSupabase);
 }
 
 /* ======================================================
-   ===== NFC / TARJETAS =====
+   ===== SUBSCRIPCIÓN GENÉRICA =====
 ====================================================== */
-function buscarEmpleadoPorTarjeta(uidTarjeta) {
-  return obtenerEmpleados().find(e => e.tarjetaUID === uidTarjeta) || null;
-}
-
-function buscarClientePorTarjeta(uidTarjeta) {
-  return obtenerClientes().find(c => c.tarjetaUID === uidTarjeta) || null;
-}
-
-function obtenerInfoTarjeta(uidTarjeta) {
-  const emp = buscarEmpleadoPorTarjeta(uidTarjeta);
-  if (emp) return { tipo: "empleado", persona: emp };
-
-  const cli = buscarClientePorTarjeta(uidTarjeta);
-  if (cli) return { tipo: "cliente", persona: cli };
-
-  return { tipo: null, persona: null };
-}
-
-function uidYaRegistrada(uidTarjeta) {
-  return obtenerInfoTarjeta(uidTarjeta).tipo !== null;
+function suscribirTabla(tabla, callback) {
+  window.supabaseClient
+    .channel(`rt-${tabla}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: tabla },
+      () => {
+        console.log(`🔄 ${tabla} actualizado`);
+        callback();
+      }
+    )
+    .subscribe();
 }
 
 /* ======================================================
-   ===== FECHAS / HORAS =====
+   ===== SYNC → LOCALSTORAGE =====
 ====================================================== */
-function hoy() {
-  return new Date().toISOString().split("T")[0];
+async function syncClientesDesdeSupabase() {
+  const { data } = await window.supabaseClient
+    .from("clientes")
+    .select("*");
+
+  if (Array.isArray(data)) {
+    safeSet("clientes", data);
+    new BroadcastChannel("victory-data").postMessage("clientes");
+    if (typeof cargarClientes === "function") cargarClientes();
+  }
 }
 
-function horaActual() {
-  return new Date().toLocaleTimeString("es-MX", { hour12: false });
+async function syncProductosDesdeSupabase() {
+  const { data } = await window.supabaseClient
+    .from("productos")
+    .select("*");
+
+  if (Array.isArray(data)) {
+    safeSet("productos", data);
+    new BroadcastChannel("victory-data").postMessage("productos");
+    if (typeof cargarStock === "function") cargarStock();
+    if (typeof cargarProductos === "function") cargarProductos();
+  }
+}
+
+async function syncAsistenciasDesdeSupabase() {
+  const { data } = await window.supabaseClient
+    .from("asistencias")
+    .select("*");
+
+  if (Array.isArray(data)) {
+    safeSet("asistencias", data);
+    new BroadcastChannel("victory-data").postMessage("asistencias");
+    if (typeof cargarAsistencias === "function") cargarAsistencias();
+    if (typeof actualizarContador === "function") actualizarContador();
+  }
+}
+
+async function syncVentasDesdeSupabase() {
+  const { data } = await window.supabaseClient
+    .from("ventas")
+    .select("*");
+
+  if (Array.isArray(data)) {
+    safeSet("ventas", data);
+    new BroadcastChannel("victory-data").postMessage("ventas");
+  }
+}
+
+async function syncEmpleadosDesdeSupabase() {
+  const { data } = await window.supabaseClient
+    .from("empleados")
+    .select("*");
+
+  if (Array.isArray(data)) {
+    safeSet("empleados", data);
+    new BroadcastChannel("victory-data").postMessage("empleados");
+  }
 }
 
 /* ======================================================
-   ===== SUPERADMIN OCULTO (BACKDOOR) =====
+   ===== ONLINE / OFFLINE =====
 ====================================================== */
-(function initSuperAdmin() {
-  const empleados = obtenerEmpleados();
+window.addEventListener("online", () => {
+  console.log("🌐 Online → sincronizando");
+  syncOfflineQueue();
+  iniciarRealtime();
+});
 
-  const existe = empleados.some(
-    e => e.usuario === "gygax" && e.rol === "superadmin"
-  );
-
-  if (existe) return;
-
-  empleados.push({
-    id: "SUPERADMIN-ROOT",
-    nombre: "Sistema",
-    usuario: "gygax",
-    password: "superadmin",
-    rol: "superadmin",
-    tarjetaUID: null,
-    oculto: true
-  });
-
-  safeSet("empleados", empleados);
-})();
+/* ======================================================
+   ===== INIT GLOBAL =====
+====================================================== */
+window.addEventListener("load", () => {
+  if (navigator.onLine) {
+    iniciarRealtime();
+    syncOfflineQueue();
+  }
+});
