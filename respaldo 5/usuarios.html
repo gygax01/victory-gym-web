@@ -5,13 +5,14 @@
   <title>Usuarios</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- SUPABASE (solo NFC / realtime) -->
+  <!-- SUPABASE -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- CORE -->
   <script src="js/storage.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/nfc.js"></script>
+  <script src="js/realtime.js"></script>
 </head>
 
 <body onload="initUsuarios()">
@@ -33,22 +34,17 @@
     <input id="usuario" placeholder="Usuario">
     <input id="password" type="password" placeholder="Contraseña">
 
-    <!-- 🔒 SELECTOR SIN SUPERADMIN -->
     <select id="rol">
       <option value="employee">Empleado</option>
       <option value="admin">Administrador</option>
     </select>
 
-    <button class="nfc" onclick="asignarTarjeta()">
-      Asignar tarjeta
-    </button>
+    <button class="nfc" onclick="asignarTarjeta()">Asignar tarjeta</button>
     <p id="uidTexto" class="uid"></p>
   </div>
 
   <div class="usuarios-col">
-    <button id="btnRegistrar"
-            onclick="pedirClaveRegistro()"
-            disabled>
+    <button id="btnRegistrar" onclick="pedirClaveRegistro()" disabled>
       Registrar usuario
     </button>
   </div>
@@ -56,9 +52,7 @@
 
 <!-- ================= BUSCADOR / LISTAS ================= -->
 <div class="search-bar" id="buscador">
-  <input id="busqueda"
-         placeholder="Buscar usuario..."
-         oninput="renderUsuarios()">
+  <input id="busqueda" placeholder="Buscar usuario..." oninput="renderUsuarios()">
 </div>
 
 <div class="historial-container" id="listasUsuarios">
@@ -69,17 +63,15 @@
   <div id="listaEmpleados"></div>
 </div>
 
-<!-- ================= POPUP NFC ================= -->
+<!-- ================= NFC ================= -->
 <div class="overlay" id="overlay">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
-    <div id="estado" class="estado amarillo">
-      Esperando tarjeta…
-    </div>
+    <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
   </div>
 </div>
 
-<!-- ================= CONFIRMACION ================= -->
+<!-- ================= CONFIRM ================= -->
 <div class="confirmacion" id="confirmacion">
   <div class="box">
     <h1 id="tituloConfirm"></h1>
@@ -89,27 +81,43 @@
 </div>
 
 <script>
-/* ===== CONFIG ===== */
+/* ================= CONFIG ================= */
 const CLAVE_MAESTRA = "victory(profitness)";
 let tarjetaUID = null;
-let usuarioAEliminar = null;
-let usuarioAReasignar = null;
 
-/* ===== INIT ===== */
+/* ================= INIT ================= */
 function initUsuarios() {
-  verificarSesion();
+  if (!verificarSesion()) return;
 
   const s = obtenerSesion();
-  if (!s || !["admin","superadmin"].includes(s.rol)) {
-    alert("Acceso no autorizado");
+  if (!["admin","superadmin"].includes(s.rol)) {
     location.href = "index.html";
     return;
   }
 
+  iniciarSyncUsuarios();
   renderUsuarios();
 }
 
-/* ===== VOLVER ===== */
+/* ================= SYNC ================= */
+function iniciarSyncUsuarios() {
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "empleados") renderUsuarios();
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "empleados") renderUsuarios();
+  });
+
+  window.addEventListener("online", () => {
+    syncOfflineQueue();
+    renderUsuarios();
+  });
+}
+
+/* ================= VOLVER ================= */
 function volver() {
   location.href = "index.html";
 }
@@ -121,22 +129,22 @@ function asignarTarjeta() {
 
   overlay.style.display = "flex";
   estado.className = "estado amarillo";
-  estado.innerText = "Esperando tarjeta…";
-  uidTexto.innerText = "";
+  estado.textContent = "Esperando tarjeta…";
+  uidTexto.textContent = "";
 
   iniciarNFCControlado({
     onUID: uid => {
       if (uidYaRegistrada(uid)) {
         estado.className = "estado rojo";
-        estado.innerText = "Tarjeta ya registrada";
+        estado.textContent = "Tarjeta ya registrada";
         setTimeout(cerrarPopup, 1500);
         return;
       }
 
       tarjetaUID = uid;
-      uidTexto.innerText = "UID: " + uid;
+      uidTexto.textContent = "UID: " + uid;
       estado.className = "estado verde";
-      estado.innerText = "Tarjeta asignada";
+      estado.textContent = "Tarjeta asignada";
 
       setTimeout(() => {
         cerrarPopup();
@@ -183,16 +191,25 @@ function registrarUsuario() {
 
   const empleados = obtenerEmpleados();
 
-  empleados.push({
+  const nuevo = {
     id: crypto.randomUUID(),
     nombre: nombre.value.trim(),
     usuario: usuario.value.trim(),
     password: password.value,
-    rol: rol.value, // 👈 nunca superadmin
+    rol: rol.value,
     tarjetaUID
+  };
+
+  empleados.push(nuevo);
+  guardarEmpleados(empleados);
+
+  agregarEvento({
+    tabla: "empleados",
+    accion: "add",
+    data: nuevo
   });
 
-  guardarEmpleados(empleados);
+  new BroadcastChannel("victory-data").postMessage("empleados");
 
   mostrarConfirm(
     "Correcto",
@@ -206,11 +223,9 @@ function renderUsuarios() {
   const q = busqueda.value.toLowerCase();
   const empleados = obtenerEmpleados()
     .filter(e =>
-      e.rol !== "superadmin" && // 🔒 OCULTO TOTAL
-      (
-        e.nombre.toLowerCase().includes(q) ||
-        e.usuario.toLowerCase().includes(q)
-      )
+      e.rol !== "superadmin" &&
+      (e.nombre.toLowerCase().includes(q) ||
+       e.usuario.toLowerCase().includes(q))
     );
 
   listaAdmins.innerHTML = "";
