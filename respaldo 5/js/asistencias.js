@@ -1,15 +1,15 @@
 /* ===============================
-   ===== ASISTENCIAS GYM (PRO) =====
+   ===== ASISTENCIAS GYM (SYNC) =====
 =============================== */
 
 /* ===============================
-   ===== INIT SYNC =====
+   ===== INIT GLOBAL =====
 =============================== */
 (function initAsistenciasSync() {
 
-  // 🔁 broadcast entre pestañas / dispositivos
   const bc = new BroadcastChannel("victory-data");
 
+  // 🔁 Broadcast entre pestañas / dispositivos
   bc.onmessage = e => {
     if (e.data === "asistencias") {
       cargarAsistencias();
@@ -17,7 +17,7 @@
     }
   };
 
-  // 🔁 cambios directos en localStorage
+  // 🔁 Cambios directos en localStorage
   window.addEventListener("storage", e => {
     if (e.key === "asistencias") {
       cargarAsistencias();
@@ -25,7 +25,7 @@
     }
   });
 
-  // 🌐 vuelve internet
+  // 🌐 Internet vuelve
   window.addEventListener("online", () => {
     syncOfflineQueue();
     cargarAsistencias();
@@ -44,7 +44,6 @@ function cargarAsistencias() {
   const tbody = document.getElementById("tablaAsistencias");
   if (!tbody || !Array.isArray(asistencias)) return;
 
-  // 🔥 render limpio
   tbody.innerHTML = "";
 
   asistencias
@@ -66,10 +65,7 @@ function cargarAsistencias() {
       const tdSalida = document.createElement("td");
       tdSalida.textContent = a.salida || "-";
 
-      tr.appendChild(tdNombre);
-      tr.appendChild(tdEntrada);
-      tr.appendChild(tdSalida);
-
+      tr.append(tdNombre, tdEntrada, tdSalida);
       tbody.appendChild(tr);
     });
 }
@@ -78,8 +74,8 @@ function cargarAsistencias() {
    ===== CONTADOR AFORO =====
 =============================== */
 function actualizarContador() {
-  const hoyFecha = hoy();
   const asistencias = obtenerAsistencias();
+  const hoyFecha = hoy();
 
   if (!Array.isArray(asistencias)) return;
 
@@ -93,16 +89,12 @@ function actualizarContador() {
   if (!contador) return;
 
   const strong = contador.querySelector("strong");
-  if (strong) {
-    strong.textContent = dentro;
-  } else {
-    contador.textContent = `Dentro: ${dentro}`;
-  }
+  if (strong) strong.textContent = dentro;
+  else contador.textContent = `Dentro: ${dentro}`;
 }
 
 /* ===============================
    ===== NOTIFICADOR GLOBAL =====
-   (llamar cuando se modifica asistencia)
 =============================== */
 function notificarCambioAsistencias() {
   new BroadcastChannel("victory-data").postMessage("asistencias");
