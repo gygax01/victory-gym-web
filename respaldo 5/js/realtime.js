@@ -16,6 +16,26 @@ const supabaseClient = window.supabase.createClient(
   SUPABASE_ANON_KEY
 );
 
+/* ================= CARGA INICIAL ================= */
+async function cargarProductosIniciales() {
+  console.log("⬇️ Cargando productos iniciales...");
+
+  const { data, error } = await supabaseClient
+    .from("productos")
+    .select("*");
+
+  if (error) {
+    console.error("❌ Error carga inicial:", error);
+    return;
+  }
+
+  if (Array.isArray(data)) {
+    guardarProductos(data);
+    new BroadcastChannel("victory-data").postMessage("productos");
+    console.log("✅ Productos iniciales cargados:", data.length);
+  }
+}
+
 /* ================= SUBIR EVENTOS ================= */
 async function subirEventoASupabase(e) {
   try {
@@ -99,14 +119,16 @@ function iniciarRealtime() {
 }
 
 /* ================= INIT ================= */
-window.addEventListener("online", () => {
+window.addEventListener("online", async () => {
   console.log("🌐 Online");
-  syncOfflineQueue();
+  await cargarProductosIniciales();
   iniciarRealtime();
+  syncOfflineQueue();
 });
 
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
   if (navigator.onLine) {
+    await cargarProductosIniciales();
     iniciarRealtime();
     syncOfflineQueue();
   }
