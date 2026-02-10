@@ -101,3 +101,44 @@ window.addEventListener("load", () => {
     iniciarRealtime();
   }
 });
+/* ======================================================
+   ===== HISTORIAL STOCK (AUDITORÍA PRO) =================
+====================================================== */
+
+/**
+ * Guarda un evento de historial de stock en Supabase
+ * @param {Array} cambios - lista de productos modificados
+ */
+async function pushHistorialStock(cambios) {
+  try {
+    const session = JSON.parse(localStorage.getItem("session"));
+    if (!session) return;
+
+    const now = new Date();
+
+    const payload = {
+      id: crypto.randomUUID(),
+      fecha: now.toISOString().slice(0, 10),
+      hora: now.toTimeString().slice(0, 8),
+
+      usuario: session.nombre,
+      rol: session.rol,
+
+      cambios: cambios,
+      ts: Date.now()
+    };
+
+    const { error } = await supabaseClient
+      .from("historial_stock")
+      .insert(payload);
+
+    if (error) {
+      console.error("❌ Error historial stock:", error);
+    } else {
+      console.log("📝 Historial stock guardado");
+    }
+
+  } catch (e) {
+    console.error("❌ Error pushHistorialStock:", e);
+  }
+}
