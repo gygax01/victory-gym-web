@@ -5,7 +5,7 @@
   <title>Registro de Cliente</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- 🔑 CLAVE: SUPABASE -->
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -13,7 +13,7 @@
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png" alt="Victory Pro Fitness">
+    <img src="img/logo.png">
     <h2>Registro de Cliente</h2>
   </div>
 
@@ -22,10 +22,7 @@
   </button>
 </header>
 
-<!-- CONTENEDOR PRINCIPAL -->
 <main class="main">
-
-  <!-- ================= REGISTRO ================= -->
   <div class="card registro-pc">
 
     <!-- COLUMNA IZQUIERDA -->
@@ -52,10 +49,7 @@
       <p id="expiraTexto"></p>
 
       <div class="registro-acciones">
-        <button class="nfc" id="btnAsignar" onclick="abrirPopup()">
-          Asignar tarjeta
-        </button>
-
+        <button class="nfc" onclick="abrirPopup()">Asignar tarjeta</button>
         <button id="finalizar" onclick="registrarCliente()" disabled>
           Registrar cliente
         </button>
@@ -65,7 +59,7 @@
   </div>
 </main>
 
-<!-- ================= POPUP NFC ================= -->
+<!-- NFC -->
 <div class="overlay" id="overlay">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
@@ -74,7 +68,7 @@
   </div>
 </div>
 
-<!-- ================= CONFIRMACION ================= -->
+<!-- CONFIRM -->
 <div class="confirmacion" id="confirmacion">
   <div class="box">
     <h1 id="tituloConfirm"></h1>
@@ -82,15 +76,11 @@
   </div>
 </div>
 
+<!-- CORE -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
-
-
-<!-- NFC SIEMPRE DESPUÉS DE SUPABASE -->
 <script src="js/nfc.js"></script>
-<script src="js/realtime.js"></script>
-
 
 <script>
 let tarjetaUID = null;
@@ -106,7 +96,7 @@ function setDias(d) {
     "Expira el: " + expira.toLocaleDateString();
 }
 
-/* ===== NFC ASIGNACIÓN ===== */
+/* ===== NFC ===== */
 function abrirPopup() {
   if (leyendoNFC) return;
 
@@ -156,36 +146,46 @@ function registrarCliente() {
     !tarjetaUID ||
     diasMembresia === 0
   ) {
-    mostrarConfirm(
-      "Datos incompletos",
-      "Complete todos los campos antes de continuar"
-    );
+    mostrarConfirm("Datos incompletos",
+      "Complete todos los campos");
     return;
   }
 
-  const clientes = obtenerClientes();
   const expira = new Date();
   expira.setDate(expira.getDate() + diasMembresia);
 
-  clientes.push({
+  const cliente = {
+    id: crypto.randomUUID(),
     nombre: nombre.value.trim(),
     peso: peso.value,
     altura: altura.value,
     telefono: telefono.value,
     tarjetaUID,
-    membresiaExpira: expira.toISOString().split("T")[0]
+    membresiaExpira: expira.toISOString().split("T")[0],
+    fechaRegistro: hoy()
+  };
+
+  registrarClienteOffline(cliente);
+
+  mostrarConfirm("Registro completado",
+    "Cliente registrado correctamente");
+
+  setTimeout(() => location.href = "index.html", 1800);
+}
+
+/* ===== OFFLINE + REALTIME ===== */
+function registrarClienteOffline(cliente) {
+  const lista = obtenerClientes();
+  lista.push(cliente);
+
+  safeSet("clientes", lista);
+  agregarEvento({
+    tabla: "clientes",
+    accion: "add",
+    data: cliente
   });
 
-  guardarClientes(clientes);
-
-  mostrarConfirm(
-    "Registro completado",
-    "Cliente registrado correctamente"
-  );
-
-  setTimeout(() => {
-    location.href = "index.html";
-  }, 2000);
+  new BroadcastChannel("victory-data").postMessage("clientes");
 }
 
 /* ===== CONFIRM ===== */
@@ -198,4 +198,3 @@ function mostrarConfirm(t, m) {
 
 </body>
 </html>
-
