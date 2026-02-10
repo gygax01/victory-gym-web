@@ -24,7 +24,7 @@
   </div>
 </header>
 
-<!-- MODAL MASTER -->
+<!-- ================= MODAL MASTER ================= -->
 <div id="modalMaster" class="modal-overlay">
   <div class="modal-card pop">
     <h3>🔒 Acceso restringido</h3>
@@ -38,23 +38,34 @@
   </div>
 </div>
 
-<div class="card stock-nuevo" data-permission="products_create">
+<!-- ================= NUEVO PRODUCTO (SOLO EDICIÓN) ================= -->
+<div
+  class="card stock-nuevo"
+  data-permission="products_create"
+  id="panelNuevoProducto"
+  style="display:none"
+>
   <h3>Nuevo producto</h3>
   <div class="stock-form">
     <input id="inputNombre" placeholder="Nombre">
     <input id="inputPrecio" type="number" step="0.01" placeholder="Precio">
     <input id="inputStock" type="number" placeholder="Stock inicial">
-    <button id="btnAgregar">Agregar</button>
+    <button onclick="solicitarAltaProducto()">Agregar</button>
   </div>
 </div>
 
+<!-- ================= BUSCADOR ================= -->
 <div class="search-bar">
   <input id="buscadorStock" placeholder="Buscar producto...">
 </div>
 
+<!-- ================= LISTA ================= -->
 <div class="stock-grid" id="listaStock"></div>
+
+<!-- ================= PANEL EDICIÓN ================= -->
 <div class="stock-footer" id="panelEdicion"></div>
 
+<!-- CORE -->
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
 
@@ -64,23 +75,21 @@ let productos = [];
 let productosFiltrados = [];
 let modoEdicion = false;
 let accionMaster = null;
-let productoAbierto = null;
 
 /* ================= DOM ================= */
 const inputNombre   = document.getElementById("inputNombre");
 const inputPrecio   = document.getElementById("inputPrecio");
 const inputStock    = document.getElementById("inputStock");
-const btnAgregar    = document.getElementById("btnAgregar");
 const buscadorStock = document.getElementById("buscadorStock");
 const listaStock    = document.getElementById("listaStock");
 const panelEdicion  = document.getElementById("panelEdicion");
+const panelNuevoProducto = document.getElementById("panelNuevoProducto");
 
 /* ================= INIT ================= */
 function initStock() {
   if (!verificarSesion()) return;
   if (!can("stock_view")) location.href = "index.html";
 
-  btnAgregar.onclick = nuevoProducto;
   buscadorStock.oninput = filtrarStock;
 
   iniciarSyncStock();
@@ -88,11 +97,23 @@ function initStock() {
   applyPermissions();
 }
 
+/* ================= SYNC ================= */
+function iniciarSyncStock() {
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "productos") cargarStock();
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "productos") cargarStock();
+  });
+}
+
 /* ================= DATA ================= */
 function cargarStock() {
   productos = JSON.parse(localStorage.getItem("productos") || "[]");
   productosFiltrados = [...productos];
-  productoAbierto = null;
   renderStock();
 }
 
@@ -100,37 +121,34 @@ function cargarStock() {
 function renderStock() {
   listaStock.innerHTML = "";
 
+  if (!productosFiltrados.length) {
+    listaStock.innerHTML = "<p style='opacity:.6'>No hay productos</p>";
+    return;
+  }
+
   productosFiltrados.forEach(p => {
-    const abierto = productoAbierto === p.id;
     const bajo = Number(p.stock) <= Number(p.stock_minimo || 0);
 
     const card = document.createElement("div");
     card.className = "stock-card" + (bajo ? " bajo" : "");
-    card.dataset.id = p.id;
 
     card.innerHTML = `
-      <div class="stock-header" onclick="toggleProducto('${p.id}')">
-        <h4 style="${bajo ? "color:#e74c3c" : ""}">${p.nombre}</h4>
-        ${modoEdicion ? `<span>${abierto ? "▲" : "▼"}</span>` : ""}
-      </div>
-
+      <h4 style="${bajo ? "color:#e74c3c" : ""}">${p.nombre}</h4>
       <div class="precio">$${Number(p.precio).toFixed(2)}</div>
 
       ${
         !modoEdicion
-          ? `
-            <div class="stock-cantidad">Stock: ${p.stock}</div>
-            <div class="small">Stock mínimo: ${p.stock_minimo || 0}</div>
-          `
-          : `
-            <div class="edit-panel" style="display:${abierto ? "block" : "none"}">
-              <input value="${p.nombre}">
-              <input type="number" value="${p.precio}">
-              <input type="number" value="${p.stock}">
-              <input type="number" value="${p.stock_minimo || 0}">
-              <input type="number" placeholder="Cantidad exacta (opcional)">
-            </div>
-          `
+        ? `
+          <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
+          <div class="small">Stock mínimo: ${p.stock_minimo || 0}</div>
+        `
+        : `
+          <input value="${p.nombre}">
+          <input type="number" value="${p.precio}">
+          <input type="number" value="${p.stock}">
+          <input type="number" value="${p.stock_minimo || 0}">
+          <input type="number" placeholder="Cantidad exacta (opcional)">
+        `
       }
     `;
 
@@ -140,27 +158,23 @@ function renderStock() {
   renderPanel();
 }
 
-/* ================= TOGGLE ================= */
-function toggleProducto(id) {
-  if (!modoEdicion) return;
-  productoAbierto = productoAbierto === id ? null : id;
-  renderStock();
-}
-
-/* ================= PANEL ================= */
+/* ================= PANEL EDICIÓN ================= */
 function renderPanel() {
   panelEdicion.innerHTML = "";
 
   if (!modoEdicion) {
+    panelNuevoProducto.style.display = "none";
+
     const btn = document.createElement("button");
     btn.textContent = "✏️ Editar stock";
     btn.onclick = () => {
       modoEdicion = true;
-      productoAbierto = null;
       renderStock();
     };
     panelEdicion.appendChild(btn);
   } else {
+    panelNuevoProducto.style.display = "block";
+
     const guardar = document.createElement("button");
     guardar.className = "btn-guardar";
     guardar.textContent = "💾 Guardar cambios";
@@ -187,10 +201,16 @@ function abrirModalHistorial() {
   abrirModalMaster();
 }
 
+function solicitarAltaProducto() {
+  accionMaster = "nuevo";
+  abrirModalMaster();
+}
+
 function abrirModalMaster() {
   modalMaster.style.display = "flex";
   inputMaster.value = "";
   msgMaster.textContent = "";
+  msgMaster.className = "modal-msg";
 }
 
 function cerrarModal() {
@@ -213,19 +233,16 @@ function confirmarMaster() {
   }
 
   if (accionMaster === "guardar") guardarCambiosStock();
+  if (accionMaster === "nuevo") confirmarNuevoProducto();
 }
 
-/* ================= GUARDAR ================= */
+/* ================= GUARDAR CAMBIOS ================= */
 async function guardarCambiosStock() {
   const cards = document.querySelectorAll(".stock-card");
 
-  for (const card of cards) {
-    const inputs = card.querySelectorAll(".edit-panel input");
+  for (let i = 0; i < cards.length; i++) {
+    const inputs = cards[i].querySelectorAll("input");
     if (!inputs.length) continue;
-
-    const id = card.dataset.id;
-    const prod = productos.find(p => p.id === id);
-    if (!prod) continue;
 
     const nombre = inputs[0].value.trim();
     const precio = Number(inputs[1].value);
@@ -233,6 +250,9 @@ async function guardarCambiosStock() {
     const stockMin = Number(inputs[3].value);
     const exacto = inputs[4].value;
     const nuevoStock = exacto !== "" ? Number(exacto) : stockEdit;
+
+    const prod = productosFiltrados[i];
+    const antes = { stock: prod.stock, precio: prod.precio };
 
     prod.nombre = nombre;
     prod.precio = precio;
@@ -242,28 +262,46 @@ async function guardarCambiosStock() {
     await supabaseClient
       .from("productos")
       .update({ nombre, precio, stock: nuevoStock, stock_minimo: stockMin })
-      .eq("id", id);
+      .eq("id", prod.id);
+
+    await pushHistorialStock([{
+      producto_id: prod.id,
+      nombre,
+      antes,
+      despues: { stock: nuevoStock, precio }
+    }]);
   }
 
   localStorage.setItem("productos", JSON.stringify(productos));
   location.reload();
 }
 
-/* ================= NUEVO ================= */
-async function nuevoProducto() {
-  if (!can("products_create")) return;
+/* ================= NUEVO PRODUCTO ================= */
+async function confirmarNuevoProducto() {
   if (!inputNombre.value || !inputPrecio.value) return;
 
-  await insertarProductoSupabase({
+  const prod = {
+    id: crypto.randomUUID(),
     nombre: inputNombre.value.trim(),
     precio: Number(inputPrecio.value),
     stock: Number(inputStock.value) || 0,
     stock_minimo: 0
-  });
+  };
+
+  await insertarProductoSupabase(prod);
+
+  await pushHistorialStock([{
+    producto_id: prod.id,
+    nombre: prod.nombre,
+    antes: null,
+    despues: { stock: prod.stock, precio: prod.precio }
+  }]);
 
   inputNombre.value = "";
   inputPrecio.value = "";
   inputStock.value = "";
+
+  location.reload();
 }
 
 /* ================= FILTRO ================= */
@@ -272,7 +310,6 @@ function filtrarStock() {
   productosFiltrados = productos.filter(p =>
     p.nombre.toLowerCase().includes(q)
   );
-  productoAbierto = null;
   renderStock();
 }
 </script>
