@@ -110,3 +110,29 @@ function hoy() {
 function horaActual() {
   return new Date().toTimeString().slice(0, 8);
 }
+
+/* ======================================================
+   ===== EVENTOS GENÉRICOS (POS / STOCK) ================
+====================================================== */
+
+function agregarEvento(evento) {
+  try {
+    // Siempre guardar offline primero
+    enqueueOffline({
+      tipo: "db",
+      tabla: evento.tabla,
+      accion: evento.accion,
+      data: evento.data
+    });
+
+    // Si hay internet y existe supabase, sincroniza
+    if (navigator.onLine && window.supabase && typeof actualizarStockSupabase === "function") {
+      if (evento.tabla === "productos" && evento.accion === "update") {
+        actualizarStockSupabase(evento.data.id, evento.data.stock);
+      }
+    }
+
+  } catch (e) {
+    console.error("❌ agregarEvento error:", e);
+  }
+}
