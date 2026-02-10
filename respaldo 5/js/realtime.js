@@ -1,5 +1,5 @@
 /* ======================================================
-   ===== SUPABASE REALTIME (ULTRA FAST) =================
+   ===== SUPABASE REALTIME (ULTRA FAST + SAFE) ==========
 ====================================================== */
 
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
@@ -15,10 +15,35 @@ const supabaseClient = window.supabase.createClient(
 const bc = new BroadcastChannel("victory-data");
 let realtimeChannel = null;
 
-/* ================= CARGA INICIAL (1 SOLA VEZ) ================= */
-async function cargarProductosIniciales() {
-  console.log("⬇️ Cargando productos iniciales...");
+/* ================= SUBIR EVENTOS ================= */
+async function subirEventoASupabase(e) {
+  try {
+    if (e.tabla !== "productos") return true;
 
+    if (e.accion === "delete") {
+      const { error } = await supabaseClient
+        .from("productos")
+        .delete()
+        .eq("id", e.data.id);
+
+      if (error) throw error;
+    } else {
+      const { error } = await supabaseClient
+        .from("productos")
+        .upsert(e.data, { onConflict: "id" });
+
+      if (error) throw error;
+    }
+
+    return true;
+  } catch (err) {
+    console.error("❌ Error subiendo a Supabase:", err);
+    return false;
+  }
+}
+
+/* ================= CARGA INICIAL ================= */
+async function cargarProductosIniciales() {
   const { data, error } = await supabaseClient
     .from("productos")
     .select("*");
@@ -28,11 +53,10 @@ async function cargarProductosIniciales() {
     return;
   }
 
-  if (Array.isArray(data)) {
-    guardarProductos(data);
-    bc.postMessage("productos");
-    console.log("✅ Productos iniciales:", data.length);
-  }
+  guardarProductos(data || []);
+  bc.postMessage("productos");
+
+  console.log("✅ Productos iniciales:", data.length);
 }
 
 /* ================= OFFLINE → ONLINE ================= */
@@ -54,7 +78,7 @@ async function syncOfflineQueue() {
   guardarColaOffline(pendientes);
 }
 
-/* ================= REALTIME (PAYLOAD DIRECTO) ================= */
+/* ================= REALTIME (SIN FETCH) ================= */
 function iniciarRealtime() {
   if (realtimeChannel) return;
 
@@ -66,8 +90,6 @@ function iniciarRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "productos" },
       payload => {
-        console.log("📡 Realtime:", payload.eventType);
-
         let productos = obtenerProductos();
 
         if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
@@ -83,8 +105,6 @@ function iniciarRealtime() {
         }
 
         guardarProductos(productos);
-
-        // 🔥 fuerza actualización inmediata en TODAS las pantallas
         bc.postMessage("productos");
       }
     )
@@ -97,10 +117,7 @@ function iniciarRealtime() {
 
 /* ================= INIT ================= */
 window.addEventListener("online", async () => {
-  console.log("🌐 Online");
-  await cargarProductosIniciales();
-  iniciarRealtime();
-  syncOfflineQueue();
+  await syncOfflineQueue();
 });
 
 window.addEventListener("load", async () => {
