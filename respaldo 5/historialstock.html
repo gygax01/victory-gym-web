@@ -73,7 +73,7 @@ function renderHistorial() {
     return;
   }
 
-  historialFiltrado.forEach((h, index) => {
+  historialFiltrado.forEach(h => {
     const card = document.createElement("div");
     card.className = "cliente";
 
@@ -107,18 +107,50 @@ function renderHistorial() {
   });
 }
 
-/* ================= TABLA ================= */
+/* ================= TABLA (CORREGIDA) ================= */
 function renderTablaCambios(cambios = []) {
   if (!cambios.length) return "<p>Sin cambios</p>";
 
   let rows = "";
 
-  cambios.forEach((c, i) => {
+  cambios.forEach(c => {
+    const antes = c.antes || {};
+    const despues = c.despues || {};
+
+    const stockAntes = antes.stock ?? "-";
+    const stockDespues = despues.stock ?? "-";
+
+    let diffHtml = "";
+    if (typeof stockAntes === "number" && typeof stockDespues === "number") {
+      const diff = stockDespues - stockAntes;
+      if (diff !== 0) {
+        diffHtml = diff > 0
+          ? `<span style="color:#4caf50;font-weight:bold"> (+${diff})</span>`
+          : `<span style="color:#f44336;font-weight:bold"> (${diff})</span>`;
+      }
+    }
+
+    const precioAntes =
+      typeof antes.precio === "number"
+        ? `$${antes.precio.toFixed(2)}`
+        : "-";
+
+    const precioDespues =
+      typeof despues.precio === "number"
+        ? `$${despues.precio.toFixed(2)}`
+        : "-";
+
     rows += `
-      <tr class="${i % 2 ? "alt" : ""}">
-        <td>${c.nombre || "-"}</td>
-        <td>${c.antes ? JSON.stringify(c.antes) : "-"}</td>
-        <td>${c.despues ? JSON.stringify(c.despues) : "-"}</td>
+      <tr>
+        <td><b>${c.nombre || "-"}</b></td>
+        <td>
+          Stock: ${stockAntes}<br>
+          Precio: ${precioAntes}
+        </td>
+        <td>
+          Stock: ${stockDespues}${diffHtml}<br>
+          Precio: ${precioDespues}
+        </td>
       </tr>
     `;
   });
