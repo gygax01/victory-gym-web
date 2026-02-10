@@ -6,7 +6,6 @@
 <link rel="stylesheet" href="css/styles.css">
 
 <style>
-/* ===== POS LAYOUT ===== */
 .pos-wrap{
   max-width:1100px;
   margin:20px auto;
@@ -108,34 +107,42 @@
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
+<!-- SUPABASE v1 (global, compatible) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@1.35.7/dist/umd/supabase.min.js"></script>
 
 <script src="js/realtime.js"></script>
 
 <script>
-function registrarVenta(){}
-
+/* ================= VARS ================= */
 let productos = [];
 let carrito = [];
+let cobrando = false;
 
+function registrarVenta(){}
+
+/* ================= INIT ================= */
 function initPOS(){
   if (!verificarSesion()) return;
   cargarProductos();
   iniciarSyncPOS();
 }
 
+/* ================= SYNC ================= */
 function iniciarSyncPOS(){
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = e => {
+    if (cobrando) return;
     if (e.data === "productos") cargarProductos();
   };
 
   window.addEventListener("storage", e => {
+    if (cobrando) return;
     if (e.key === "productos") cargarProductos();
   });
 }
 
+/* ================= PRODUCTOS ================= */
 function cargarProductos(){
   grid.innerHTML = "";
   productos = obtenerProductos().filter(p => p && p.stock > 0);
@@ -154,6 +161,7 @@ function cargarProductos(){
   });
 }
 
+/* ================= CARRITO ================= */
 function agregar(id){
   carrito.push(id);
   render();
@@ -179,15 +187,19 @@ function cancelar(){
   render();
 }
 
+/* ================= COBRAR ================= */
 function cobrar(){
+  if (!carrito.length) return alert("Carrito vacío");
+
   const totalVenta = Number(total.innerText);
   const paga = Number(pago.value);
-
-  if (!carrito.length) return alert("Carrito vacío");
   if (paga < totalVenta) return alert("Pago insuficiente");
+
+  cobrando = true;
 
   const stock = obtenerProductos();
 
+  // contar ventas por producto
   const conteo = {};
   carrito.forEach(id => conteo[id] = (conteo[id] || 0) + 1);
 
@@ -210,7 +222,10 @@ function cobrar(){
   cambio.innerText = (paga - totalVenta).toFixed(2);
   overlay.style.display = "flex";
 
-  setTimeout(()=>location.href="index.html", 3500);
+  setTimeout(() => {
+    cobrando = false;
+    location.href = "index.html";
+  }, 3500);
 }
 </script>
 
