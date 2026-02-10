@@ -4,8 +4,47 @@
 
 const PUBLIC_PAGES = ["login.html", "usuarios.html"];
 
+/* ======================================================
+   ===== UTILIDADES =====
+====================================================== */
 function esPaginaPublica() {
   return PUBLIC_PAGES.some(p => location.pathname.endsWith(p));
+}
+
+function getSession() {
+  try {
+    return JSON.parse(localStorage.getItem("session"));
+  } catch {
+    return null;
+  }
+}
+
+/* ======================================================
+   ===== SEED SUPERADMIN (CRÍTICO) =====
+====================================================== */
+function seedSuperAdmin() {
+  let empleados = [];
+
+  try {
+    empleados = JSON.parse(localStorage.getItem("empleados")) || [];
+  } catch {
+    empleados = [];
+  }
+
+  const existe = empleados.some(e => e.usuario === "gygax");
+
+  if (!existe) {
+    empleados.push({
+      id: "superadmin-gygax",
+      nombre: "Gygax",
+      usuario: "gygax",
+      password: "superadmin",
+      rol: "superadmin"
+    });
+
+    localStorage.setItem("empleados", JSON.stringify(empleados));
+    console.log("🟢 Superadmin sembrado automáticamente");
+  }
 }
 
 /* ======================================================
@@ -32,7 +71,7 @@ const ROLE_PERMISSIONS = {
 function verificarSesion() {
   if (esPaginaPublica()) return true;
 
-  const s = localStorage.getItem("session");
+  const s = getSession();
   if (!s) {
     location.href = "login.html";
     return false;
@@ -44,7 +83,7 @@ function verificarSesion() {
    ===== PERMISOS =====
 ====================================================== */
 function can(permission) {
-  const s = JSON.parse(localStorage.getItem("session") || "null");
+  const s = getSession();
   if (!s) return false;
 
   if (s.rol === "superadmin") return true;
@@ -53,9 +92,9 @@ function can(permission) {
 
 function applyPermissions() {
   document.querySelectorAll("[data-permission]").forEach(el => {
-    const perm = el.dataset.permission;
+    const permiso = el.dataset.permission;
     el.style.display =
-      can("system_all") || can(perm) ? "" : "none";
+      can("system_all") || can(permiso) ? "" : "none";
   });
 }
 
@@ -92,6 +131,7 @@ function broadcastAuth(data) {
 
 AUTH_CHANNEL.onmessage = e => {
   if (esPaginaPublica()) return;
+
   const { type, session } = e.data || {};
 
   if (type === "logout") {
@@ -99,7 +139,7 @@ AUTH_CHANNEL.onmessage = e => {
     location.href = "login.html";
   }
 
-  if (type === "login") {
+  if (type === "login" && session) {
     localStorage.setItem("session", JSON.stringify(session));
     applyPermissions();
   }
@@ -112,8 +152,16 @@ window.addEventListener("storage", e => {
   if (esPaginaPublica()) return;
   if (e.key !== "session") return;
 
-  const existeSesion = !!localStorage.getItem("session");
-  if (!existeSesion) {
+  if (!localStorage.getItem("session")) {
     location.href = "login.html";
   }
+});
+
+/* ======================================================
+   ===== INIT GLOBAL =====
+====================================================== */
+window.addEventListener("load", () => {
+  seedSuperAdmin();     // 🔐 CRÍTICO
+  verificarSesion();    // 🔎
+  applyPermissions();   // 🎛️
 });
