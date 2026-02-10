@@ -1,129 +1,212 @@
-/* ======================================================
-   ===== SUPABASE REALTIME (ULTRA FAST + SAFE) ==========
-====================================================== */
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Stock</title>
+<link rel="stylesheet" href="css/styles.css">
 
-const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkemZubXJreGZ5emh1c21rbGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MTQ2MTcsImV4cCI6MjA4NTk5MDYxN30.juvLQ83pjdckK1MqkKu0JsFjtpcTPNfEwG65op_5YEI";
+<!-- Supabase (solo para realtime.js) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
 
-/* ================= CLIENT ================= */
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
+<body onload="initStock()">
 
-const bc = new BroadcastChannel("victory-data");
-let realtimeChannel = null;
+<header class="header-brand">
+  <div class="brand">
+    <img src="img/logo.png">
+    <h2>Stock</h2>
+  </div>
+  <button onclick="location.href='index.html'">← Inicio</button>
+</header>
 
-/* ================= SUBIR EVENTOS ================= */
-async function subirEventoASupabase(e) {
-  try {
-    if (e.tabla !== "productos") return true;
+<!-- ===== NUEVO PRODUCTO ===== -->
+<div class="card stock-nuevo" data-permission="products_create">
+  <h3>Nuevo producto</h3>
+  <div class="stock-form">
+    <input id="inputNombre" placeholder="Nombre">
+    <input id="inputPrecio" type="number" step="0.01" placeholder="Precio">
+    <input id="inputStock" type="number" placeholder="Stock inicial">
+    <button id="btnAgregar">Agregar</button>
+  </div>
+</div>
 
-    if (e.accion === "delete") {
-      const { error } = await supabaseClient
-        .from("productos")
-        .delete()
-        .eq("id", e.data.id);
+<!-- ===== BUSCADOR ===== -->
+<div class="search-bar">
+  <input id="buscadorStock" placeholder="Buscar...">
+</div>
 
-      if (error) throw error;
-    } else {
-      const { error } = await supabaseClient
-        .from("productos")
-        .upsert(e.data, { onConflict: "id" });
+<!-- ===== LISTA ===== -->
+<div class="stock-grid" id="listaStock"></div>
 
-      if (error) throw error;
-    }
+<!-- ===== FOOTER ===== -->
+<div class="stock-footer" data-permission="stock_add">
+  <button id="btnGuardar">💾 Guardar</button>
+</div>
 
-    return true;
-  } catch (err) {
-    console.error("❌ Error subiendo a Supabase:", err);
-    return false;
-  }
-}
+<!-- CORE -->
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/realtime.js"></script>
 
-/* ================= CARGA INICIAL ================= */
-async function cargarProductosIniciales() {
-  const { data, error } = await supabaseClient
-    .from("productos")
-    .select("*");
+<script>
+/* ================= DOM ================= */
+const inputNombre = document.getElementById("inputNombre");
+const inputPrecio = document.getElementById("inputPrecio");
+const inputStock = document.getElementById("inputStock");
+const btnAgregar = document.getElementById("btnAgregar");
+const buscadorStock = document.getElementById("buscadorStock");
+const listaStock = document.getElementById("listaStock");
+const btnGuardar = document.getElementById("btnGuardar");
 
-  if (error) {
-    console.error("❌ Error carga inicial:", error);
+/* ================= ESTADO ================= */
+let productos = [];
+let productosFiltrados = [];
+
+/* ================= INIT ================= */
+function initStock() {
+  if (typeof verificarSesion === "function" && !verificarSesion()) return;
+
+  if (typeof can === "function" && !can("stock_view")) {
+    location.href = "index.html";
     return;
   }
 
-  guardarProductos(data || []);
-  bc.postMessage("productos");
+  btnAgregar.onclick = nuevoProducto;
+  btnGuardar.onclick = guardarCambios;
+  buscadorStock.oninput = filtrarStock;
 
-  console.log("✅ Productos iniciales:", data.length);
+  iniciarSyncStock();
+  cargarStock();
+
+  if (typeof applyPermissions === "function") {
+    applyPermissions();
+  }
 }
 
-/* ================= OFFLINE → ONLINE ================= */
-async function syncOfflineQueue() {
-  if (!navigator.onLine) return;
+/* ================= SYNC (OPTIMIZADO) ================= */
+let stockRenderTimeout = null;
 
-  const cola = obtenerColaOffline();
-  if (!cola.length) return;
+function iniciarSyncStock() {
+  const bc = new BroadcastChannel("victory-data");
 
-  console.log("🔄 Sync offline:", cola.length);
+  bc.onmessage = e => {
+    if (e.data === "productos") {
+      scheduleRender();
+    }
+  };
 
-  const pendientes = [];
+  window.addEventListener("storage", e => {
+    if (e.key === "productos") {
+      scheduleRender();
+    }
+  });
+}
 
-  for (const e of cola) {
-    const ok = await subirEventoASupabase(e);
-    if (!ok) pendientes.push(e);
+function scheduleRender() {
+  clearTimeout(stockRenderTimeout);
+
+  // 🔥 agrupa múltiples eventos en un solo render
+  stockRenderTimeout = setTimeout(() => {
+    cargarStock();
+  }, 50);
+}
+
+
+/* ================= CARGA ================= */
+function cargarStock() {
+  productos = obtenerProductos().filter(p => p && p.nombre);
+  productosFiltrados = [...productos];
+  renderStock();
+}
+
+/* ================= RENDER ================= */
+function renderStock() {
+  listaStock.innerHTML = "";
+
+  if (!productosFiltrados.length) {
+    listaStock.innerHTML = "<p>No hay productos</p>";
+    return;
   }
 
-  guardarColaOffline(pendientes);
-}
+  productosFiltrados.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "stock-card";
 
-/* ================= REALTIME (SIN FETCH) ================= */
-function iniciarRealtime() {
-  if (realtimeChannel) return;
+    card.innerHTML = `
+      <h4>${p.nombre}</h4>
+      <div class="precio">$${Number(p.precio).toFixed(2)}</div>
+      <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
+      <div class="stock-botones">
+        <button data-permission="stock_add">+1</button>
+        <button data-permission="stock_add">+10</button>
+        <button data-permission="stock_delete">Eliminar</button>
+      </div>
+    `;
 
-  console.log("🟢 Realtime conectando...");
+    const [b1, b10, bDel] = card.querySelectorAll("button");
 
-  realtimeChannel = supabaseClient
-    .channel("rt-productos")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "productos" },
-      payload => {
-        let productos = obtenerProductos();
+    b1.onclick = () => modificarStock(p, 1);
+    b10.onclick = () => modificarStock(p, 10);
+    bDel.onclick = () => eliminarProducto(p.id);
 
-        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-          const nuevo = payload.new;
-          const idx = productos.findIndex(p => p.id === nuevo.id);
+    listaStock.appendChild(card);
+  });
 
-          if (idx >= 0) productos[idx] = nuevo;
-          else productos.push(nuevo);
-        }
-
-        if (payload.eventType === "DELETE") {
-          productos = productos.filter(p => p.id !== payload.old.id);
-        }
-
-        guardarProductos(productos);
-        bc.postMessage("productos");
-      }
-    )
-    .subscribe(status => {
-      if (status === "SUBSCRIBED") {
-        console.log("✅ Realtime productos activo");
-      }
-    });
-}
-
-/* ================= INIT ================= */
-window.addEventListener("online", async () => {
-  await syncOfflineQueue();
-});
-
-window.addEventListener("load", async () => {
-  if (navigator.onLine) {
-    await cargarProductosIniciales();
-    iniciarRealtime();
-    syncOfflineQueue();
+  if (typeof applyPermissions === "function") {
+    applyPermissions();
   }
-});
+}
+
+/* ================= ACCIONES ================= */
+function modificarStock(p, cant) {
+  if (typeof can === "function" && !can("stock_add")) return;
+  p.stock += cant;
+  renderStock();
+}
+
+function eliminarProducto(id) {
+  if (typeof can === "function" && !can("stock_delete")) return;
+
+  productos = productos.filter(p => p.id !== id);
+  eliminarProductoLocal(id);
+  guardarCambios();
+}
+
+function nuevoProducto() {
+  if (typeof can === "function" && !can("products_create")) return;
+  if (!inputNombre.value || !inputPrecio.value) return;
+
+  const prod = {
+    id: crypto.randomUUID(),
+    nombre: inputNombre.value.trim(),
+    precio: Number(inputPrecio.value),
+    stock: Number(inputStock.value) || 0
+  };
+
+  productos.push(prod);
+  registrarProducto(prod);
+
+  inputNombre.value = "";
+  inputPrecio.value = "";
+  inputStock.value = "";
+
+  guardarCambios();
+}
+
+function guardarCambios() {
+  safeSet("productos", productos);
+  new BroadcastChannel("victory-data").postMessage("productos");
+}
+
+/* ================= FILTRO ================= */
+function filtrarStock() {
+  const q = buscadorStock.value.toLowerCase();
+  productosFiltrados = productos.filter(p =>
+    p.nombre.toLowerCase().includes(q)
+  );
+  renderStock();
+}
+</script>
+
+</body>
+</html>
