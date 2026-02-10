@@ -75,6 +75,7 @@
 <!-- CORE -->
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
+<script src="js/storage.js"></script>
 
 <script>
 /* ================= DOM ================= */
@@ -90,6 +91,7 @@ const panelEdicion  = document.getElementById("panelEdicion");
 let productos = [];
 let productosFiltrados = [];
 let modoEdicion = false;
+let accionMaster = null; // "guardar" | "historial"
 
 /* ================= INIT ================= */
 function initStock() {
@@ -119,7 +121,7 @@ function iniciarSyncStock() {
 
 /* ================= DATA ================= */
 function cargarStock() {
-  productos = JSON.parse(localStorage.getItem("productos") || "[]");
+  productos = obtenerProductos();
   productosFiltrados = [...productos];
   renderStock();
 }
@@ -140,25 +142,24 @@ function renderStock() {
     card.className = "stock-card" + (bajo ? " bajo" : "");
 
     card.innerHTML = `
-      <div class="stock-header">
-        <h4 style="${bajo ? "color:#e74c3c" : ""}">${p.nombre}</h4>
-      </div>
-
+      <h4 style="${bajo ? "color:#e74c3c" : ""}">${p.nombre}</h4>
       <div class="precio">$${Number(p.precio).toFixed(2)}</div>
 
       ${
         !modoEdicion
-        ? `<div class="stock-cantidad">
-             Stock: <span>${p.stock}</span>
-           </div>
-           <div class="small">Stock mínimo: ${p.stock_minimo || 0}</div>`
-        : `
-          <input type="text" value="${p.nombre}">
-          <input type="number" value="${p.precio}">
-          <input type="number" value="${p.stock}">
-          <input type="number" placeholder="Stock mínimo" value="${p.stock_minimo || 0}">
-          <input type="number" placeholder="Cantidad exacta (opcional)">
-        `
+          ? `
+            <div class="stock-cantidad">
+              Stock: <span>${p.stock}</span>
+            </div>
+            <div class="small">Stock mínimo: ${p.stock_minimo || 0}</div>
+          `
+          : `
+            <input value="${p.nombre}">
+            <input type="number" value="${p.precio}">
+            <input type="number" value="${p.stock}">
+            <input type="number" value="${p.stock_minimo || 0}">
+            <input type="number" placeholder="Cantidad exacta (opcional)">
+          `
       }
     `;
 
@@ -182,9 +183,12 @@ function renderPanel() {
     panelEdicion.appendChild(btn);
   } else {
     const guardar = document.createElement("button");
-    guardar.textContent = "💾 Guardar cambios";
     guardar.className = "btn-guardar";
-    guardar.onclick = abrirModalMaster;
+    guardar.textContent = "💾 Guardar cambios";
+    guardar.onclick = () => {
+      accionMaster = "guardar";
+      abrirModalMaster();
+    };
 
     const cancelar = document.createElement("button");
     cancelar.textContent = "❌ Cancelar";
@@ -198,11 +202,10 @@ function renderPanel() {
   }
 }
 
-/* ================= MODAL MASTER ================= */
+/* ================= MODAL ================= */
 function abrirModalHistorial() {
-  modalMaster.style.display = "flex";
-  inputMaster.value = "";
-  msgMaster.textContent = "";
+  accionMaster = "historial";
+  abrirModalMaster();
 }
 
 function abrirModalMaster() {
@@ -215,7 +218,7 @@ function cerrarModal() {
   modalMaster.style.display = "none";
 }
 
-/* ================= CONFIRMAR ================= */
+/* ================= CONFIRMAR MASTER ================= */
 async function confirmarMaster() {
   if (!validarPasswordMaestra(inputMaster.value)) {
     msgMaster.textContent = "✖ Contraseña incorrecta";
@@ -223,6 +226,25 @@ async function confirmarMaster() {
     return;
   }
 
+  msgMaster.textContent = "✔ Contraseña correcta";
+  msgMaster.className = "modal-msg ok";
+
+  setTimeout(async () => {
+    cerrarModal();
+
+    if (accionMaster === "historial") {
+      location.href = "historialstock.html";
+      return;
+    }
+
+    if (accionMaster === "guardar") {
+      await guardarCambiosStock();
+    }
+  }, 400);
+}
+
+/* ================= GUARDAR CAMBIOS ================= */
+async function guardarCambiosStock() {
   const cards = document.querySelectorAll(".stock-card");
 
   cards.forEach((card, i) => {
@@ -235,18 +257,32 @@ async function confirmarMaster() {
     const stockMin = Number(inputs[3].value);
     const exacto = inputs[4].value;
 
-    productosFiltrados[i].nombre = nombre;
-    productosFiltrados[i].precio = precio;
-    productosFiltrados[i].stock = exacto !== "" ? Number(exacto) : stockEdit;
-    productosFiltrados[i].stock_minimo = stockMin;
+    const nuevoStock = exacto !== "" ? Number(exacto) : stockEdit;
+
+    const prod = productosFiltrados[i];
+    prod.nombre = nombre;
+    prod.precio = precio;
+    prod.stock = nuevoStock;
+    prod.stock_minimo = stockMin;
+
+    // reflejar en fuente real
+    const idx = productos.findIndex(p => p.id === prod.id);
+    if (idx >= 0) productos[idx] = { ...prod };
+
+    // sync supabase
+    await supabaseClient
+      .from("productos")
+      .update({
+        nombre,
+        precio,
+        stock: nuevoStock,
+        stock_minimo: stockMin
+      })
+      .eq("id", prod.id);
   });
 
-  localStorage.setItem("productos", JSON.stringify(productos));
-
-  msgMaster.textContent = "✔ Cambios guardados";
-  msgMaster.className = "modal-msg ok";
-
-  setTimeout(() => location.reload(), 600);
+  guardarProductos(productos);
+  location.reload();
 }
 
 /* ================= NUEVO PRODUCTO ================= */
