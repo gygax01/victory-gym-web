@@ -4,25 +4,6 @@
 <meta charset="UTF-8">
 <title>Punto de Venta</title>
 <link rel="stylesheet" href="css/styles.css">
-
-<style>
-.pos-wrap{max-width:1100px;margin:20px auto;display:grid;grid-template-columns:2fr 1fr;gap:20px}
-@media(max-width:900px){.pos-wrap{grid-template-columns:1fr}}
-.productos{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
-.prod{background:linear-gradient(145deg,#3a3a3a,#2a2a2a);border-radius:18px;padding:26px;text-align:center;cursor:pointer;transition:.15s}
-.prod:hover{transform:scale(1.06)}
-.prod b{display:block;font-size:18px}
-.prod span{color:#2ecc71;font-size:22px}
-.carrito{background:#222;border-radius:16px;padding:16px}
-.carrito ul{list-style:none;padding:0;margin:0}
-.carrito li{display:flex;justify-content:space-between;margin:6px 0}
-.total{background:#111;border-radius:18px;padding:20px;text-align:center;margin:14px 0}
-.total span{font-size:44px;color:#2ecc71}
-.overlay-cambio{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;justify-content:center;align-items:center;z-index:5000}
-.overlay-cambio .box{background:#2ecc71;color:#fff;padding:80px;border-radius:22px;text-align:center;animation:zoom .25s ease}
-.overlay-cambio h1{font-size:64px;margin:0}
-@keyframes zoom{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
-</style>
 </head>
 
 <body>
@@ -55,16 +36,12 @@
   </div>
 </div>
 
-<!-- ===== JS BASE ===== -->
-<script src="js/storage.js?v=6"></script>
+<script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
 
-
 <script>
-/* ===============================
-   ===== DOM =====
-=============================== */
+/* ================= DOM ================= */
 const grid = document.getElementById("grid");
 const lista = document.getElementById("lista");
 const totalSpan = document.getElementById("total");
@@ -74,63 +51,57 @@ const cambioSpan = document.getElementById("cambio");
 const btnCobrar = document.getElementById("btnCobrar");
 const btnCancelar = document.getElementById("btnCancelar");
 
-/* ===============================
-   ===== ESTADO =====
-=============================== */
+/* ================= ESTADO ================= */
 let productos = [];
 let carrito = [];
 
-/* ===============================
-   ===== INIT =====
-=============================== */
+/* ================= INIT ================= */
 window.addEventListener("load", initPOS);
 
 function initPOS() {
   if (!verificarSesion()) return;
   if (!requirePermission("sales_do")) return;
 
-  btnCobrar.addEventListener("click", cobrar);
-  btnCancelar.addEventListener("click", cancelar);
+  btnCobrar.onclick = cobrar;
+  btnCancelar.onclick = cancelar;
 
+  iniciarSyncPOS();
   cargarProductos();
 }
 
-/* ===============================
-   ===== PRODUCTOS =====
-=============================== */
+/* ================= SYNC ================= */
+function iniciarSyncPOS() {
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "productos") cargarProductos();
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "productos") cargarProductos();
+  });
+}
+
+/* ================= PRODUCTOS ================= */
 function cargarProductos() {
   grid.innerHTML = "";
-
-  productos = obtenerProductos()
-    .filter(p => p && typeof p.nombre === "string" && Number(p.stock) > 0);
+  productos = obtenerProductos().filter(p => p && p.stock > 0);
 
   if (!productos.length) {
-    const p = document.createElement("p");
-    p.textContent = "No hay productos disponibles";
-    grid.appendChild(p);
+    grid.innerHTML = "<p>No hay productos disponibles</p>";
     return;
   }
 
   productos.forEach(p => {
     const d = document.createElement("div");
     d.className = "prod";
-
-    const b = document.createElement("b");
-    b.textContent = p.nombre;
-
-    const s = document.createElement("span");
-    s.textContent = "$" + Number(p.precio).toFixed(2);
-
-    d.append(b, s);
+    d.innerHTML = `<b>${p.nombre}</b><span>$${Number(p.precio).toFixed(2)}</span>`;
     d.onclick = () => agregarProducto(p.nombre);
-
     grid.appendChild(d);
   });
 }
 
-/* ===============================
-   ===== CARRITO =====
-=============================== */
+/* ================= CARRITO ================= */
 function agregarProducto(nombre) {
   carrito.push(nombre);
   renderCarrito();
@@ -143,12 +114,8 @@ function renderCarrito() {
   carrito.forEach(n => {
     const p = productos.find(x => x.nombre === n);
     if (!p) return;
-
-    total += Number(p.precio) || 0;
-
-    const li = document.createElement("li");
-    li.innerHTML = `<span>${n}</span><span>$${Number(p.precio).toFixed(2)}</span>`;
-    lista.appendChild(li);
+    total += Number(p.precio);
+    lista.innerHTML += `<li><span>${n}</span><span>$${p.precio.toFixed(2)}</span></li>`;
   });
 
   totalSpan.textContent = total.toFixed(2);
@@ -161,9 +128,7 @@ function cancelar() {
   renderCarrito();
 }
 
-/* ===============================
-   ===== COBRAR (FIX PRO) =====
-=============================== */
+/* ================= COBRAR ================= */
 function cobrar() {
   const totalVenta = Number(totalSpan.textContent);
   const paga = Number(pagoInput.value);
@@ -171,36 +136,34 @@ function cobrar() {
   if (!carrito.length) return alert("Carrito vacío");
   if (paga < totalVenta) return alert("Pago insuficiente");
 
-  /* 🔥 DESCONTAR STOCK */
+  const stockCompleto = obtenerProductos();
+
   carrito.forEach(n => {
-    const p = productos.find(x => x.nombre === n);
-    if (p) p.stock = Number(p.stock) - 1;
+    const p = stockCompleto.find(x => x.nombre === n);
+    if (p) p.stock--;
   });
 
-  guardarProductos(productos);
-  notificarCambioStock();           // 🔔
+  safeSet("productos", stockCompleto);
+  new BroadcastChannel("victory-data").postMessage("productos");
 
-  /* 🔥 REGISTRAR VENTA */
   const ventas = obtenerVentas();
   ventas.push({
+    id: crypto.randomUUID(),
     fecha: hoy(),
     hora: horaActual(),
     total: totalVenta
   });
-  guardarVentas(ventas);
-  notificarCambioVentas();          // 🔔
+  safeSet("ventas", ventas);
 
-  /* UI CAMBIO */
   cambioSpan.textContent = (paga - totalVenta).toFixed(2);
   overlay.style.display = "flex";
 
   setTimeout(() => {
     overlay.style.display = "none";
     location.href = "index.html";
-  }, 3500);
+  }, 3000);
 }
 </script>
 
 </body>
 </html>
-
