@@ -72,6 +72,11 @@
 <script src="js/realtime.js"></script>
 
 <script>
+/* ======================================================
+   ===== MASTER PASSWORD (FIJA, NO MODIFICABLE) =====
+====================================================== */
+const MASTER_PASSWORD = "victory(profitness)";
+
 /* ================= DOM ================= */
 const inputNombre = document.getElementById("inputNombre");
 const inputPrecio = document.getElementById("inputPrecio");
@@ -98,8 +103,6 @@ function initStock() {
 }
 
 /* ================= MODAL MASTER ================= */
-const MASTER_PASSWORD = "victory(profitness)";
-
 function abrirModalHistorial() {
   document.getElementById("modalMaster").style.display = "flex";
   document.getElementById("inputMaster").value = "";
@@ -127,8 +130,10 @@ function validarMaster() {
     msg.className = "modal-msg error";
 
     setTimeout(() => {
-      cerrarModalHistorial();
-    }, 900);
+      msg.textContent = "";
+      document.getElementById("inputMaster").value = "";
+      document.getElementById("inputMaster").focus();
+    }, 1200);
   }
 }
 
@@ -192,30 +197,13 @@ function renderStock() {
 async function modificarStock(p, delta) {
   if (!can("stock_add")) return;
 
-  const antes = { stock: p.stock, precio: p.precio };
   const nuevoStock = p.stock + delta;
-
   await actualizarStockSupabase(p.id, nuevoStock);
-
-  await pushHistorialStock([{
-    producto_id: p.id,
-    nombre: p.nombre,
-    antes,
-    despues: { stock: nuevoStock, precio: p.precio }
-  }]);
 }
 
 async function eliminarProducto(p) {
   if (!can("stock_delete")) return;
-
   await borrarProductoSupabase(p.id);
-
-  await pushHistorialStock([{
-    producto_id: p.id,
-    nombre: p.nombre,
-    antes: { stock: p.stock, precio: p.precio },
-    despues: null
-  }]);
 }
 
 async function nuevoProducto() {
@@ -231,13 +219,6 @@ async function nuevoProducto() {
 
   await insertarProductoSupabase(prod);
 
-  await pushHistorialStock([{
-    producto_id: prod.id,
-    nombre: prod.nombre,
-    antes: null,
-    despues: { stock: prod.stock, precio: prod.precio }
-  }]);
-
   inputNombre.value = "";
   inputPrecio.value = "";
   inputStock.value = "";
@@ -251,6 +232,11 @@ function filtrarStock() {
   );
   renderStock();
 }
+
+/* ================= UX EXTRA ================= */
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") cerrarModalHistorial();
+});
 </script>
 
 </body>
