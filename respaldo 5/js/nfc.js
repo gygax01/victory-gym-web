@@ -9,65 +9,22 @@ let ultimoUID = null;
 let ultimoTiempo = 0;
 const COOLDOWN_MS = 450;
 
-let supabaseClient = null;
-
-/* ===============================
-   ===== ESPERAR SUPABASE
-=============================== */
-function esperarSupabase(intentos = 30) {
-  return new Promise((resolve, reject) => {
-    const check = () => {
-      if (window.supabase?.createClient) {
-        resolve(window.supabase);
-      } else if (intentos <= 0) {
-        reject("Supabase no cargado");
-      } else {
-        intentos--;
-        setTimeout(check, 100);
-      }
-    };
-    check();
-  });
-}
-
-/* ===============================
-   ===== INIT SUPABASE NFC
-=============================== */
-async function initSupabaseNFC() {
-  if (supabaseClient) return supabaseClient;
-
-  const supabase = await esperarSupabase();
-
-  const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
-  const SUPABASE_ANON_KEY =
-    "sb_publishable_uV1OQab8AfWE3SzNkuleQw_W0xgyfER";
-
-  supabaseClient = supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
-
-  return supabaseClient;
-}
-
 /* ===============================
    ===== INICIAR NFC
 =============================== */
-async function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
+function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
   if (escuchando) return;
 
-  try {
-    await initSupabaseNFC();
-  } catch (e) {
-    console.warn("❌ NFC sin Supabase", e);
-    if (typeof onError === "function") onError(e);
+  if (!window.supabaseClient) {
+    console.error("❌ Supabase no inicializado");
+    if (typeof onError === "function") onError("Supabase no listo");
     return;
   }
 
   detenerNFC();
   escuchando = true;
 
-  canalNFC = supabaseClient
+  canalNFC = window.supabaseClient
     .channel("nfc-events")
     .on(
       "postgres_changes",
@@ -88,18 +45,13 @@ async function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
         ultimoUID = uid;
         ultimoTiempo = ahora;
 
-        if (typeof onUID === "function") {
-          onUID(uid);
-        }
+        if (typeof onUID === "function") onUID(uid);
       }
     )
-    .subscribe(status => {
-      if (status === "SUBSCRIBED") {
-        console.log("📡 NFC Supabase escuchando");
-      }
+    .subscribe(() => {
+      console.log("📡 NFC escuchando (Supabase)");
     });
 
-  // ⏱️ timeout opcional
   if (typeof onTimeout === "function") {
     setTimeout(() => {
       if (escuchando) onTimeout();
@@ -111,8 +63,8 @@ async function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
    ===== DETENER NFC
 =============================== */
 function detenerNFC() {
-  if (canalNFC && supabaseClient) {
-    supabaseClient.removeChannel(canalNFC);
+  if (canalNFC && window.supabaseClient) {
+    window.supabaseClient.removeChannel(canalNFC);
   }
 
   canalNFC = null;
@@ -120,13 +72,3 @@ function detenerNFC() {
   ultimoUID = null;
   ultimoTiempo = 0;
 }
-
-/* ===============================
-   ===== DEBUG GLOBAL
-=============================== */
-window._debugNFC = () => ({
-  escuchando,
-  ultimoUID,
-  ultimoTiempo,
-  supabaseActivo: !!supabaseClient
-});
