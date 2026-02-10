@@ -11,7 +11,6 @@
 
 <body>
 
-<!-- ===== HEADER ===== -->
 <header class="header-brand">
   <div class="brand">
     <img src="img/logo.png" alt="Victory Pro Fitness">
@@ -30,7 +29,6 @@
   </div>
 </header>
 
-<!-- ===== ACCIONES ===== -->
 <div class="panel-acciones">
   <button class="destacado" onclick="location.href='registro.html'">Registro</button>
   <button onclick="location.href='pos.html'">Ventas</button>
@@ -45,7 +43,6 @@
   </button>
 </div>
 
-<!-- ===== TABLA ===== -->
 <div id="contenedorTabla" style="max-height:70vh; overflow-y:auto;">
   <table>
     <thead>
@@ -59,7 +56,6 @@
   </table>
 </div>
 
-<!-- ===== CONFIRMACIÓN ===== -->
 <div class="confirmacion" id="confirmacion">
   <div class="box">
     <h1 id="tituloConfirmacion"></h1>
@@ -79,10 +75,6 @@
 /* ================= DOM ================= */
 const estadoLector = document.getElementById("estadoLector");
 const estadoConexion = document.getElementById("estadoConexion");
-const contenedorTabla = document.getElementById("contenedorTabla");
-const confirmacion = document.getElementById("confirmacion");
-const tituloConfirmacion = document.getElementById("tituloConfirmacion");
-const mensajeConfirmacion = document.getElementById("mensajeConfirmacion");
 const btnUsuarios = document.getElementById("btnUsuarios");
 const btnLogout = document.getElementById("btnLogout");
 
@@ -98,12 +90,18 @@ function initIndex() {
   actualizarEstadoConexion();
   cargarAsistencias();
   actualizarContador();
+
   iniciarLecturaNFCIndex();
   iniciarSyncLocal();
 
-  // 🔥 Bluetooth automático si NO hay internet
-  if (!isOnline()) {
-    conectarBluetooth().catch(()=>{});
+  // 🌐 Realtime Supabase
+  if (navigator.onLine && typeof iniciarRealtime === "function") {
+    iniciarRealtime();
+  }
+
+  // 🔵 Bluetooth automático si no hay internet
+  if (!navigator.onLine) {
+    conectarBluetooth().catch(() => {});
   }
 }
 
@@ -117,7 +115,7 @@ function aplicarRolIndex() {
 
 /* ================= CONEXIÓN ================= */
 function actualizarEstadoConexion() {
-  if (isOnline()) {
+  if (navigator.onLine) {
     estadoConexion.textContent = "Online";
     estadoConexion.className = "lector on";
     syncOfflineQueue();
@@ -129,8 +127,9 @@ function actualizarEstadoConexion() {
 
 window.addEventListener("online", () => {
   actualizarEstadoConexion();
-  conectarBluetooth().catch(()=>{});
+  if (typeof iniciarRealtime === "function") iniciarRealtime();
 });
+
 window.addEventListener("offline", actualizarEstadoConexion);
 
 /* ================= SYNC LOCAL ================= */
@@ -166,10 +165,15 @@ function iniciarLecturaNFCIndex() {
 
 /* ================= CONFIRM ================= */
 function mostrarConfirmacion(tipo, titulo, mensaje) {
+  const confirmacion = document.getElementById("confirmacion");
+  const tituloConfirmacion = document.getElementById("tituloConfirmacion");
+  const mensajeConfirmacion = document.getElementById("mensajeConfirmacion");
+
   confirmacion.className = "confirmacion " + tipo;
   tituloConfirmacion.textContent = titulo;
   mensajeConfirmacion.textContent = mensaje;
   confirmacion.style.display = "flex";
+
   setTimeout(() => confirmacion.style.display = "none", 2200);
 }
 
@@ -186,8 +190,8 @@ function procesarTarjeta(uid) {
     return;
   }
 
-  const hoyFecha = hoy();
   const asistencias = obtenerAsistencias();
+  const hoyFecha = hoy();
 
   const delDia = asistencias
     .filter(a => a.tarjetaUID === uid && a.fecha === hoyFecha)
@@ -196,8 +200,7 @@ function procesarTarjeta(uid) {
   const ultima = delDia[delDia.length - 1] || null;
 
   if (!ultima || ultima.salida !== null) {
-    asistencias.push({
-      id: crypto.randomUUID(),
+    registrarAsistencia({
       tarjetaUID: uid,
       nombre: cliente.nombre,
       entrada: horaActual(),
@@ -207,15 +210,13 @@ function procesarTarjeta(uid) {
     mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
   } else {
     ultima.salida = horaActual();
+    safeSet("asistencias", asistencias);
     mostrarConfirmacion("salida","Hasta luego",cliente.nombre);
   }
 
-  guardarAsistencias(asistencias);
   notificarCambioAsistencias();
   cargarAsistencias();
   actualizarContador();
-
-  new BroadcastChannel("victory-data").postMessage("asistencias");
 }
 </script>
 
