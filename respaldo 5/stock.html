@@ -24,7 +24,7 @@
   </div>
 </header>
 
-<!-- ================= MODAL MASTER ================= -->
+<!-- MODAL MASTER -->
 <div id="modalMaster" class="modal-overlay">
   <div class="modal-card pop">
     <h3>🔒 Acceso restringido</h3>
@@ -38,7 +38,6 @@
   </div>
 </div>
 
-<!-- ================= NUEVO PRODUCTO ================= -->
 <div class="card stock-nuevo" data-permission="products_create">
   <h3>Nuevo producto</h3>
   <div class="stock-form">
@@ -49,15 +48,11 @@
   </div>
 </div>
 
-<!-- ================= BUSCADOR ================= -->
 <div class="search-bar">
   <input id="buscadorStock" placeholder="Buscar producto...">
 </div>
 
-<!-- ================= LISTA ================= -->
 <div class="stock-grid" id="listaStock"></div>
-
-<!-- ================= PANEL ================= -->
 <div class="stock-footer" id="panelEdicion"></div>
 
 <script src="js/auth.js"></script>
@@ -69,6 +64,7 @@ let productos = [];
 let productosFiltrados = [];
 let modoEdicion = false;
 let accionMaster = null;
+let productoAbierto = null;
 
 /* ================= DOM ================= */
 const inputNombre   = document.getElementById("inputNombre");
@@ -92,18 +88,11 @@ function initStock() {
   applyPermissions();
 }
 
-/* ================= SYNC ================= */
-function iniciarSyncStock() {
-  const bc = new BroadcastChannel("victory-data");
-  bc.onmessage = e => {
-    if (e.data === "productos") cargarStock();
-  };
-}
-
 /* ================= DATA ================= */
 function cargarStock() {
   productos = JSON.parse(localStorage.getItem("productos") || "[]");
   productosFiltrados = [...productos];
+  productoAbierto = null;
   renderStock();
 }
 
@@ -112,6 +101,7 @@ function renderStock() {
   listaStock.innerHTML = "";
 
   productosFiltrados.forEach(p => {
+    const abierto = productoAbierto === p.id;
     const bajo = Number(p.stock) <= Number(p.stock_minimo || 0);
 
     const card = document.createElement("div");
@@ -119,21 +109,27 @@ function renderStock() {
     card.dataset.id = p.id;
 
     card.innerHTML = `
-      <h4 style="${bajo ? "color:#e74c3c" : ""}">${p.nombre}</h4>
+      <div class="stock-header" onclick="toggleProducto('${p.id}')">
+        <h4 style="${bajo ? "color:#e74c3c" : ""}">${p.nombre}</h4>
+        ${modoEdicion ? `<span>${abierto ? "▲" : "▼"}</span>` : ""}
+      </div>
+
       <div class="precio">$${Number(p.precio).toFixed(2)}</div>
 
       ${
         !modoEdicion
           ? `
-            <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
+            <div class="stock-cantidad">Stock: ${p.stock}</div>
             <div class="small">Stock mínimo: ${p.stock_minimo || 0}</div>
           `
           : `
-            <input value="${p.nombre}">
-            <input type="number" value="${p.precio}">
-            <input type="number" value="${p.stock}">
-            <input type="number" value="${p.stock_minimo || 0}">
-            <input type="number" placeholder="Cantidad exacta (opcional)">
+            <div class="edit-panel" style="display:${abierto ? "block" : "none"}">
+              <input value="${p.nombre}">
+              <input type="number" value="${p.precio}">
+              <input type="number" value="${p.stock}">
+              <input type="number" value="${p.stock_minimo || 0}">
+              <input type="number" placeholder="Cantidad exacta (opcional)">
+            </div>
           `
       }
     `;
@@ -142,6 +138,13 @@ function renderStock() {
   });
 
   renderPanel();
+}
+
+/* ================= TOGGLE ================= */
+function toggleProducto(id) {
+  if (!modoEdicion) return;
+  productoAbierto = productoAbierto === id ? null : id;
+  renderStock();
 }
 
 /* ================= PANEL ================= */
@@ -153,6 +156,7 @@ function renderPanel() {
     btn.textContent = "✏️ Editar stock";
     btn.onclick = () => {
       modoEdicion = true;
+      productoAbierto = null;
       renderStock();
     };
     panelEdicion.appendChild(btn);
@@ -211,12 +215,12 @@ function confirmarMaster() {
   if (accionMaster === "guardar") guardarCambiosStock();
 }
 
-/* ================= GUARDAR (FIX REAL) ================= */
+/* ================= GUARDAR ================= */
 async function guardarCambiosStock() {
   const cards = document.querySelectorAll(".stock-card");
 
   for (const card of cards) {
-    const inputs = card.querySelectorAll("input");
+    const inputs = card.querySelectorAll(".edit-panel input");
     if (!inputs.length) continue;
 
     const id = card.dataset.id;
@@ -237,12 +241,7 @@ async function guardarCambiosStock() {
 
     await supabaseClient
       .from("productos")
-      .update({
-        nombre,
-        precio,
-        stock: nuevoStock,
-        stock_minimo: stockMin
-      })
+      .update({ nombre, precio, stock: nuevoStock, stock_minimo: stockMin })
       .eq("id", id);
   }
 
@@ -255,15 +254,12 @@ async function nuevoProducto() {
   if (!can("products_create")) return;
   if (!inputNombre.value || !inputPrecio.value) return;
 
-  const prod = {
-    id: crypto.randomUUID(),
+  await insertarProductoSupabase({
     nombre: inputNombre.value.trim(),
     precio: Number(inputPrecio.value),
     stock: Number(inputStock.value) || 0,
     stock_minimo: 0
-  };
-
-  await insertarProductoSupabase(prod);
+  });
 
   inputNombre.value = "";
   inputPrecio.value = "";
@@ -276,6 +272,7 @@ function filtrarStock() {
   productosFiltrados = productos.filter(p =>
     p.nombre.toLowerCase().includes(q)
   );
+  productoAbierto = null;
   renderStock();
 }
 </script>
