@@ -27,48 +27,44 @@
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
 
-
 <script>
-/* ===============================
-   ===== DOM =====
-=============================== */
+/* ================= DOM ================= */
 const listaHistorial = document.getElementById("listaHistorial");
 const busqueda = document.getElementById("busqueda");
 
-/* ===============================
-   ===== ESTADO =====
-=============================== */
+/* ================= ESTADO ================= */
 let clientes = [];
 let asistencias = [];
 
-/* ===============================
-   ===== INIT =====
-=============================== */
+/* ================= INIT ================= */
 window.addEventListener("load", initHistorial);
 
 function initHistorial() {
   if (!verificarSesion()) return;
-  if (!requirePermission("history_view")) return;
+  if (!can("history_view")) return;
 
   busqueda.addEventListener("input", filtrar);
+
   iniciarSyncHistorial();
   cargarHistorial();
+
+  if (navigator.onLine && typeof iniciarRealtime === "function") {
+    iniciarRealtime();
+  }
 }
 
-/* ===============================
-   ===== SINCRONIZACIÓN =====
-=============================== */
+/* ================= SINCRONIZACIÓN ================= */
 function iniciarSyncHistorial() {
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = e => {
-    if (e.data === "asistencias" || e.data === "clientes") {
+    if (["asistencias","clientes"].includes(e.data)) {
       cargarHistorial();
     }
   };
 
   window.addEventListener("storage", e => {
-    if (e.key === "asistencias" || e.key === "clientes") {
+    if (["asistencias","clientes"].includes(e.key)) {
       cargarHistorial();
     }
   });
@@ -79,9 +75,7 @@ function iniciarSyncHistorial() {
   });
 }
 
-/* ===============================
-   ===== UTILIDADES =====
-=============================== */
+/* ================= UTILIDADES ================= */
 function diasEntre(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
 }
@@ -123,9 +117,7 @@ function calcularRachas(uid) {
   return { actual, max };
 }
 
-/* ===============================
-   ===== CARGA =====
-=============================== */
+/* ================= CARGA ================= */
 function cargarHistorial() {
   clientes = obtenerClientes().filter(c => c && typeof c.nombre === "string");
   asistencias = obtenerAsistencias();
@@ -138,9 +130,7 @@ function cargarHistorial() {
   render(clientes);
 }
 
-/* ===============================
-   ===== RENDER =====
-=============================== */
+/* ================= RENDER ================= */
 function render(lista) {
   listaHistorial.innerHTML = "";
 
@@ -204,19 +194,11 @@ function render(lista) {
     const header = card.querySelector(".cliente-header");
     const panel = card.querySelector(".historial");
 
-    if (registros.length > 0) {
-      card.classList.add("abierto");
-      panel.classList.add("abierto");
-      header.setAttribute("aria-expanded", "true");
-    }
-
     header.onclick = () => {
       document.querySelectorAll(".cliente.abierto").forEach(o => {
         if (o !== card) {
           o.classList.remove("abierto");
           o.querySelector(".historial")?.classList.remove("abierto");
-          o.querySelector(".cliente-header")
-            ?.setAttribute("aria-expanded", "false");
         }
       });
 
@@ -229,9 +211,7 @@ function render(lista) {
   });
 }
 
-/* ===============================
-   ===== FILTRO =====
-=============================== */
+/* ================= FILTRO ================= */
 function filtrar() {
   const q = busqueda.value.toLowerCase();
   render(clientes.filter(c =>
@@ -242,4 +222,3 @@ function filtrar() {
 
 </body>
 </html>
-
