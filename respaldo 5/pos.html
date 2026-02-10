@@ -118,17 +118,28 @@
 
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/realtime.js"></script>
 
 <script>
 let productos = [];
 let carrito = [];
 
-/* ===== INIT ===== */
+/* ================= INIT ================= */
 function initPOS(){
   if (!verificarSesion()) return;
-  cargarProductos();
+  if (!can("sales_do")) {
+    location.href = "index.html";
+    return;
+  }
 
+  cargarProductos();
+  iniciarSyncPOS();
+}
+
+/* ================= SYNC ================= */
+function iniciarSyncPOS(){
   const bc = new BroadcastChannel("victory-data");
+
   bc.onmessage = e => {
     if (e.data === "productos") cargarProductos();
   };
@@ -136,81 +147,101 @@ function initPOS(){
   window.addEventListener("storage", e => {
     if (e.key === "productos") cargarProductos();
   });
+
+  window.addEventListener("online", () => {
+    syncOfflineQueue();
+    cargarProductos();
+  });
 }
 
-/* ===== PRODUCTOS ===== */
+/* ================= PRODUCTOS ================= */
 function cargarProductos(){
-  grid.innerHTML="";
+  grid.innerHTML = "";
   productos = obtenerProductos().filter(p => p && p.stock > 0);
 
   if (!productos.length){
-    grid.innerHTML="<p>No hay productos disponibles</p>";
+    grid.innerHTML = "<p>No hay productos disponibles</p>";
     return;
   }
 
   productos.forEach(p=>{
-    const d=document.createElement("div");
-    d.className="prod";
-    d.innerHTML=`<b>${p.nombre}</b><span>$${Number(p.precio).toFixed(2)}</span>`;
-    d.onclick=()=>agregar(p.nombre);
+    const d = document.createElement("div");
+    d.className = "prod";
+    d.innerHTML = `
+      <b>${p.nombre}</b>
+      <span>$${Number(p.precio).toFixed(2)}</span>
+    `;
+    d.onclick = () => agregar(p.id);
     grid.appendChild(d);
   });
 }
 
-/* ===== CARRITO ===== */
-function agregar(nombre){
-  carrito.push(nombre);
+/* ================= CARRITO ================= */
+function agregar(id){
+  carrito.push(id);
   render();
 }
 
 function render(){
-  lista.innerHTML="";
-  let t=0;
+  lista.innerHTML = "";
+  let totalVenta = 0;
 
-  carrito.forEach(n=>{
-    const p=productos.find(x=>x.nombre===n);
-    if(!p) return;
-    t+=Number(p.precio);
-    lista.innerHTML+=`<li>${n}<span>$${Number(p.precio).toFixed(2)}</span></li>`;
+  carrito.forEach(id=>{
+    const p = productos.find(x=>x.id===id);
+    if (!p) return;
+
+    totalVenta += Number(p.precio);
+    lista.innerHTML += `
+      <li>${p.nombre}<span>$${Number(p.precio).toFixed(2)}</span></li>
+    `;
   });
 
-  total.innerText=t.toFixed(2);
+  total.innerText = totalVenta.toFixed(2);
 }
 
 function cancelar(){
-  if(!confirm("¿Cancelar venta?"))return;
-  carrito=[];
-  pago.value="";
+  if (!confirm("¿Cancelar venta?")) return;
+  carrito = [];
+  pago.value = "";
   render();
 }
 
-/* ===== COBRAR ===== */
+/* ================= COBRAR ================= */
 function cobrar(){
-  const totalVenta=Number(total.innerText);
-  const paga=Number(pago.value);
+  const totalVenta = Number(total.innerText);
+  const paga = Number(pago.value);
 
-  if(!carrito.length) return alert("Carrito vacío");
-  if(paga<totalVenta) return alert("Pago insuficiente");
+  if (!carrito.length) return alert("Carrito vacío");
+  if (paga < totalVenta) return alert("Pago insuficiente");
 
   const stock = obtenerProductos();
 
-  carrito.forEach(n=>{
-    const p=stock.find(x=>x.nombre===n);
-    if(p) p.stock--;
+  carrito.forEach(id=>{
+    const p = stock.find(x=>x.id===id);
+    if (p) {
+      p.stock--;
+
+      agregarEvento({
+        tabla: "productos",
+        accion: "update",
+        data: p
+      });
+    }
   });
 
-  stock.forEach(p=>actualizarProducto(p));
+  safeSet("productos", stock);
+  new BroadcastChannel("victory-data").postMessage("productos");
 
   registrarVenta({
-    fecha:hoy(),
-    hora:horaActual(),
-    total:totalVenta
+    fecha: hoy(),
+    hora: horaActual(),
+    total: totalVenta
   });
 
-  cambio.innerText=(paga-totalVenta).toFixed(2);
-  overlay.style.display="flex";
+  cambio.innerText = (paga - totalVenta).toFixed(2);
+  overlay.style.display = "flex";
 
-  setTimeout(()=>location.href="index.html",3500);
+  setTimeout(()=>location.href="index.html", 3500);
 }
 </script>
 
