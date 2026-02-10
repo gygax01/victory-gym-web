@@ -5,7 +5,7 @@
   <title>Login - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- Supabase SOLO para nfc.js -->
+  <!-- Supabase SOLO para NFC / realtime -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -67,11 +67,8 @@
 <script src="js/nfc.js"></script>
 <script src="js/realtime.js"></script>
 
-
 <script>
-/* ===============================
-   ===== DOM =====
-=============================== */
+/* ================= DOM ================= */
 const btnLogin = document.getElementById("btnLogin");
 const btnNFC = document.getElementById("btnNFC");
 const inputUser = document.getElementById("inputUser");
@@ -88,28 +85,26 @@ const estadoNFC = document.getElementById("estadoNFC");
 
 const estadoConexion = document.getElementById("estadoConexion");
 
-/* ===============================
-   ===== ESTADO =====
-=============================== */
+/* ================= ESTADO ================= */
 let leyendoNFC = false;
 let timeoutNFC = null;
 
-/* ===============================
-   ===== INIT =====
-=============================== */
+/* ================= INIT ================= */
 window.addEventListener("load", () => {
-  // 🔒 si ya hay sesión activa, no permitir login
   if (obtenerSesion()) {
     location.href = "index.html";
     return;
   }
 
   actualizarEstadoConexion();
+  iniciarSyncUsuarios();
+
+  if (navigator.onLine && typeof iniciarRealtime === "function") {
+    iniciarRealtime();
+  }
 });
 
-/* ===============================
-   ===== CONEXIÓN =====
-=============================== */
+/* ================= CONEXIÓN ================= */
 function actualizarEstadoConexion() {
   if (navigator.onLine) {
     estadoConexion.textContent = "Conectado";
@@ -123,16 +118,33 @@ function actualizarEstadoConexion() {
 window.addEventListener("online", actualizarEstadoConexion);
 window.addEventListener("offline", actualizarEstadoConexion);
 
-/* ===============================
-   ===== HELPERS =====
-=============================== */
+/* ================= SYNC USUARIOS ================= */
+function iniciarSyncUsuarios() {
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "empleados") {
+      console.log("🔄 Usuarios actualizados");
+    }
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "empleados") {
+      console.log("🔄 Usuarios actualizados (storage)");
+    }
+  });
+
+  window.addEventListener("online", () => {
+    syncOfflineQueue();
+  });
+}
+
+/* ================= HELPERS ================= */
 function ocultarOverlays() {
   document.querySelectorAll(".overlay").forEach(o => o.style.display = "none");
 }
 
-/* ===============================
-   ===== LOGIN NORMAL =====
-=============================== */
+/* ================= LOGIN NORMAL ================= */
 btnLogin.onclick = () => {
   ocultarOverlays();
 
@@ -162,9 +174,7 @@ btnLogin.onclick = () => {
   }
 };
 
-/* ===============================
-   ===== LOGIN NFC =====
-=============================== */
+/* ================= LOGIN NFC ================= */
 btnNFC.onclick = () => {
   if (leyendoNFC) return;
   leyendoNFC = true;
@@ -177,7 +187,7 @@ btnNFC.onclick = () => {
 
   timeoutNFC = setTimeout(() => {
     estadoNFC.className = "estado rojo";
-    estadoNFC.textContent = "Tiempo excedido para lectura";
+    estadoNFC.textContent = "Tiempo excedido";
     setTimeout(resetNFC, 1500);
   }, 10000);
 
@@ -217,4 +227,3 @@ function resetNFC() {
 
 </body>
 </html>
-
