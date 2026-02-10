@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Historial de Stock</title>
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body onload="initHistorialStock()">
+
+<header class="header-brand">
+  <div class="brand">
+    <img src="img/logo.png">
+    <h2>Historial de Stock</h2>
+  </div>
+  <button onclick="location.href='stock.html'">← Volver</button>
+</header>
+
+<!-- ===== BUSCADOR ===== -->
+<div class="search-bar">
+  <input id="buscadorHistorial" placeholder="Buscar por fecha, usuario o producto...">
+</div>
+
+<!-- ===== HISTORIAL ===== -->
+<div class="historial-container" id="contenedorHistorial"></div>
+
+<!-- CORE -->
+<script src="js/auth.js"></script>
+<script src="js/realtime.js"></script>
+
+<script>
+/* ================= STATE ================= */
+let historial = [];
+let historialFiltrado = [];
+
+/* ================= INIT ================= */
+async function initHistorialStock() {
+  if (!verificarSesion()) return;
+  if (!can("stock_view")) location.href = "index.html";
+
+  document
+    .getElementById("buscadorHistorial")
+    .addEventListener("input", filtrarHistorial);
+
+  await cargarHistorial();
+}
+
+/* ================= DATA ================= */
+async function cargarHistorial() {
+  const { data, error } = await supabaseClient
+    .from("historial_stock")
+    .select("*")
+    .order("ts", { ascending: false });
+
+  if (error) {
+    console.error("❌ Error cargando historial:", error);
+    return;
+  }
+
+  historial = data || [];
+  historialFiltrado = [...historial];
+  renderHistorial();
+}
+
+/* ================= RENDER ================= */
+function renderHistorial() {
+  const cont = document.getElementById("contenedorHistorial");
+  cont.innerHTML = "";
+
+  if (!historialFiltrado.length) {
+    cont.innerHTML = "<p style='text-align:center'>No hay registros</p>";
+    return;
+  }
+
+  historialFiltrado.forEach((h, index) => {
+    const card = document.createElement("div");
+    card.className = "cliente";
+
+    card.innerHTML = `
+      <div class="cliente-header">
+        <div class="info-wrapper">
+          <div class="info-bloque">
+            <h3>${h.fecha}</h3>
+            <div class="racha">
+              ${h.hora} · ${h.usuario} (${h.rol})
+            </div>
+          </div>
+        </div>
+        <div class="flecha">▾</div>
+      </div>
+
+      <div class="historial">
+        ${renderTablaCambios(h.cambios)}
+      </div>
+    `;
+
+    const header = card.querySelector(".cliente-header");
+    const body = card.querySelector(".historial");
+
+    header.onclick = () => {
+      card.classList.toggle("abierto");
+      body.classList.toggle("abierto");
+    };
+
+    cont.appendChild(card);
+  });
+}
+
+/* ================= TABLA ================= */
+function renderTablaCambios(cambios = []) {
+  if (!cambios.length) return "<p>Sin cambios</p>";
+
+  let rows = "";
+
+  cambios.forEach((c, i) => {
+    rows += `
+      <tr class="${i % 2 ? "alt" : ""}">
+        <td>${c.nombre || "-"}</td>
+        <td>${c.antes ? JSON.stringify(c.antes) : "-"}</td>
+        <td>${c.despues ? JSON.stringify(c.despues) : "-"}</td>
+      </tr>
+    `;
+  });
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Antes</th>
+          <th>Después</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `;
+}
+
+/* ================= FILTRO ================= */
+function filtrarHistorial(e) {
+  const q = e.target.value.toLowerCase();
+
+  historialFiltrado = historial.filter(h =>
+    h.fecha.toLowerCase().includes(q) ||
+    h.usuario.toLowerCase().includes(q) ||
+    JSON.stringify(h.cambios).toLowerCase().includes(q)
+  );
+
+  renderHistorial();
+}
+</script>
+
+</body>
+</html>
