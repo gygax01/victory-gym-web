@@ -85,7 +85,9 @@ function iniciarSyncPOS() {
 /* ================= PRODUCTOS ================= */
 function cargarProductos() {
   grid.innerHTML = "";
-  productos = obtenerProductos().filter(p => p && p.stock > 0);
+
+  productos = obtenerProductos()
+    .filter(p => p && p.nombre && Number(p.stock) > 0);
 
   if (!productos.length) {
     grid.innerHTML = "<p>No hay productos disponibles</p>";
@@ -96,14 +98,14 @@ function cargarProductos() {
     const d = document.createElement("div");
     d.className = "prod";
     d.innerHTML = `<b>${p.nombre}</b><span>$${Number(p.precio).toFixed(2)}</span>`;
-    d.onclick = () => agregarProducto(p.nombre);
+    d.onclick = () => agregarProducto(p.id);
     grid.appendChild(d);
   });
 }
 
 /* ================= CARRITO ================= */
-function agregarProducto(nombre) {
-  carrito.push(nombre);
+function agregarProducto(id) {
+  carrito.push(id);
   renderCarrito();
 }
 
@@ -111,11 +113,15 @@ function renderCarrito() {
   lista.innerHTML = "";
   let total = 0;
 
-  carrito.forEach(n => {
-    const p = productos.find(x => x.nombre === n);
+  carrito.forEach(id => {
+    const p = productos.find(x => x.id === id);
     if (!p) return;
+
     total += Number(p.precio);
-    lista.innerHTML += `<li><span>${n}</span><span>$${p.precio.toFixed(2)}</span></li>`;
+
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${p.nombre}</span><span>$${Number(p.precio).toFixed(2)}</span>`;
+    lista.appendChild(li);
   });
 
   totalSpan.textContent = total.toFixed(2);
@@ -128,7 +134,7 @@ function cancelar() {
   renderCarrito();
 }
 
-/* ================= COBRAR ================= */
+/* ================= COBRAR (CORRECTO) ================= */
 function cobrar() {
   const totalVenta = Number(totalSpan.textContent);
   const paga = Number(pagoInput.value);
@@ -136,25 +142,25 @@ function cobrar() {
   if (!carrito.length) return alert("Carrito vacío");
   if (paga < totalVenta) return alert("Pago insuficiente");
 
-  const stockCompleto = obtenerProductos();
+  /* 🔥 DESCONTAR STOCK (API CORRECTA) */
+  carrito.forEach(id => {
+    const p = productos.find(x => x.id === id);
+    if (!p) return;
 
-  carrito.forEach(n => {
-    const p = stockCompleto.find(x => x.nombre === n);
-    if (p) p.stock--;
+    p.stock = Number(p.stock) - 1;
+    actualizarProducto(p);
   });
 
-  safeSet("productos", stockCompleto);
-  new BroadcastChannel("victory-data").postMessage("productos");
-
-  const ventas = obtenerVentas();
-  ventas.push({
-    id: crypto.randomUUID(),
+  /* 🔥 REGISTRAR VENTA */
+  registrarVenta({
     fecha: hoy(),
     hora: horaActual(),
     total: totalVenta
   });
-  safeSet("ventas", ventas);
 
+  new BroadcastChannel("victory-data").postMessage("productos");
+
+  /* UI CAMBIO */
   cambioSpan.textContent = (paga - totalVenta).toFixed(2);
   overlay.style.display = "flex";
 
