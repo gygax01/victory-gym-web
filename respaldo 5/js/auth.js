@@ -1,12 +1,10 @@
 /* ======================================================
-   ===== AUTH + SESIÓN (OFFLINE + REALTIME READY) =====
+   ===== AUTH + SESIÓN (OFFLINE FIRST) =====
 ====================================================== */
 
 const PUBLIC_PAGES = ["login.html", "usuarios.html"];
 
-/* ======================================================
-   ===== UTILIDADES =====
-====================================================== */
+/* ================= UTIL ================= */
 function esPaginaPublica() {
   return PUBLIC_PAGES.some(p => location.pathname.endsWith(p));
 }
@@ -19,9 +17,7 @@ function getSession() {
   }
 }
 
-/* ======================================================
-   ===== SEED SUPERADMIN (CRÍTICO) =====
-====================================================== */
+/* ================= SUPERADMIN SEED ================= */
 function seedSuperAdmin() {
   let empleados = [];
 
@@ -31,9 +27,7 @@ function seedSuperAdmin() {
     empleados = [];
   }
 
-  const existe = empleados.some(e => e.usuario === "gygax");
-
-  if (!existe) {
+  if (!empleados.some(e => e.usuario === "gygax")) {
     empleados.push({
       id: "superadmin-gygax",
       nombre: "Gygax",
@@ -43,64 +37,47 @@ function seedSuperAdmin() {
     });
 
     localStorage.setItem("empleados", JSON.stringify(empleados));
-    console.log("🟢 Superadmin sembrado automáticamente");
+    console.log("🟢 Superadmin creado");
   }
 }
 
-/* ======================================================
-   ===== PERMISOS POR ROL =====
-====================================================== */
+/* ================= PERMISOS ================= */
 const ROLE_PERMISSIONS = {
-  employee: {
-    stock_view: true
-  },
+  employee: { stock_view: true },
   admin: {
     stock_view: true,
     stock_add: true,
     stock_delete: true,
     products_create: true
   },
-  superadmin: {
-    system_all: true
-  }
+  superadmin: { system_all: true }
 };
 
-/* ======================================================
-   ===== SESIÓN =====
-====================================================== */
-function verificarSesion() {
-  if (esPaginaPublica()) return true;
-
-  const s = getSession();
-  if (!s) {
-    location.href = "login.html";
-    return false;
-  }
-  return true;
-}
-
-/* ======================================================
-   ===== PERMISOS =====
-====================================================== */
 function can(permission) {
   const s = getSession();
   if (!s) return false;
-
   if (s.rol === "superadmin") return true;
   return ROLE_PERMISSIONS[s.rol]?.[permission] === true;
 }
 
 function applyPermissions() {
   document.querySelectorAll("[data-permission]").forEach(el => {
-    const permiso = el.dataset.permission;
-    el.style.display =
-      can("system_all") || can(permiso) ? "" : "none";
+    el.style.display = can(el.dataset.permission) ? "" : "none";
   });
 }
 
-/* ======================================================
-   ===== LOGIN / LOGOUT =====
-====================================================== */
+/* ================= LOGIN REAL ================= */
+function login(usuario, password) {
+  const empleados = obtenerEmpleados();
+  const emp = empleados.find(e => e.usuario === usuario);
+
+  if (!emp) return "NO_USER";
+  if (emp.password !== password) return "BAD_PASS";
+
+  iniciarSesion(emp);
+  return "OK";
+}
+
 function iniciarSesion(emp) {
   const session = {
     id: emp.id,
@@ -109,59 +86,27 @@ function iniciarSesion(emp) {
   };
 
   localStorage.setItem("session", JSON.stringify(session));
-  broadcastAuth({ type: "login", session });
-
   location.href = "index.html";
 }
 
 function logout() {
   localStorage.removeItem("session");
-  broadcastAuth({ type: "logout" });
   location.href = "login.html";
 }
 
-/* ======================================================
-   ===== REALTIME AUTH (MULTI TAB / DEVICE) =====
-====================================================== */
-const AUTH_CHANNEL = new BroadcastChannel("victory-auth");
-
-function broadcastAuth(data) {
-  AUTH_CHANNEL.postMessage(data);
+/* ================= GUARDIA ================= */
+function verificarSesion() {
+  if (esPaginaPublica()) return true;
+  if (!getSession()) {
+    location.href = "login.html";
+    return false;
+  }
+  return true;
 }
 
-AUTH_CHANNEL.onmessage = e => {
-  if (esPaginaPublica()) return;
-
-  const { type, session } = e.data || {};
-
-  if (type === "logout") {
-    localStorage.removeItem("session");
-    location.href = "login.html";
-  }
-
-  if (type === "login" && session) {
-    localStorage.setItem("session", JSON.stringify(session));
-    applyPermissions();
-  }
-};
-
-/* ======================================================
-   ===== STORAGE SYNC (SEGURIDAD) =====
-====================================================== */
-window.addEventListener("storage", e => {
-  if (esPaginaPublica()) return;
-  if (e.key !== "session") return;
-
-  if (!localStorage.getItem("session")) {
-    location.href = "login.html";
-  }
-});
-
-/* ======================================================
-   ===== INIT GLOBAL =====
-====================================================== */
+/* ================= INIT ================= */
 window.addEventListener("load", () => {
-  seedSuperAdmin();     // 🔐 CRÍTICO
-  verificarSesion();    // 🔎
-  applyPermissions();   // 🎛️
+  seedSuperAdmin();
+  verificarSesion();
+  applyPermissions();
 });
