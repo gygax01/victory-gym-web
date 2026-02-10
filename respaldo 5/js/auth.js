@@ -78,10 +78,12 @@ function login(usuario, password) {
   return "OK";
 }
 
+/* ================= SESIÓN (FIX CLAVE) ================= */
 function iniciarSesion(emp) {
   const session = {
     id: emp.id,
-    nombre: emp.nombre,
+    nombre: emp.nombre,   // nombre visible
+    usuario: emp.usuario, // username (auditoría)
     rol: emp.rol
   };
 
@@ -97,6 +99,7 @@ function logout() {
 /* ================= GUARDIA ================= */
 function verificarSesion() {
   if (esPaginaPublica()) return true;
+
   if (!getSession()) {
     location.href = "login.html";
     return false;
