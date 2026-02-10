@@ -5,7 +5,7 @@
   <title>Clientes</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- Supabase (necesario para nfc.js) -->
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -13,7 +13,7 @@
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png" alt="Victory Pro Fitness">
+    <img src="img/logo.png">
     <h2>Clientes</h2>
   </div>
   <button onclick="location.href='index.html'">← Inicio</button>
@@ -45,17 +45,14 @@
   </div>
 </div>
 
-<!-- ===== JS BASE (ORDEN IMPORTANTE) ===== -->
-<script src="js/storage.js?v=6"></script>
+<!-- ===== CORE ===== -->
+<script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
 <script src="js/realtime.js"></script>
 
-
 <script>
-/* ===============================
-   ===== DOM =====
-=============================== */
+/* ================= DOM ================= */
 const listaClientes = document.getElementById("listaClientes");
 const busqueda = document.getElementById("busqueda");
 const confirmBorrar = document.getElementById("confirmBorrar");
@@ -66,49 +63,54 @@ const btnConfirmarBorrado = document.getElementById("btnConfirmarBorrado");
 const btnCancelarBorrado = document.getElementById("btnCancelarBorrado");
 const btnCancelarReasignar = document.getElementById("btnCancelarReasignar");
 
-/* ===============================
-   ===== ESTADO =====
-=============================== */
+/* ================= ESTADO ================= */
 let clientes = [];
-let clienteAEliminar = null;
-let clienteAReasignar = null;
+let clienteUIDEliminar = null;
+let clienteUIDReasignar = null;
 let leyendoTarjeta = false;
 
-/* ===============================
-   ===== INIT =====
-=============================== */
-window.addEventListener("load", initClientes);
-
-function initClientes() {
+/* ================= INIT ================= */
+window.addEventListener("load", () => {
   if (!verificarSesion()) return;
   if (!requirePermission("clients_view")) return;
 
-  busqueda.addEventListener("input", filtrar);
-  btnConfirmarBorrado.addEventListener("click", confirmarBorrado);
-  btnCancelarBorrado.addEventListener("click", cancelarBorrado);
-  btnCancelarReasignar.addEventListener("click", cancelarReasignacion);
+  busqueda.oninput = filtrar;
+  btnConfirmarBorrado.onclick = confirmarBorrado;
+  btnCancelarBorrado.onclick = cancelarBorrado;
+  btnCancelarReasignar.onclick = cancelarReasignacion;
 
+  iniciarSyncClientes();
   cargarClientes();
+});
+
+/* ================= SYNC ================= */
+function iniciarSyncClientes() {
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = e => {
+    if (e.data === "clientes") cargarClientes();
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "clientes") cargarClientes();
+  });
 }
 
-/* ===============================
-   ===== CARGAR =====
-=============================== */
+/* ================= CARGA ================= */
 function cargarClientes() {
   clientes = obtenerClientes()
     .filter(c => c && typeof c.nombre === "string")
-    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    .sort((a,b)=>a.nombre.localeCompare(b.nombre));
 
   render(clientes);
 }
 
+/* ================= RENDER ================= */
 function render(lista) {
   listaClientes.innerHTML = "";
 
-  if (lista.length === 0) {
-    const p = document.createElement("p");
-    p.textContent = "No hay clientes registrados";
-    listaClientes.appendChild(p);
+  if (!lista.length) {
+    listaClientes.innerHTML = "<p>No hay clientes registrados</p>";
     return;
   }
 
@@ -116,73 +118,64 @@ function render(lista) {
     const cont = document.createElement("div");
     cont.className = "cliente";
 
-    const header = document.createElement("div");
-    header.className = "cliente-header";
+    cont.innerHTML = `
+      <div class="cliente-header">
+        <h3>${c.nombre}</h3>
+        <div class="acciones">
+          <button onclick="iniciarReasignacion('${c.tarjetaUID}')">
+            Reasignar tarjeta
+          </button>
+          ${
+            can("clients_delete")
+              ? `<button onclick="pedirConfirmacion('${c.tarjetaUID}')">Eliminar</button>`
+              : ""
+          }
+        </div>
+      </div>
+    `;
 
-    const nombre = document.createElement("h3");
-    nombre.textContent = c.nombre;
-
-    const acciones = document.createElement("div");
-    acciones.className = "acciones";
-
-    /* ===== REASIGNAR (TODOS) ===== */
-    const btnReasignar = document.createElement("button");
-    btnReasignar.textContent = "Reasignar tarjeta";
-    btnReasignar.onclick = () => iniciarReasignacion(c.tarjetaUID || "");
-    acciones.appendChild(btnReasignar);
-
-    /* ===== ELIMINAR (SOLO ADMIN / SUPERADMIN) ===== */
-    if (can("clients_delete")) {
-      const btnEliminar = document.createElement("button");
-      btnEliminar.textContent = "Eliminar";
-      btnEliminar.onclick = () => pedirConfirmacion(c.tarjetaUID || "");
-      acciones.appendChild(btnEliminar);
-    }
-
-    header.append(nombre, acciones);
-    cont.appendChild(header);
     listaClientes.appendChild(cont);
   });
 }
 
-/* ===============================
-   ===== FILTRO =====
-=============================== */
+/* ================= FILTRO ================= */
 function filtrar() {
   const q = busqueda.value.toLowerCase();
   render(clientes.filter(c => c.nombre.toLowerCase().includes(q)));
 }
 
-/* ===============================
-   ===== ELIMINAR =====
-=============================== */
+/* ================= ELIMINAR ================= */
 function pedirConfirmacion(uid) {
-  if (!requirePermission("clients_delete")) return;
-  clienteAEliminar = uid;
+  clienteUIDEliminar = uid;
   confirmBorrar.style.display = "flex";
 }
 
 function cancelarBorrado() {
-  clienteAEliminar = null;
+  clienteUIDEliminar = null;
   confirmBorrar.style.display = "none";
 }
 
 function confirmarBorrado() {
-  if (!requirePermission("clients_delete")) return;
-
-  guardarClientes(
-    obtenerClientes().filter(c => c.tarjetaUID !== clienteAEliminar)
+  const nuevaLista = obtenerClientes().filter(
+    c => c.tarjetaUID !== clienteUIDEliminar
   );
+
+  safeSet("clientes", nuevaLista);
+  agregarEvento({
+    tabla: "clientes",
+    accion: "delete",
+    data: { tarjetaUID: clienteUIDEliminar }
+  });
+
+  new BroadcastChannel("victory-data").postMessage("clientes");
 
   cancelarBorrado();
   cargarClientes();
 }
 
-/* ===============================
-   ===== REASIGNAR TARJETA =====
-=============================== */
-function iniciarReasignacion(uidActual) {
-  clienteAReasignar = uidActual;
+/* ================= REASIGNAR NFC ================= */
+function iniciarReasignacion(uid) {
+  clienteUIDReasignar = uid;
   leyendoTarjeta = false;
 
   estadoTarjeta.className = "estado amarillo";
@@ -190,11 +183,11 @@ function iniciarReasignacion(uidActual) {
   confirmReasignar.style.display = "flex";
 
   iniciarNFCControlado({
-    onUID: uidNueva => {
-      if (!uidNueva || leyendoTarjeta) return;
+    onUID: uidNuevo => {
+      if (leyendoTarjeta) return;
       leyendoTarjeta = true;
 
-      if (uidYaRegistrada(uidNueva)) {
+      if (uidYaRegistrada(uidNuevo)) {
         estadoTarjeta.className = "estado rojo";
         estadoTarjeta.textContent = "Tarjeta ya registrada";
         setTimeout(cancelarReasignacion, 1500);
@@ -202,13 +195,19 @@ function iniciarReasignacion(uidActual) {
       }
 
       const lista = obtenerClientes().map(c => {
-        if (c.tarjetaUID === clienteAReasignar) {
-          c.tarjetaUID = uidNueva;
+        if (c.tarjetaUID === clienteUIDReasignar) {
+          c.tarjetaUID = uidNuevo;
+          agregarEvento({
+            tabla: "clientes",
+            accion: "update",
+            data: c
+          });
         }
         return c;
       });
 
-      guardarClientes(lista);
+      safeSet("clientes", lista);
+      new BroadcastChannel("victory-data").postMessage("clientes");
 
       estadoTarjeta.className = "estado verde";
       estadoTarjeta.textContent = "Tarjeta reasignada";
@@ -222,7 +221,7 @@ function iniciarReasignacion(uidActual) {
 }
 
 function cancelarReasignacion() {
-  clienteAReasignar = null;
+  clienteUIDReasignar = null;
   leyendoTarjeta = false;
   detenerNFC();
   confirmReasignar.style.display = "none";
@@ -231,4 +230,3 @@ function cancelarReasignacion() {
 
 </body>
 </html>
-
