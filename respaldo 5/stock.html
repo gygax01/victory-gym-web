@@ -83,18 +83,34 @@ function initStock() {
   }
 }
 
-/* ================= SYNC ================= */
+/* ================= SYNC (OPTIMIZADO) ================= */
+let stockRenderTimeout = null;
+
 function iniciarSyncStock() {
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = e => {
-    if (e.data === "productos") cargarStock();
+    if (e.data === "productos") {
+      scheduleRender();
+    }
   };
 
   window.addEventListener("storage", e => {
-    if (e.key === "productos") cargarStock();
+    if (e.key === "productos") {
+      scheduleRender();
+    }
   });
 }
+
+function scheduleRender() {
+  clearTimeout(stockRenderTimeout);
+
+  // 🔥 agrupa múltiples eventos en un solo render
+  stockRenderTimeout = setTimeout(() => {
+    cargarStock();
+  }, 50);
+}
+
 
 /* ================= CARGA ================= */
 function cargarStock() {
@@ -194,3 +210,4 @@ function filtrarStock() {
 
 </body>
 </html>
+
