@@ -14,6 +14,15 @@ function safeSet(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+/* ================= EMPLEADOS ================= */
+function obtenerEmpleados() {
+  return safeGet("empleados");
+}
+
+function guardarEmpleados(data) {
+  safeSet("empleados", data);
+}
+
 /* ================= PRODUCTOS ================= */
 function obtenerProductos() {
   return safeGet("productos");
@@ -52,9 +61,4 @@ function enqueueOffline(evento) {
   const cola = obtenerColaOffline();
   cola.push({ ...evento, ts: Date.now() });
   guardarColaOffline(cola);
-}
-
-/* ================= ONLINE ================= */
-function isOnline() {
-  return navigator.onLine;
 }
