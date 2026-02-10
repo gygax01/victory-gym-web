@@ -78,12 +78,12 @@ function login(usuario, password) {
   return "OK";
 }
 
-/* ================= SESIÓN (FIX CLAVE) ================= */
+/* ================= SESIÓN ================= */
 function iniciarSesion(emp) {
   const session = {
     id: emp.id,
-    nombre: emp.nombre,   // nombre visible
-    usuario: emp.usuario, // username (auditoría)
+    nombre: emp.nombre,
+    usuario: emp.usuario,
     rol: emp.rol
   };
 
@@ -113,23 +113,19 @@ window.addEventListener("load", () => {
   verificarSesion();
   applyPermissions();
 });
-function solicitarPasswordMaestra() {
-  const pass = prompt("🔐 Ingresa la contraseña maestra");
 
-  if (!pass) return false;
+/* ======================================================
+   ===== CONTRASEÑA MAESTRA (FIJA / INMUTABLE) =====
+====================================================== */
 
-  const master = localStorage.getItem("master_password");
+const MASTER_PASSWORD = "victory(profitness)";
 
-  if (!master) {
-    alert("⚠️ No hay contraseña maestra configurada");
-    return false;
-  }
-
-  if (pass !== master) {
-    alert("❌ Contraseña incorrecta");
-    return false;
-  }
-
-  return true;
+/**
+ * Valida la contraseña maestra.
+ * NO usa alerts
+ * NO usa prompt
+ * NO usa localStorage
+ */
+function validarPasswordMaestra(input) {
+  return input === MASTER_PASSWORD;
 }
-
