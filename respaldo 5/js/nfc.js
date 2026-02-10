@@ -1,23 +1,20 @@
 /* ===============================
-   ===== NFC REALTIME (SEGURO)
+   ===== NFC UNIFICADO (PRO)
 =============================== */
 
-/* ===============================
-   ===== ESTADO NFC (ARRIBA)
-=============================== */
 let canalNFC = null;
 let escuchando = false;
+
 let ultimoUID = null;
 let ultimoTiempo = 0;
-
-const COOLDOWN_MS = 400;
+const COOLDOWN_MS = 450;
 
 let supabaseClient = null;
 
 /* ===============================
    ===== ESPERAR SUPABASE
 =============================== */
-function esperarSupabase(intentos = 20) {
+function esperarSupabase(intentos = 30) {
   return new Promise((resolve, reject) => {
     const check = () => {
       if (window.supabase?.createClient) {
@@ -56,10 +53,16 @@ async function initSupabaseNFC() {
 /* ===============================
    ===== INICIAR NFC
 =============================== */
-async function iniciarNFCControlado({ onUID } = {}) {
-  if (escuchando && canalNFC) return;
+async function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
+  if (escuchando) return;
 
-  await initSupabaseNFC();
+  try {
+    await initSupabaseNFC();
+  } catch (e) {
+    console.warn("❌ NFC sin Supabase", e);
+    if (typeof onError === "function") onError(e);
+    return;
+  }
 
   detenerNFC();
   escuchando = true;
@@ -92,9 +95,16 @@ async function iniciarNFCControlado({ onUID } = {}) {
     )
     .subscribe(status => {
       if (status === "SUBSCRIBED") {
-        console.log("📡 NFC escuchando");
+        console.log("📡 NFC Supabase escuchando");
       }
     });
+
+  // ⏱️ timeout opcional
+  if (typeof onTimeout === "function") {
+    setTimeout(() => {
+      if (escuchando) onTimeout();
+    }, 12000);
+  }
 }
 
 /* ===============================
@@ -112,12 +122,11 @@ function detenerNFC() {
 }
 
 /* ===============================
-   ===== DEBUG
+   ===== DEBUG GLOBAL
 =============================== */
 window._debugNFC = () => ({
   escuchando,
-  canalNFC,
   ultimoUID,
   ultimoTiempo,
-  supabaseCargado: !!window.supabase
+  supabaseActivo: !!supabaseClient
 });
