@@ -45,11 +45,8 @@
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
 
-
 <script>
-/* ===============================
-   ===== DOM =====
-=============================== */
+/* ================= DOM ================= */
 const inputNombre = document.getElementById("inputNombre");
 const inputPrecio = document.getElementById("inputPrecio");
 const inputStock = document.getElementById("inputStock");
@@ -58,70 +55,50 @@ const buscadorStock = document.getElementById("buscadorStock");
 const listaStock = document.getElementById("listaStock");
 const btnGuardar = document.getElementById("btnGuardar");
 
-/* ===============================
-   ===== ESTADO =====
-=============================== */
+/* ================= ESTADO ================= */
 let productos = [];
 let productosFiltrados = [];
 
-/* ===============================
-   ===== INIT =====
-=============================== */
+/* ================= INIT ================= */
 window.addEventListener("load", initStock);
 
 function initStock() {
   if (!verificarSesion()) return;
-
   if (!can("stock_view")) {
     location.href = "index.html";
     return;
   }
 
-  btnAgregar?.addEventListener("click", nuevoProducto);
-  btnGuardar?.addEventListener("click", guardarStock);
-  buscadorStock.addEventListener("input", filtrarStock);
+  btnAgregar.onclick = nuevoProducto;
+  btnGuardar.onclick = guardarStock;
+  buscadorStock.oninput = filtrarStock;
 
   iniciarSyncStock();
   cargarStock();
   applyPermissions();
 }
 
-/* ===============================
-   ===== SINCRONIZACIÓN =====
-=============================== */
+/* ================= SYNC ================= */
 function iniciarSyncStock() {
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = e => {
-    if (e.data === "productos") {
-      cargarStock();
-    }
+    if (e.data === "productos") cargarStock();
   };
 
   window.addEventListener("storage", e => {
-    if (e.key === "productos") {
-      cargarStock();
-    }
-  });
-
-  window.addEventListener("online", () => {
-    syncOfflineQueue();
-    cargarStock();
+    if (e.key === "productos") cargarStock();
   });
 }
 
-/* ===============================
-   ===== CARGA =====
-=============================== */
+/* ================= CARGA ================= */
 function cargarStock() {
   productos = obtenerProductos().filter(p => p && p.nombre);
   productosFiltrados = [...productos];
   renderStock();
 }
 
-/* ===============================
-   ===== RENDER =====
-=============================== */
+/* ================= RENDER ================= */
 function renderStock() {
   listaStock.innerHTML = "";
 
@@ -138,7 +115,6 @@ function renderStock() {
       <h4>${p.nombre}</h4>
       <div class="precio">$${Number(p.precio).toFixed(2)}</div>
       <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
-
       <div class="stock-botones">
         <button data-permission="stock_add">+1</button>
         <button data-permission="stock_add">+10</button>
@@ -147,7 +123,6 @@ function renderStock() {
     `;
 
     const [b1, b10, bDel] = card.querySelectorAll("button");
-
     b1.onclick = () => modificarStock(p, 1);
     b10.onclick = () => modificarStock(p, 10);
     bDel.onclick = () => eliminarProducto(p);
@@ -158,9 +133,7 @@ function renderStock() {
   applyPermissions();
 }
 
-/* ===============================
-   ===== ACCIONES =====
-=============================== */
+/* ================= ACCIONES ================= */
 function modificarStock(p, cant) {
   if (!can("stock_add")) return;
   p.stock += cant;
@@ -169,7 +142,6 @@ function modificarStock(p, cant) {
 
 function eliminarProducto(p) {
   if (!can("stock_delete")) return;
-
   productos = productos.filter(x => x !== p);
   guardarStock();
 }
@@ -177,19 +149,20 @@ function eliminarProducto(p) {
 function guardarStock() {
   if (!can("stock_add")) return;
 
-  guardarProductos(productos);
-
-  // 🔔 notifica a otras vistas / dispositivos
+  safeSet("productos", productos);
   new BroadcastChannel("victory-data").postMessage("productos");
 }
 
 function nuevoProducto() {
   if (!can("products_create")) return;
 
+  if (!inputNombre.value || !inputPrecio.value) return;
+
   productos.push({
+    id: crypto.randomUUID(),
     nombre: inputNombre.value.trim(),
     precio: Number(inputPrecio.value),
-    stock: Number(inputStock.value)
+    stock: Number(inputStock.value) || 0
   });
 
   inputNombre.value = "";
@@ -199,9 +172,7 @@ function nuevoProducto() {
   guardarStock();
 }
 
-/* ===============================
-   ===== FILTRO =====
-=============================== */
+/* ================= FILTRO ================= */
 function filtrarStock() {
   const q = buscadorStock.value.toLowerCase();
   productosFiltrados = productos.filter(p =>
@@ -213,4 +184,3 @@ function filtrarStock() {
 
 </body>
 </html>
-
