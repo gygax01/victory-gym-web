@@ -1,196 +1,119 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Stock</title>
-<link rel="stylesheet" href="css/styles.css">
+/* ======================================================
+   ===== AUTH + SESIÓN (OFFLINE + REALTIME READY) =====
+====================================================== */
 
-<!-- Supabase (solo para realtime.js) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
+const PUBLIC_PAGES = ["login.html", "usuarios.html"];
 
-<body onload="initStock()">
-
-<header class="header-brand">
-  <div class="brand">
-    <img src="img/logo.png">
-    <h2>Stock</h2>
-  </div>
-  <button onclick="location.href='index.html'">← Inicio</button>
-</header>
-
-<!-- ===== NUEVO PRODUCTO ===== -->
-<div class="card stock-nuevo" data-permission="products_create">
-  <h3>Nuevo producto</h3>
-  <div class="stock-form">
-    <input id="inputNombre" placeholder="Nombre">
-    <input id="inputPrecio" type="number" step="0.01" placeholder="Precio">
-    <input id="inputStock" type="number" placeholder="Stock inicial">
-    <button id="btnAgregar">Agregar</button>
-  </div>
-</div>
-
-<!-- ===== BUSCADOR ===== -->
-<div class="search-bar">
-  <input id="buscadorStock" placeholder="Buscar...">
-</div>
-
-<!-- ===== LISTA ===== -->
-<div class="stock-grid" id="listaStock"></div>
-
-<!-- ===== FOOTER ===== -->
-<div class="stock-footer" data-permission="stock_add">
-  <button id="btnGuardar">💾 Guardar</button>
-</div>
-
-<!-- CORE -->
-<script src="js/storage.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/realtime.js"></script>
-
-<script>
-/* ================= DOM ================= */
-const inputNombre = document.getElementById("inputNombre");
-const inputPrecio = document.getElementById("inputPrecio");
-const inputStock = document.getElementById("inputStock");
-const btnAgregar = document.getElementById("btnAgregar");
-const buscadorStock = document.getElementById("buscadorStock");
-const listaStock = document.getElementById("listaStock");
-const btnGuardar = document.getElementById("btnGuardar");
-
-/* ================= ESTADO ================= */
-let productos = [];
-let productosFiltrados = [];
-
-/* ================= INIT ================= */
-function initStock() {
-  if (typeof verificarSesion === "function" && !verificarSesion()) return;
-
-  if (typeof can === "function" && !can("stock_view")) {
-    location.href = "index.html";
-    return;
-  }
-
-  btnAgregar.onclick = nuevoProducto;
-  btnGuardar.onclick = guardarCambios;
-  buscadorStock.oninput = filtrarStock;
-
-  iniciarSyncStock();
-  cargarStock();
-
-  if (typeof applyPermissions === "function") {
-    applyPermissions();
-  }
+function esPaginaPublica() {
+  return PUBLIC_PAGES.some(p => location.pathname.endsWith(p));
 }
 
-/* ================= SYNC ================= */
-function iniciarSyncStock() {
-  const bc = new BroadcastChannel("victory-data");
+/* ======================================================
+   ===== PERMISOS POR ROL =====
+====================================================== */
+const ROLE_PERMISSIONS = {
+  employee: {
+    stock_view: true
+  },
+  admin: {
+    stock_view: true,
+    stock_add: true,
+    stock_delete: true,
+    products_create: true
+  },
+  superadmin: {
+    system_all: true
+  }
+};
 
-  bc.onmessage = e => {
-    if (e.data === "productos") cargarStock();
-  };
+/* ======================================================
+   ===== SESIÓN =====
+====================================================== */
+function verificarSesion() {
+  if (esPaginaPublica()) return true;
 
-  window.addEventListener("storage", e => {
-    if (e.key === "productos") cargarStock();
+  const s = localStorage.getItem("session");
+  if (!s) {
+    location.href = "login.html";
+    return false;
+  }
+  return true;
+}
+
+/* ======================================================
+   ===== PERMISOS =====
+====================================================== */
+function can(permission) {
+  const s = JSON.parse(localStorage.getItem("session") || "null");
+  if (!s) return false;
+
+  if (s.rol === "superadmin") return true;
+  return ROLE_PERMISSIONS[s.rol]?.[permission] === true;
+}
+
+function applyPermissions() {
+  document.querySelectorAll("[data-permission]").forEach(el => {
+    const perm = el.dataset.permission;
+    el.style.display =
+      can("system_all") || can(perm) ? "" : "none";
   });
 }
 
-/* ================= CARGA ================= */
-function cargarStock() {
-  productos = obtenerProductos().filter(p => p && p.nombre);
-  productosFiltrados = [...productos];
-  renderStock();
-}
-
-/* ================= RENDER ================= */
-function renderStock() {
-  listaStock.innerHTML = "";
-
-  if (!productosFiltrados.length) {
-    listaStock.innerHTML = "<p>No hay productos</p>";
-    return;
-  }
-
-  productosFiltrados.forEach(p => {
-    const card = document.createElement("div");
-    card.className = "stock-card";
-
-    card.innerHTML = `
-      <h4>${p.nombre}</h4>
-      <div class="precio">$${Number(p.precio).toFixed(2)}</div>
-      <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
-      <div class="stock-botones">
-        <button data-permission="stock_add">+1</button>
-        <button data-permission="stock_add">+10</button>
-        <button data-permission="stock_delete">Eliminar</button>
-      </div>
-    `;
-
-    const [b1, b10, bDel] = card.querySelectorAll("button");
-
-    b1.onclick = () => modificarStock(p, 1);
-    b10.onclick = () => modificarStock(p, 10);
-    bDel.onclick = () => eliminarProducto(p.id);
-
-    listaStock.appendChild(card);
-  });
-
-  if (typeof applyPermissions === "function") {
-    applyPermissions();
-  }
-}
-
-/* ================= ACCIONES ================= */
-function modificarStock(p, cant) {
-  if (typeof can === "function" && !can("stock_add")) return;
-  p.stock += cant;
-  renderStock();
-}
-
-function eliminarProducto(id) {
-  if (typeof can === "function" && !can("stock_delete")) return;
-
-  productos = productos.filter(p => p.id !== id);
-  eliminarProductoLocal(id);
-  guardarCambios();
-}
-
-function nuevoProducto() {
-  if (typeof can === "function" && !can("products_create")) return;
-  if (!inputNombre.value || !inputPrecio.value) return;
-
-  const prod = {
-    id: crypto.randomUUID(),
-    nombre: inputNombre.value.trim(),
-    precio: Number(inputPrecio.value),
-    stock: Number(inputStock.value) || 0
+/* ======================================================
+   ===== LOGIN / LOGOUT =====
+====================================================== */
+function iniciarSesion(emp) {
+  const session = {
+    id: emp.id,
+    nombre: emp.nombre,
+    rol: emp.rol
   };
 
-  productos.push(prod);
-  registrarProducto(prod);
+  localStorage.setItem("session", JSON.stringify(session));
+  broadcastAuth({ type: "login", session });
 
-  inputNombre.value = "";
-  inputPrecio.value = "";
-  inputStock.value = "";
-
-  guardarCambios();
+  location.href = "index.html";
 }
 
-function guardarCambios() {
-  safeSet("productos", productos);
-  new BroadcastChannel("victory-data").postMessage("productos");
+function logout() {
+  localStorage.removeItem("session");
+  broadcastAuth({ type: "logout" });
+  location.href = "login.html";
 }
 
-/* ================= FILTRO ================= */
-function filtrarStock() {
-  const q = buscadorStock.value.toLowerCase();
-  productosFiltrados = productos.filter(p =>
-    p.nombre.toLowerCase().includes(q)
-  );
-  renderStock();
-}
-</script>
+/* ======================================================
+   ===== REALTIME AUTH (MULTI TAB / DEVICE) =====
+====================================================== */
+const AUTH_CHANNEL = new BroadcastChannel("victory-auth");
 
-</body>
-</html>
+function broadcastAuth(data) {
+  AUTH_CHANNEL.postMessage(data);
+}
+
+AUTH_CHANNEL.onmessage = e => {
+  if (esPaginaPublica()) return;
+  const { type, session } = e.data || {};
+
+  if (type === "logout") {
+    localStorage.removeItem("session");
+    location.href = "login.html";
+  }
+
+  if (type === "login") {
+    localStorage.setItem("session", JSON.stringify(session));
+    applyPermissions();
+  }
+};
+
+/* ======================================================
+   ===== STORAGE SYNC (SEGURIDAD) =====
+====================================================== */
+window.addEventListener("storage", e => {
+  if (esPaginaPublica()) return;
+  if (e.key !== "session") return;
+
+  const existeSesion = !!localStorage.getItem("session");
+  if (!existeSesion) {
+    location.href = "login.html";
+  }
+});
