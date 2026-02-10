@@ -91,7 +91,7 @@ let timeoutNFC = null;
 
 /* ================= INIT ================= */
 window.addEventListener("load", () => {
-  if (obtenerSesion()) {
+  if (getSession()) {
     location.href = "index.html";
     return;
   }
@@ -227,3 +227,4 @@ function resetNFC() {
 
 </body>
 </html>
+
