@@ -4,9 +4,12 @@
 <meta charset="UTF-8">
 <title>Stock</title>
 <link rel="stylesheet" href="css/styles.css">
+
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body>
+<body onload="initStock()">
 
 <header class="header-brand">
   <div class="brand">
@@ -40,7 +43,7 @@
   <button id="btnGuardar">💾 Guardar</button>
 </div>
 
-<!-- ===== JS BASE ===== -->
+<!-- CORE -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
@@ -60,8 +63,6 @@ let productos = [];
 let productosFiltrados = [];
 
 /* ================= INIT ================= */
-window.addEventListener("load", initStock);
-
 function initStock() {
   if (!verificarSesion()) return;
   if (!can("stock_view")) {
@@ -70,7 +71,7 @@ function initStock() {
   }
 
   btnAgregar.onclick = nuevoProducto;
-  btnGuardar.onclick = guardarStock;
+  btnGuardar.onclick = guardarCambios;
   buscadorStock.oninput = filtrarStock;
 
   iniciarSyncStock();
@@ -88,6 +89,11 @@ function iniciarSyncStock() {
 
   window.addEventListener("storage", e => {
     if (e.key === "productos") cargarStock();
+  });
+
+  window.addEventListener("online", () => {
+    syncOfflineQueue();
+    cargarStock();
   });
 }
 
@@ -115,6 +121,7 @@ function renderStock() {
       <h4>${p.nombre}</h4>
       <div class="precio">$${Number(p.precio).toFixed(2)}</div>
       <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
+
       <div class="stock-botones">
         <button data-permission="stock_add">+1</button>
         <button data-permission="stock_add">+10</button>
@@ -123,6 +130,7 @@ function renderStock() {
     `;
 
     const [b1, b10, bDel] = card.querySelectorAll("button");
+
     b1.onclick = () => modificarStock(p, 1);
     b10.onclick = () => modificarStock(p, 10);
     bDel.onclick = () => eliminarProducto(p);
@@ -145,25 +153,15 @@ function eliminarProducto(p) {
 
   productos = productos.filter(x => x.id !== p.id);
 
-  // reflejar eliminación en storage
-  const actuales = obtenerProductos().filter(x => x.id !== p.id);
-  safeSet("productos", actuales);
-
-  new BroadcastChannel("victory-data").postMessage("productos");
-}
-
-/* 🔑 AQUÍ ESTÁ LA CLAVE */
-function guardarStock() {
-  if (!can("stock_add")) return;
-
-  productos.forEach(p => {
-    actualizarProducto(p);   // ✅ API CORRECTA
+  agregarEvento({
+    tabla: "productos",
+    accion: "delete",
+    data: p
   });
 
-  new BroadcastChannel("victory-data").postMessage("productos");
+  guardarCambios();
 }
 
-/* 🔑 Y AQUÍ TAMBIÉN */
 function nuevoProducto() {
   if (!can("products_create")) return;
   if (!inputNombre.value || !inputPrecio.value) return;
@@ -175,13 +173,33 @@ function nuevoProducto() {
     stock: Number(inputStock.value) || 0
   };
 
-  registrarProducto(prod);   // ✅ API CORRECTA
+  productos.push(prod);
+
+  agregarEvento({
+    tabla: "productos",
+    accion: "add",
+    data: prod
+  });
 
   inputNombre.value = "";
   inputPrecio.value = "";
   inputStock.value = "";
 
-  cargarStock();
+  guardarCambios();
+}
+
+function guardarCambios() {
+  safeSet("productos", productos);
+
+  productos.forEach(p => {
+    agregarEvento({
+      tabla: "productos",
+      accion: "update",
+      data: p
+    });
+  });
+
+  new BroadcastChannel("victory-data").postMessage("productos");
 }
 
 /* ================= FILTRO ================= */
