@@ -24,7 +24,7 @@
   </div>
 </header>
 
-<!-- MODAL MASTER -->
+<!-- ================= MODAL MASTER ================= -->
 <div id="modalMaster" class="modal-overlay">
   <div class="modal-card pop">
     <h3>🔒 Acceso restringido</h3>
@@ -38,6 +38,7 @@
   </div>
 </div>
 
+<!-- ================= NUEVO PRODUCTO ================= -->
 <div class="card stock-nuevo" data-permission="products_create">
   <h3>Nuevo producto</h3>
   <div class="stock-form">
@@ -48,11 +49,15 @@
   </div>
 </div>
 
+<!-- ================= BUSCADOR ================= -->
 <div class="search-bar">
   <input id="buscadorStock" placeholder="Buscar producto...">
 </div>
 
+<!-- ================= LISTA ================= -->
 <div class="stock-grid" id="listaStock"></div>
+
+<!-- ================= PANEL ================= -->
 <div class="stock-footer" id="panelEdicion"></div>
 
 <script src="js/auth.js"></script>
@@ -74,33 +79,6 @@ const buscadorStock = document.getElementById("buscadorStock");
 const listaStock    = document.getElementById("listaStock");
 const panelEdicion  = document.getElementById("panelEdicion");
 
-/* ================= NUEVO PRODUCTO ================= */
-async function nuevoProducto() {
-  if (!can("products_create")) return;
-  if (!inputNombre.value || !inputPrecio.value) return;
-
-  const prod = {
-    id: crypto.randomUUID(),
-    nombre: inputNombre.value.trim(),
-    precio: Number(inputPrecio.value),
-    stock: Number(inputStock.value) || 0,
-    stock_minimo: 0
-  };
-
-  await insertarProductoSupabase(prod);
-
-  await pushHistorialStock([{
-    producto_id: prod.id,
-    nombre: prod.nombre,
-    antes: null,
-    despues: { stock: prod.stock, precio: prod.precio }
-  }]);
-
-  inputNombre.value = "";
-  inputPrecio.value = "";
-  inputStock.value = "";
-}
-
 /* ================= INIT ================= */
 function initStock() {
   if (!verificarSesion()) return;
@@ -117,10 +95,9 @@ function initStock() {
 /* ================= SYNC ================= */
 function iniciarSyncStock() {
   const bc = new BroadcastChannel("victory-data");
-  bc.onmessage = e => { if (e.data === "productos") cargarStock(); };
-  window.addEventListener("storage", e => {
-    if (e.key === "productos") cargarStock();
-  });
+  bc.onmessage = e => {
+    if (e.data === "productos") cargarStock();
+  };
 }
 
 /* ================= DATA ================= */
@@ -136,23 +113,31 @@ function renderStock() {
 
   productosFiltrados.forEach(p => {
     const bajo = Number(p.stock) <= Number(p.stock_minimo || 0);
+
     const card = document.createElement("div");
     card.className = "stock-card" + (bajo ? " bajo" : "");
+    card.dataset.id = p.id;
 
     card.innerHTML = `
       <h4 style="${bajo ? "color:#e74c3c" : ""}">${p.nombre}</h4>
       <div class="precio">$${Number(p.precio).toFixed(2)}</div>
+
       ${
         !modoEdicion
-        ? `<div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
-           <div class="small">Stock mínimo: ${p.stock_minimo || 0}</div>`
-        : `<input value="${p.nombre}">
-           <input type="number" value="${p.precio}">
-           <input type="number" value="${p.stock}">
-           <input type="number" value="${p.stock_minimo || 0}">
-           <input type="number" placeholder="Cantidad exacta (opcional)">`
+          ? `
+            <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
+            <div class="small">Stock mínimo: ${p.stock_minimo || 0}</div>
+          `
+          : `
+            <input value="${p.nombre}">
+            <input type="number" value="${p.precio}">
+            <input type="number" value="${p.stock}">
+            <input type="number" value="${p.stock_minimo || 0}">
+            <input type="number" placeholder="Cantidad exacta (opcional)">
+          `
       }
     `;
+
     listaStock.appendChild(card);
   });
 
@@ -166,17 +151,26 @@ function renderPanel() {
   if (!modoEdicion) {
     const btn = document.createElement("button");
     btn.textContent = "✏️ Editar stock";
-    btn.onclick = () => { modoEdicion = true; renderStock(); };
+    btn.onclick = () => {
+      modoEdicion = true;
+      renderStock();
+    };
     panelEdicion.appendChild(btn);
   } else {
     const guardar = document.createElement("button");
     guardar.className = "btn-guardar";
     guardar.textContent = "💾 Guardar cambios";
-    guardar.onclick = () => { accionMaster = "guardar"; abrirModalMaster(); };
+    guardar.onclick = () => {
+      accionMaster = "guardar";
+      abrirModalMaster();
+    };
 
     const cancelar = document.createElement("button");
     cancelar.textContent = "❌ Cancelar";
-    cancelar.onclick = () => { modoEdicion = false; cargarStock(); };
+    cancelar.onclick = () => {
+      modoEdicion = false;
+      cargarStock();
+    };
 
     panelEdicion.appendChild(guardar);
     panelEdicion.appendChild(cancelar);
@@ -217,13 +211,17 @@ function confirmarMaster() {
   if (accionMaster === "guardar") guardarCambiosStock();
 }
 
-/* ================= GUARDAR ================= */
+/* ================= GUARDAR (FIX REAL) ================= */
 async function guardarCambiosStock() {
   const cards = document.querySelectorAll(".stock-card");
 
-  for (let i = 0; i < cards.length; i++) {
-    const inputs = cards[i].querySelectorAll("input");
+  for (const card of cards) {
+    const inputs = card.querySelectorAll("input");
     if (!inputs.length) continue;
+
+    const id = card.dataset.id;
+    const prod = productos.find(p => p.id === id);
+    if (!prod) continue;
 
     const nombre = inputs[0].value.trim();
     const precio = Number(inputs[1].value);
@@ -232,22 +230,44 @@ async function guardarCambiosStock() {
     const exacto = inputs[4].value;
     const nuevoStock = exacto !== "" ? Number(exacto) : stockEdit;
 
-    productosFiltrados[i].nombre = nombre;
-    productosFiltrados[i].precio = precio;
-    productosFiltrados[i].stock = nuevoStock;
-    productosFiltrados[i].stock_minimo = stockMin;
-
-    const idx = productos.findIndex(p => p.id === productosFiltrados[i].id);
-    if (idx >= 0) productos[idx] = { ...productosFiltrados[i] };
+    prod.nombre = nombre;
+    prod.precio = precio;
+    prod.stock = nuevoStock;
+    prod.stock_minimo = stockMin;
 
     await supabaseClient
       .from("productos")
-      .update({ nombre, precio, stock: nuevoStock, stock_minimo: stockMin })
-      .eq("id", productosFiltrados[i].id);
+      .update({
+        nombre,
+        precio,
+        stock: nuevoStock,
+        stock_minimo: stockMin
+      })
+      .eq("id", id);
   }
 
   localStorage.setItem("productos", JSON.stringify(productos));
   location.reload();
+}
+
+/* ================= NUEVO ================= */
+async function nuevoProducto() {
+  if (!can("products_create")) return;
+  if (!inputNombre.value || !inputPrecio.value) return;
+
+  const prod = {
+    id: crypto.randomUUID(),
+    nombre: inputNombre.value.trim(),
+    precio: Number(inputPrecio.value),
+    stock: Number(inputStock.value) || 0,
+    stock_minimo: 0
+  };
+
+  await insertarProductoSupabase(prod);
+
+  inputNombre.value = "";
+  inputPrecio.value = "";
+  inputStock.value = "";
 }
 
 /* ================= FILTRO ================= */
