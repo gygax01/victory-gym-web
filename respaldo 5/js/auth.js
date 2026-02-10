@@ -113,3 +113,23 @@ window.addEventListener("load", () => {
   verificarSesion();
   applyPermissions();
 });
+function solicitarPasswordMaestra() {
+  const pass = prompt("🔐 Ingresa la contraseña maestra");
+
+  if (!pass) return false;
+
+  const master = localStorage.getItem("master_password");
+
+  if (!master) {
+    alert("⚠️ No hay contraseña maestra configurada");
+    return false;
+  }
+
+  if (pass !== master) {
+    alert("❌ Contraseña incorrecta");
+    return false;
+  }
+
+  return true;
+}
+
