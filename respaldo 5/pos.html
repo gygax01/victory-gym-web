@@ -4,6 +4,82 @@
 <meta charset="UTF-8">
 <title>Punto de Venta</title>
 <link rel="stylesheet" href="css/styles.css">
+
+<style>
+/* ===== POS LAYOUT ===== */
+.pos-wrap{
+  max-width:1100px;
+  margin:20px auto;
+  display:grid;
+  grid-template-columns: 2fr 1fr;
+  gap:20px;
+}
+@media(max-width:900px){
+  .pos-wrap{grid-template-columns:1fr}
+}
+
+/* ===== PRODUCTOS ===== */
+.productos{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:16px;
+}
+.prod{
+  background:linear-gradient(145deg,#3a3a3a,#2a2a2a);
+  border-radius:18px;
+  padding:26px;
+  text-align:center;
+  cursor:pointer;
+  transition:.15s;
+}
+.prod:hover{transform:scale(1.06)}
+.prod b{display:block;font-size:18px}
+.prod span{color:#2ecc71;font-size:22px}
+
+/* ===== CARRITO ===== */
+.carrito{
+  background:#222;
+  border-radius:16px;
+  padding:16px;
+}
+.carrito ul{list-style:none;padding:0;margin:0}
+.carrito li{
+  display:flex;
+  justify-content:space-between;
+  margin:6px 0;
+}
+
+/* ===== TOTAL ===== */
+.total{
+  background:#111;
+  border-radius:18px;
+  padding:20px;
+  text-align:center;
+  margin:14px 0;
+}
+.total span{font-size:44px;color:#2ecc71}
+
+/* ===== OVERLAY CAMBIO ===== */
+.overlay-cambio{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.7);
+  backdrop-filter:blur(6px);
+  display:none;
+  justify-content:center;
+  align-items:center;
+  z-index:5000;
+}
+.overlay-cambio .box{
+  background:#2ecc71;
+  color:#fff;
+  padding:80px;
+  border-radius:22px;
+  text-align:center;
+  animation:zoom .25s ease;
+}
+.overlay-cambio h1{font-size:64px;margin:0}
+@keyframes zoom{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
 </head>
 
 <body>
@@ -14,21 +90,28 @@
 </header>
 
 <div class="pos-wrap">
+  <!-- PRODUCTOS -->
   <div>
     <h3>Productos</h3>
     <div class="productos" id="grid"></div>
   </div>
 
+  <!-- CARRITO -->
   <div class="carrito">
     <h3>Carrito</h3>
     <ul id="lista"></ul>
-    <div class="total">Total $<span id="total">0.00</span></div>
-    <input id="pago" type="number" min="0" placeholder="¿Con cuánto paga?">
-    <button id="btnCobrar">Cobrar</button>
-    <button id="btnCancelar">Cancelar</button>
+
+    <div class="total">
+      Total $<span id="total">0.00</span>
+    </div>
+
+    <input id="pago" type="number" placeholder="¿Con cuánto paga?">
+    <button onclick="cobrar()">Cobrar</button>
+    <button onclick="cancelar()">Cancelar</button>
   </div>
 </div>
 
+<!-- CAMBIO -->
 <div class="overlay-cambio" id="overlay">
   <div class="box">
     <p>Cambio</p>
@@ -41,16 +124,6 @@
 <script src="js/realtime.js"></script>
 
 <script>
-/* ================= DOM ================= */
-const grid = document.getElementById("grid");
-const lista = document.getElementById("lista");
-const totalSpan = document.getElementById("total");
-const pagoInput = document.getElementById("pago");
-const overlay = document.getElementById("overlay");
-const cambioSpan = document.getElementById("cambio");
-const btnCobrar = document.getElementById("btnCobrar");
-const btnCancelar = document.getElementById("btnCancelar");
-
 /* ================= ESTADO ================= */
 let productos = [];
 let carrito = [];
@@ -58,19 +131,16 @@ let carrito = [];
 /* ================= INIT ================= */
 window.addEventListener("load", initPOS);
 
-function initPOS() {
+function initPOS(){
   if (!verificarSesion()) return;
   if (!requirePermission("sales_do")) return;
-
-  btnCobrar.onclick = cobrar;
-  btnCancelar.onclick = cancelar;
 
   iniciarSyncPOS();
   cargarProductos();
 }
 
 /* ================= SYNC ================= */
-function iniciarSyncPOS() {
+function iniciarSyncPOS(){
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = e => {
@@ -83,9 +153,8 @@ function iniciarSyncPOS() {
 }
 
 /* ================= PRODUCTOS ================= */
-function cargarProductos() {
+function cargarProductos(){
   grid.innerHTML = "";
-
   productos = obtenerProductos()
     .filter(p => p && p.nombre && Number(p.stock) > 0);
 
@@ -104,45 +173,48 @@ function cargarProductos() {
 }
 
 /* ================= CARRITO ================= */
-function agregarProducto(id) {
+function agregarProducto(id){
   carrito.push(id);
-  renderCarrito();
+  render();
 }
 
-function renderCarrito() {
+function render(){
   lista.innerHTML = "";
-  let total = 0;
+  let totalVenta = 0;
 
   carrito.forEach(id => {
     const p = productos.find(x => x.id === id);
     if (!p) return;
 
-    total += Number(p.precio);
+    totalVenta += Number(p.precio);
 
-    const li = document.createElement("li");
-    li.innerHTML = `<span>${p.nombre}</span><span>$${Number(p.precio).toFixed(2)}</span>`;
-    lista.appendChild(li);
+    lista.innerHTML += `
+      <li>
+        <span>${p.nombre}</span>
+        <span>$${Number(p.precio).toFixed(2)}</span>
+      </li>
+    `;
   });
 
-  totalSpan.textContent = total.toFixed(2);
+  total.textContent = totalVenta.toFixed(2);
 }
 
-function cancelar() {
+function cancelar(){
   if (!confirm("¿Cancelar venta?")) return;
   carrito = [];
-  pagoInput.value = "";
-  renderCarrito();
+  pago.value = "";
+  render();
 }
 
 /* ================= COBRAR (CORRECTO) ================= */
-function cobrar() {
-  const totalVenta = Number(totalSpan.textContent);
-  const paga = Number(pagoInput.value);
+function cobrar(){
+  const totalVenta = Number(total.textContent);
+  const paga = Number(pago.value);
 
   if (!carrito.length) return alert("Carrito vacío");
   if (paga < totalVenta) return alert("Pago insuficiente");
 
-  /* 🔥 DESCONTAR STOCK (API CORRECTA) */
+  /* 🔥 DESCONTAR STOCK */
   carrito.forEach(id => {
     const p = productos.find(x => x.id === id);
     if (!p) return;
@@ -161,13 +233,13 @@ function cobrar() {
   new BroadcastChannel("victory-data").postMessage("productos");
 
   /* UI CAMBIO */
-  cambioSpan.textContent = (paga - totalVenta).toFixed(2);
+  cambio.textContent = (paga - totalVenta).toFixed(2);
   overlay.style.display = "flex";
 
   setTimeout(() => {
     overlay.style.display = "none";
     location.href = "index.html";
-  }, 3000);
+  }, 3500);
 }
 </script>
 
