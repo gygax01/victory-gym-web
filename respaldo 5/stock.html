@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <title>Stock</title>
 <link rel="stylesheet" href="css/styles.css">
-
-<!-- Supabase (solo para realtime.js) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -38,13 +36,7 @@
 <!-- ===== LISTA ===== -->
 <div class="stock-grid" id="listaStock"></div>
 
-<!-- ===== FOOTER ===== -->
-<div class="stock-footer" data-permission="stock_add">
-  <button id="btnGuardar">💾 Guardar</button>
-</div>
-
 <!-- CORE -->
-<script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
 
@@ -56,65 +48,40 @@ const inputStock = document.getElementById("inputStock");
 const btnAgregar = document.getElementById("btnAgregar");
 const buscadorStock = document.getElementById("buscadorStock");
 const listaStock = document.getElementById("listaStock");
-const btnGuardar = document.getElementById("btnGuardar");
 
-/* ================= ESTADO ================= */
+/* ================= STATE ================= */
 let productos = [];
 let productosFiltrados = [];
 
 /* ================= INIT ================= */
 function initStock() {
-  if (typeof verificarSesion === "function" && !verificarSesion()) return;
-
-  if (typeof can === "function" && !can("stock_view")) {
-    location.href = "index.html";
-    return;
-  }
+  if (!verificarSesion()) return;
+  if (!can("stock_view")) location.href = "index.html";
 
   btnAgregar.onclick = nuevoProducto;
-  btnGuardar.onclick = guardarCambios;
   buscadorStock.oninput = filtrarStock;
 
   iniciarSyncStock();
   cargarStock();
-
-  if (typeof applyPermissions === "function") {
-    applyPermissions();
-  }
+  applyPermissions();
 }
 
-/* ================= SYNC (OPTIMIZADO) ================= */
-let stockRenderTimeout = null;
-
+/* ================= SYNC UI ================= */
 function iniciarSyncStock() {
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = e => {
-    if (e.data === "productos") {
-      scheduleRender();
-    }
+    if (e.data === "productos") cargarStock();
   };
 
   window.addEventListener("storage", e => {
-    if (e.key === "productos") {
-      scheduleRender();
-    }
+    if (e.key === "productos") cargarStock();
   });
 }
 
-function scheduleRender() {
-  clearTimeout(stockRenderTimeout);
-
-  // 🔥 agrupa múltiples eventos en un solo render
-  stockRenderTimeout = setTimeout(() => {
-    cargarStock();
-  }, 50);
-}
-
-
-/* ================= CARGA ================= */
+/* ================= DATA ================= */
 function cargarStock() {
-  productos = obtenerProductos().filter(p => p && p.nombre);
+  productos = JSON.parse(localStorage.getItem("productos") || "[]");
   productosFiltrados = [...productos];
   renderStock();
 }
@@ -135,7 +102,7 @@ function renderStock() {
     card.innerHTML = `
       <h4>${p.nombre}</h4>
       <div class="precio">$${Number(p.precio).toFixed(2)}</div>
-      <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
+      <div class="stock-cantidad">Stock: <b>${p.stock}</b></div>
       <div class="stock-botones">
         <button data-permission="stock_add">+1</button>
         <button data-permission="stock_add">+10</button>
@@ -145,57 +112,41 @@ function renderStock() {
 
     const [b1, b10, bDel] = card.querySelectorAll("button");
 
-    b1.onclick = () => modificarStock(p, 1);
-    b10.onclick = () => modificarStock(p, 10);
+    b1.onclick  = () => cambiarStock(p, 1);
+    b10.onclick = () => cambiarStock(p, 10);
     bDel.onclick = () => eliminarProducto(p.id);
 
     listaStock.appendChild(card);
   });
 
-  if (typeof applyPermissions === "function") {
-    applyPermissions();
-  }
+  applyPermissions();
 }
 
-/* ================= ACCIONES ================= */
-function modificarStock(p, cant) {
-  if (typeof can === "function" && !can("stock_add")) return;
-  p.stock += cant;
-  renderStock();
+/* ================= ACCIONES (CLAVE) ================= */
+async function cambiarStock(p, delta) {
+  if (!can("stock_add")) return;
+  await actualizarStockSupabase(p.id, p.stock + delta);
 }
 
-function eliminarProducto(id) {
-  if (typeof can === "function" && !can("stock_delete")) return;
-
-  productos = productos.filter(p => p.id !== id);
-  eliminarProductoLocal(id);
-  guardarCambios();
+async function eliminarProducto(id) {
+  if (!can("stock_delete")) return;
+  await borrarProductoSupabase(id);
 }
 
-function nuevoProducto() {
-  if (typeof can === "function" && !can("products_create")) return;
+async function nuevoProducto() {
+  if (!can("products_create")) return;
   if (!inputNombre.value || !inputPrecio.value) return;
 
-  const prod = {
+  await insertarProductoSupabase({
     id: crypto.randomUUID(),
     nombre: inputNombre.value.trim(),
     precio: Number(inputPrecio.value),
     stock: Number(inputStock.value) || 0
-  };
-
-  productos.push(prod);
-  registrarProducto(prod);
+  });
 
   inputNombre.value = "";
   inputPrecio.value = "";
   inputStock.value = "";
-
-  guardarCambios();
-}
-
-function guardarCambios() {
-  safeSet("productos", productos);
-  new BroadcastChannel("victory-data").postMessage("productos");
 }
 
 /* ================= FILTRO ================= */
