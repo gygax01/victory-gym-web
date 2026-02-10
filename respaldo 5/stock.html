@@ -142,34 +142,46 @@ function modificarStock(p, cant) {
 
 function eliminarProducto(p) {
   if (!can("stock_delete")) return;
-  productos = productos.filter(x => x !== p);
-  guardarStock();
-}
 
-function guardarStock() {
-  if (!can("stock_add")) return;
+  productos = productos.filter(x => x.id !== p.id);
 
-  safeSet("productos", productos);
+  // reflejar eliminación en storage
+  const actuales = obtenerProductos().filter(x => x.id !== p.id);
+  safeSet("productos", actuales);
+
   new BroadcastChannel("victory-data").postMessage("productos");
 }
 
+/* 🔑 AQUÍ ESTÁ LA CLAVE */
+function guardarStock() {
+  if (!can("stock_add")) return;
+
+  productos.forEach(p => {
+    actualizarProducto(p);   // ✅ API CORRECTA
+  });
+
+  new BroadcastChannel("victory-data").postMessage("productos");
+}
+
+/* 🔑 Y AQUÍ TAMBIÉN */
 function nuevoProducto() {
   if (!can("products_create")) return;
-
   if (!inputNombre.value || !inputPrecio.value) return;
 
-  productos.push({
+  const prod = {
     id: crypto.randomUUID(),
     nombre: inputNombre.value.trim(),
     precio: Number(inputPrecio.value),
     stock: Number(inputStock.value) || 0
-  });
+  };
+
+  registrarProducto(prod);   // ✅ API CORRECTA
 
   inputNombre.value = "";
   inputPrecio.value = "";
   inputStock.value = "";
 
-  guardarStock();
+  cargarStock();
 }
 
 /* ================= FILTRO ================= */
