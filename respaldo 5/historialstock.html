@@ -2,210 +2,180 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Stock</title>
+<title>Historial de Stock</title>
 <link rel="stylesheet" href="css/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body onload="initStock()">
+<body onload="initHistorialStock()">
 
 <header class="header-brand">
   <div class="brand">
     <img src="img/logo.png">
-    <h2>Stock</h2>
+    <h2>Historial de Stock</h2>
   </div>
 
-  <!-- BOTONES DERECHA -->
-  <div style="display:flex; gap:10px;">
-    <button
-      onclick="irHistorialStock()"
-      style="opacity:.85"
-      title="Ver historial de cambios de stock"
-    >
-      Historial de Cambios
-    </button>
-
-    <button onclick="location.href='index.html'">
-      ← Inicio
-    </button>
-  </div>
+  <button onclick="location.href='stock.html'">
+    ← Volver
+  </button>
 </header>
-
-<!-- ===== NUEVO PRODUCTO ===== -->
-<div class="card stock-nuevo" data-permission="products_create">
-  <h3>Nuevo producto</h3>
-  <div class="stock-form">
-    <input id="inputNombre" placeholder="Nombre">
-    <input id="inputPrecio" type="number" step="0.01" placeholder="Precio">
-    <input id="inputStock" type="number" placeholder="Stock inicial">
-    <button id="btnAgregar">Agregar</button>
-  </div>
-</div>
 
 <!-- ===== BUSCADOR ===== -->
 <div class="search-bar">
-  <input id="buscadorStock" placeholder="Buscar producto...">
+  <input
+    id="buscadorHistorial"
+    placeholder="Buscar por fecha, usuario o producto..."
+  >
 </div>
 
-<!-- ===== LISTA ===== -->
-<div class="stock-grid" id="listaStock"></div>
+<!-- ===== HISTORIAL ===== -->
+<div class="historial-container" id="contenedorHistorial"></div>
 
 <!-- CORE -->
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
-/* ================= DOM ================= */
-const inputNombre = document.getElementById("inputNombre");
-const inputPrecio = document.getElementById("inputPrecio");
-const inputStock  = document.getElementById("inputStock");
-const btnAgregar  = document.getElementById("btnAgregar");
-const buscadorStock = document.getElementById("buscadorStock");
-const listaStock  = document.getElementById("listaStock");
-
 /* ================= STATE ================= */
-let productos = [];
-let productosFiltrados = [];
+let historial = [];
+let historialFiltrado = [];
 
 /* ================= INIT ================= */
-function initStock() {
+async function initHistorialStock() {
   if (!verificarSesion()) return;
   if (!can("stock_view")) location.href = "index.html";
 
-  btnAgregar.onclick = nuevoProducto;
-  buscadorStock.oninput = filtrarStock;
+  document
+    .getElementById("buscadorHistorial")
+    .addEventListener("input", filtrarHistorial);
 
-  iniciarSyncStock();
-  cargarStock();
-  applyPermissions();
-}
-
-/* ================= SYNC ================= */
-function iniciarSyncStock() {
-  const bc = new BroadcastChannel("victory-data");
-
-  bc.onmessage = e => {
-    if (e.data === "productos") cargarStock();
-  };
-
-  window.addEventListener("storage", e => {
-    if (e.key === "productos") cargarStock();
-  });
+  await cargarHistorial();
 }
 
 /* ================= DATA ================= */
-function cargarStock() {
-  productos = JSON.parse(localStorage.getItem("productos") || "[]");
-  productosFiltrados = [...productos];
-  renderStock();
-}
+async function cargarHistorial() {
+  const { data, error } = await supabaseClient
+    .from("historial_stock")
+    .select("*")
+    .order("ts", { ascending: false });
 
-/* ================= RENDER ================= */
-function renderStock() {
-  listaStock.innerHTML = "";
-
-  if (!productosFiltrados.length) {
-    listaStock.innerHTML = "<p>No hay productos</p>";
+  if (error) {
+    console.error("Error cargando historial:", error);
     return;
   }
 
-  productosFiltrados.forEach(p => {
+  historial = data || [];
+  historialFiltrado = [...historial];
+  renderHistorial();
+}
+
+/* ================= RENDER ================= */
+function renderHistorial() {
+  const cont = document.getElementById("contenedorHistorial");
+  cont.innerHTML = "";
+
+  if (!historialFiltrado.length) {
+    cont.innerHTML = "<p style='text-align:center'>No hay registros</p>";
+    return;
+  }
+
+  historialFiltrado.forEach(h => {
     const card = document.createElement("div");
-    card.className = "stock-card";
+    card.className = "cliente";
 
     card.innerHTML = `
-      <h4>${p.nombre}</h4>
-      <div class="precio">$${Number(p.precio).toFixed(2)}</div>
-      <div class="stock-cantidad">Stock: <b>${p.stock}</b></div>
-      <div class="stock-botones">
-        <button data-permission="stock_add">+1</button>
-        <button data-permission="stock_add">+10</button>
-        <button data-permission="stock_delete">Eliminar</button>
+      <div class="cliente-header">
+        <div class="info-wrapper">
+          <div class="info-bloque">
+            <h3>${h.fecha}</h3>
+            <div class="racha">
+              ${h.hora} · ${h.usuario} (${h.rol})
+            </div>
+          </div>
+        </div>
+        <div class="flecha">▾</div>
+      </div>
+
+      <div class="historial">
+        ${renderTablaCambios(h.cambios)}
       </div>
     `;
 
-    const [b1, b10, bDel] = card.querySelectorAll("button");
+    const header = card.querySelector(".cliente-header");
+    const body = card.querySelector(".historial");
 
-    b1.onclick  = () => modificarStock(p, 1);
-    b10.onclick = () => modificarStock(p, 10);
-    bDel.onclick = () => eliminarProducto(p);
+    header.onclick = () => {
+      card.classList.toggle("abierto");
+      body.classList.toggle("abierto");
+    };
 
-    listaStock.appendChild(card);
+    cont.appendChild(card);
+  });
+}
+
+/* ================= TABLA ================= */
+function renderTablaCambios(cambios = []) {
+  if (!cambios.length) return "<p>Sin cambios</p>";
+
+  let rows = "";
+
+  cambios.forEach(c => {
+    const antes = c.antes || {};
+    const despues = c.despues || {};
+
+    const stockAntes = antes.stock ?? "-";
+    const stockDespues = despues.stock ?? "-";
+
+    let diff = "";
+    if (typeof stockAntes === "number" && typeof stockDespues === "number") {
+      const d = stockDespues - stockAntes;
+      if (d !== 0) {
+        diff = d > 0
+          ? `<span style="color:#4caf50"> (+${d})</span>`
+          : `<span style="color:#f44336"> (${d})</span>`;
+      }
+    }
+
+    rows += `
+      <tr>
+        <td><b>${c.nombre}</b></td>
+        <td>
+          Stock: ${stockAntes}<br>
+          Precio: $${antes.precio?.toFixed(2) ?? "-"}
+        </td>
+        <td>
+          Stock: ${stockDespues}${diff}<br>
+          Precio: $${despues.precio?.toFixed(2) ?? "-"}
+        </td>
+      </tr>
+    `;
   });
 
-  applyPermissions();
-}
-
-/* ================= ACCIONES ================= */
-async function modificarStock(p, delta) {
-  if (!can("stock_add")) return;
-
-  const antes = { stock: p.stock, precio: p.precio };
-  const nuevoStock = p.stock + delta;
-
-  await actualizarStockSupabase(p.id, nuevoStock);
-
-  await pushHistorialStock([{
-    producto_id: p.id,
-    nombre: p.nombre,
-    antes,
-    despues: { stock: nuevoStock, precio: p.precio }
-  }]);
-}
-
-async function eliminarProducto(p) {
-  if (!can("stock_delete")) return;
-
-  await borrarProductoSupabase(p.id);
-
-  await pushHistorialStock([{
-    producto_id: p.id,
-    nombre: p.nombre,
-    antes: { stock: p.stock, precio: p.precio },
-    despues: null
-  }]);
-}
-
-async function nuevoProducto() {
-  if (!can("products_create")) return;
-  if (!inputNombre.value || !inputPrecio.value) return;
-
-  const prod = {
-    id: crypto.randomUUID(),
-    nombre: inputNombre.value.trim(),
-    precio: Number(inputPrecio.value),
-    stock: Number(inputStock.value) || 0
-  };
-
-  await insertarProductoSupabase(prod);
-
-  await pushHistorialStock([{
-    producto_id: prod.id,
-    nombre: prod.nombre,
-    antes: null,
-    despues: { stock: prod.stock, precio: prod.precio }
-  }]);
-
-  inputNombre.value = "";
-  inputPrecio.value = "";
-  inputStock.value = "";
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Antes</th>
+          <th>Después</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
 }
 
 /* ================= FILTRO ================= */
-function filtrarStock() {
-  const q = buscadorStock.value.toLowerCase();
-  productosFiltrados = productos.filter(p =>
-    p.nombre.toLowerCase().includes(q)
+function filtrarHistorial(e) {
+  const q = e.target.value.toLowerCase();
+
+  historialFiltrado = historial.filter(h =>
+    h.fecha.toLowerCase().includes(q) ||
+    h.usuario.toLowerCase().includes(q) ||
+    JSON.stringify(h.cambios).toLowerCase().includes(q)
   );
-  renderStock();
-}
 
-/* ================= HISTORIAL (MAESTRA) ================= */
-function irHistorialStock() {
-  if (!solicitarPasswordMaestra()) return;
-
-  alert("✅ Contraseña correcta");
-  location.href = "historialstock.html";
+  renderHistorial();
 }
 </script>
 
