@@ -15,85 +15,23 @@
   <script src="js/nfc.js"></script>
   <script src="js/realtime.js"></script>
 
-  <!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
   <style>
   @media (max-width:768px){
-
-    .header-brand{
-      flex-direction:column;
-      gap:14px;
-      padding:18px;
-      text-align:center;
-    }
-
-    .brand{
-      flex-direction:column;
-      gap:8px;
-    }
-
-    .brand img{
-      height:70px;
-    }
-
-    .brand h2{
-      font-size:20px;
-    }
-
-    header button{
-      width:100%;
-      margin-left:0;
-    }
-
-    .card.usuarios-pc{
-      grid-template-columns:1fr !important;
-      padding:28px 20px;
-      gap:20px;
-    }
-
-    .usuarios-col input,
-    .usuarios-col select{
-      height:46px;
-      font-size:15px;
-    }
-
-    .usuarios-col button{
-      width:100%;
-      margin-top:10px;
-      height:46px;
-      font-size:15px;
-    }
-
-    #buscador{
-      width:92%;
-    }
-
-    #buscador input{
-      height:46px;
-      font-size:15px;
-    }
-
-    .historial-container{
-      width:92%;
-    }
-
-    .cliente{
-      padding:16px;
-    }
-
-    .cliente h3{
-      font-size:18px;
-    }
-
-    .confirmacion .box{
-      width:92%;
-      padding:40px 20px;
-    }
-
-    .popup{
-      width:92%;
-      padding:30px 20px;
-    }
-
+    .header-brand{flex-direction:column;gap:14px;padding:18px;text-align:center;}
+    .brand{flex-direction:column;gap:8px;}
+    .brand img{height:70px;}
+    .brand h2{font-size:20px;}
+    header button{width:100%;margin-left:0;}
+    .card.usuarios-pc{grid-template-columns:1fr !important;padding:28px 20px;gap:20px;}
+    .usuarios-col input,.usuarios-col select{height:46px;font-size:15px;}
+    .usuarios-col button{width:100%;margin-top:10px;height:46px;font-size:15px;}
+    #buscador{width:92%;}
+    #buscador input{height:46px;font-size:15px;}
+    .historial-container{width:92%;}
+    .cliente{padding:16px;}
+    .cliente h3{font-size:18px;}
+    .confirmacion .box{width:92%;padding:40px 20px;}
+    .popup{width:92%;padding:30px 20px;}
   }
   </style>
 </head>
@@ -108,7 +46,6 @@
   <button onclick="volver()">← Volver</button>
 </header>
 
-<!-- ================= REGISTRO ================= -->
 <div class="card usuarios-pc" id="registroCard">
   <div class="usuarios-col">
     <h3>Registrar usuario</h3>
@@ -133,7 +70,6 @@
   </div>
 </div>
 
-<!-- ================= BUSCADOR / LISTAS ================= -->
 <div class="search-bar" id="buscador">
   <input id="busqueda" placeholder="Buscar usuario..." oninput="renderUsuarios()">
 </div>
@@ -146,7 +82,6 @@
   <div id="listaEmpleados"></div>
 </div>
 
-<!-- ================= NFC ================= -->
 <div class="overlay" id="overlay">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
@@ -154,7 +89,6 @@
   </div>
 </div>
 
-<!-- ================= CONFIRM ================= -->
 <div class="confirmacion" id="confirmacion">
   <div class="box">
     <h1 id="tituloConfirm"></h1>
@@ -164,7 +98,6 @@
 </div>
 
 <script>
-/* ================= CONFIG ================= */
 const CLAVE_MAESTRA = "victory(profitness)";
 let tarjetaUID = null;
 
@@ -172,7 +105,7 @@ let tarjetaUID = null;
 function initUsuarios() {
   if (!verificarSesion()) return;
 
-  const s = obtenerSesion();
+  const s = getSession(); // 🔥 CORREGIDO
   if (!["admin","superadmin"].includes(s.rol)) {
     location.href = "index.html";
     return;
@@ -193,19 +126,28 @@ function iniciarSyncUsuarios() {
   window.addEventListener("storage", e => {
     if (e.key === "empleados") renderUsuarios();
   });
-
-  window.addEventListener("online", () => {
-    syncOfflineQueue();
-    renderUsuarios();
-  });
-}
-
-/* ================= VOLVER ================= */
-function volver() {
-  location.href = "index.html";
 }
 
 /* ================= NFC ================= */
+async function uidYaRegistrada(uid) {
+
+  const empleados = obtenerEmpleados();
+  if (empleados.some(e => e.tarjetaUID === uid)) return true;
+
+  if (navigator.onLine && window.supabaseClient) {
+
+    const { data } = await supabaseClient
+      .from("empleados")
+      .select("id")
+      .eq("tarjeta_uid", uid)
+      .maybeSingle();
+
+    if (data) return true;
+  }
+
+  return false;
+}
+
 function asignarTarjeta() {
   tarjetaUID = null;
   btnRegistrar.disabled = true;
@@ -216,8 +158,9 @@ function asignarTarjeta() {
   uidTexto.textContent = "";
 
   iniciarNFCControlado({
-    onUID: uid => {
-      if (uidYaRegistrada(uid)) {
+    onUID: async uid => {
+
+      if (await uidYaRegistrada(uid)) {
         estado.className = "estado rojo";
         estado.textContent = "Tarjeta ya registrada";
         setTimeout(cerrarPopup, 1500);
@@ -286,11 +229,10 @@ function registrarUsuario() {
   empleados.push(nuevo);
   guardarEmpleados(empleados);
 
-  agregarEvento({
-    tabla: "empleados",
-    accion: "add",
-    data: nuevo
-  });
+  // 🔥 AHORA TAMBIÉN GUARDA EN SUPABASE
+  if (typeof insertarEmpleadoSupabase === "function") {
+    insertarEmpleadoSupabase(nuevo);
+  }
 
   new BroadcastChannel("victory-data").postMessage("empleados");
 
@@ -339,6 +281,10 @@ function mostrarConfirm(t, m, a) {
 
 function cerrarConfirm() {
   confirmacion.style.display = "none";
+}
+
+function volver() {
+  location.href = "index.html";
 }
 </script>
 
