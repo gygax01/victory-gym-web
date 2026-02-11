@@ -78,19 +78,21 @@ function obtenerSesion() {
 }
 
 /* ================= FIXES CRÍTICOS ================= */
-/* asistencias.js y index esperan estas funciones */
-
 function obtenerAsistencias() {
   return safeGet("asistencias");
 }
 
-function syncOfflineQueue() {
-  // Stub seguro: evita que el flujo se rompa
+function obtenerClientes() {
+  return safeGet("clientes");
 }
 
 function buscarEmpleadoPorTarjeta(uid) {
   const empleados = safeGet("empleados");
   return empleados.some(e => e.tarjetaUID === uid);
+}
+
+function syncOfflineQueue() {
+  // Stub seguro (offline-first)
 }
 
 /* ================= DOM ================= */
@@ -230,7 +232,6 @@ function procesarTarjeta(uid) {
     registrarAsistencia(nueva);
     subirEntradaSupabase(nueva);
     mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
-
   } else {
     ultima.salida = horaActual();
     safeSet("asistencias", asistencias);
