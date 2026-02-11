@@ -80,10 +80,10 @@
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
-<!-- ESTE CREA window.supabaseClient -->
+<!-- CREA window.supabaseClient + funciones clientes -->
 <script src="js/realtime.js"></script>
 
-<!-- ESTE SOLO LO USA -->
+<!-- NFC -->
 <script src="js/nfc.js"></script>
 
 <script>
@@ -179,23 +179,22 @@ function registrarCliente() {
   setTimeout(() => location.href = "index.html", 1800);
 }
 
-/* ===== OFFLINE + REALTIME ===== */
+/* ===== OFFLINE + SUPABASE (CLAVE) ===== */
 function registrarClienteOffline(cliente) {
   const lista = obtenerClientes();
   lista.push(cliente);
 
   safeSet("clientes", lista);
 
-  agregarEvento({
-    tabla: "clientes",
-    accion: "add",
-    data: cliente
-  });
-
   new BroadcastChannel("victory-data").postMessage("clientes");
+
+  // 🔥 SUBIR A SUPABASE (SOURCE OF TRUTH)
+  if (typeof insertarClienteSupabase === "function") {
+    insertarClienteSupabase(cliente);
+  }
 }
 
-/* ===== HELPERS FALTANTES (CRÍTICOS) ===== */
+/* ===== HELPERS ===== */
 function obtenerClientes() {
   return safeGet("clientes");
 }
