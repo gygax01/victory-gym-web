@@ -77,7 +77,7 @@ function obtenerSesion() {
   return getSession();
 }
 
-/* ================= FIXES CRÍTICOS ================= */
+/* ================= FIXES CRÍTICOS (COMPLETOS) ================= */
 function obtenerAsistencias() {
   return safeGet("asistencias");
 }
@@ -89,6 +89,12 @@ function obtenerClientes() {
 function buscarEmpleadoPorTarjeta(uid) {
   const empleados = safeGet("empleados");
   return empleados.some(e => e.tarjetaUID === uid);
+}
+
+function registrarAsistencia(asistencia) {
+  const asistencias = safeGet("asistencias");
+  asistencias.push(asistencia);
+  safeSet("asistencias", asistencias);
 }
 
 function syncOfflineQueue() {
@@ -232,6 +238,7 @@ function procesarTarjeta(uid) {
     registrarAsistencia(nueva);
     subirEntradaSupabase(nueva);
     mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
+
   } else {
     ultima.salida = horaActual();
     safeSet("asistencias", asistencias);
