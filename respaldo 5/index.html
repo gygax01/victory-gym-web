@@ -5,7 +5,7 @@
   <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- Supabase SOLO para realtime / nfc -->
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -13,7 +13,7 @@
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png" alt="Victory Pro Fitness">
+    <img src="img/logo.png">
     <h2>Asistencias del día</h2>
   </div>
 
@@ -36,9 +36,7 @@
   <button onclick="location.href='membresias.html'">Membresías</button>
   <button onclick="location.href='clientes.html'">Clientes</button>
   <button onclick="location.href='historial.html'">Historial</button>
-
-  <button id="btnUsuarios" style="display:none"
-          onclick="location.href='usuarios.html'">
+  <button id="btnUsuarios" style="display:none" onclick="location.href='usuarios.html'">
     Usuarios
   </button>
 </div>
@@ -72,34 +70,21 @@
 <script src="js/bluetooth.js"></script>
 
 <script>
-/* ================= ALIAS SESIÓN ================= */
-function obtenerSesion() {
-  return getSession();
+/* ================= ZONA HORARIA GLOBAL ================= */
+const APP_TZ = localStorage.getItem("APP_TIMEZONE") || "America/Mexico_City";
+
+function horaDesdeTS(ts) {
+  return new Date(ts).toLocaleTimeString("es-MX", {
+    timeZone: APP_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
 
-/* ================= FIXES CRÍTICOS (COMPLETOS) ================= */
-function obtenerAsistencias() {
-  return safeGet("asistencias");
-}
-
-function obtenerClientes() {
-  return safeGet("clientes");
-}
-
-function buscarEmpleadoPorTarjeta(uid) {
-  const empleados = safeGet("empleados");
-  return empleados.some(e => e.tarjetaUID === uid);
-}
-
-function registrarAsistencia(asistencia) {
-  const asistencias = safeGet("asistencias");
-  asistencias.push(asistencia);
-  safeSet("asistencias", asistencias);
-}
-
-function syncOfflineQueue() {
-  // Stub seguro (offline-first)
-}
+/* ================= ALIAS ================= */
+function obtenerClientes() { return safeGet("clientes"); }
+function obtenerAsistencias() { return safeGet("asistencias"); }
 
 /* ================= DOM ================= */
 const estadoLector = document.getElementById("estadoLector");
@@ -108,73 +93,31 @@ const btnUsuarios = document.getElementById("btnUsuarios");
 const btnLogout = document.getElementById("btnLogout");
 
 /* ================= INIT ================= */
-window.addEventListener("load", initIndex);
-
-function initIndex() {
+window.addEventListener("load", () => {
   if (!verificarSesion()) return;
 
-  aplicarRolIndex();
-  btnLogout.onclick = logout;
+  const s = getSession();
+  if (s && (s.rol === "admin" || s.rol === "superadmin")) {
+    btnUsuarios.style.display = "inline-block";
+  }
 
+  btnLogout.onclick = logout;
   actualizarEstadoConexion();
   cargarAsistencias();
   actualizarContador();
 
   iniciarLecturaNFCIndex();
-  iniciarSyncLocal();
-
-  if (navigator.onLine && typeof iniciarRealtime === "function") {
-    iniciarRealtime();
-  }
-
-  if (!navigator.onLine) {
-    conectarBluetooth().catch(() => {});
-  }
-}
-
-/* ================= ROLES ================= */
-function aplicarRolIndex() {
-  const s = obtenerSesion();
-  if (s && (s.rol === "admin" || s.rol === "superadmin")) {
-    btnUsuarios.style.display = "inline-block";
-  }
-}
+});
 
 /* ================= CONEXIÓN ================= */
 function actualizarEstadoConexion() {
   if (navigator.onLine) {
     estadoConexion.textContent = "Online";
     estadoConexion.className = "lector on";
-    syncOfflineQueue();
   } else {
     estadoConexion.textContent = "Offline";
     estadoConexion.className = "lector off";
   }
-}
-
-window.addEventListener("online", () => {
-  actualizarEstadoConexion();
-  if (typeof iniciarRealtime === "function") iniciarRealtime();
-});
-window.addEventListener("offline", actualizarEstadoConexion);
-
-/* ================= SYNC LOCAL ================= */
-function iniciarSyncLocal() {
-  const bc = new BroadcastChannel("victory-data");
-
-  bc.onmessage = e => {
-    if (e.data === "asistencias") {
-      cargarAsistencias();
-      actualizarContador();
-    }
-  };
-
-  window.addEventListener("storage", e => {
-    if (e.key === "asistencias") {
-      cargarAsistencias();
-      actualizarContador();
-    }
-  });
 }
 
 /* ================= NFC ================= */
@@ -183,33 +126,14 @@ function iniciarLecturaNFCIndex() {
   estadoLector.textContent = "Lector activo";
 
   iniciarNFCControlado({
-    onUID: uid => procesarTarjeta(uid),
+    onUID: procesarTarjeta,
     onTimeout: iniciarLecturaNFCIndex,
     onError: () => setTimeout(iniciarLecturaNFCIndex, 2000)
   });
 }
 
-/* ================= CONFIRM ================= */
-function mostrarConfirmacion(tipo, titulo, mensaje) {
-  const confirmacion = document.getElementById("confirmacion");
-  const tituloConfirmacion = document.getElementById("tituloConfirmacion");
-  const mensajeConfirmacion = document.getElementById("mensajeConfirmacion");
-
-  confirmacion.className = "confirmacion " + tipo;
-  tituloConfirmacion.textContent = titulo;
-  mensajeConfirmacion.textContent = mensaje;
-  confirmacion.style.display = "flex";
-
-  setTimeout(() => confirmacion.style.display = "none", 2200);
-}
-
-/* ================= ENTRADA / SALIDA ================= */
+/* ================= ENTRADA / SALIDA (FIX REAL) ================= */
 function procesarTarjeta(uid) {
-  if (buscarEmpleadoPorTarjeta(uid)) {
-    mostrarConfirmacion("error", "Tarjeta de personal", "Use el login");
-    return;
-  }
-
   const cliente = obtenerClientes().find(c => c.tarjetaUID === uid);
   if (!cliente) {
     mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepción");
@@ -219,31 +143,33 @@ function procesarTarjeta(uid) {
   const asistencias = obtenerAsistencias();
   const fechaHoy = hoy();
 
-  const delDia = asistencias
-    .filter(a => a.tarjetaUID === uid && a.fecha === fechaHoy)
-    .sort((a,b)=>a.entrada.localeCompare(b.entrada));
+  // Buscar SOLO la última abierta
+  const abierta = [...asistencias]
+    .reverse()
+    .find(a => a.tarjetaUID === uid && a.fecha === fechaHoy && a.salida_ts === null);
 
-  const ultima = delDia[delDia.length - 1] || null;
+  const ahoraTS = Date.now();
 
-  if (!ultima || ultima.salida !== null) {
+  if (!abierta) {
     const nueva = {
       id: crypto.randomUUID(),
       tarjetaUID: uid,
       nombre: cliente.nombre,
-      entrada: horaActual(),
-      salida: null,
-      fecha: fechaHoy
+      fecha: fechaHoy,
+      entrada_ts: ahoraTS,
+      salida_ts: null
     };
 
-    registrarAsistencia(nueva);
+    asistencias.push(nueva);
+    safeSet("asistencias", asistencias);
     subirEntradaSupabase(nueva);
-    mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
+    mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
 
   } else {
-    ultima.salida = horaActual();
+    abierta.salida_ts = ahoraTS;
     safeSet("asistencias", asistencias);
-    subirSalidaSupabase(ultima);
-    mostrarConfirmacion("salida","Hasta luego",cliente.nombre);
+    subirSalidaSupabase(abierta);
+    mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
   }
 
   notificarCambioAsistencias();
@@ -251,7 +177,7 @@ function procesarTarjeta(uid) {
   actualizarContador();
 }
 
-/* ================= SUPABASE ASISTENCIAS ================= */
+/* ================= SUPABASE ================= */
 async function subirEntradaSupabase(a) {
   if (!window.supabaseClient || !navigator.onLine) return;
 
@@ -259,9 +185,9 @@ async function subirEntradaSupabase(a) {
     id: a.id,
     tarjeta_uid: a.tarjetaUID,
     nombre: a.nombre,
-    entrada: a.entrada,
-    salida: null,
-    fecha: a.fecha
+    fecha: a.fecha,
+    entrada_ts: a.entrada_ts,
+    salida_ts: null
   });
 }
 
@@ -270,10 +196,8 @@ async function subirSalidaSupabase(a) {
 
   await supabaseClient
     .from("asistencias")
-    .update({ salida: a.salida })
-    .eq("tarjeta_uid", a.tarjetaUID)
-    .eq("fecha", a.fecha)
-    .is("salida", null);
+    .update({ salida_ts: a.salida_ts })
+    .eq("id", a.id);
 }
 </script>
 
