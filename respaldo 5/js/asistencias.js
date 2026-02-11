@@ -1,5 +1,5 @@
 /* ======================================================
-   ===== ASISTENCIAS GYM (COMPATIBLE STORAGE NUEVO) =====
+   ===== ASISTENCIAS GYM (COMPATIBLE STORAGE + REALTIME) =====
 ====================================================== */
 
 (function initAsistenciasSync() {
@@ -23,24 +23,48 @@
 })();
 
 /* ======================================================
-   ===== UTILIDADES ===============================
+   ===== UTILIDADES =====================================
 ====================================================== */
 
 /**
- * Devuelve timestamp seguro para ordenar
+ * Devuelve timestamp seguro (number)
+ * Soporta number o ISO string
  */
 function obtenerTimestampSeguro(a) {
-  if (typeof a.entrada_ts === "number") return a.entrada_ts;
+  if (!a || !a.entrada_ts) return 0;
+
+  if (typeof a.entrada_ts === "number") {
+    return a.entrada_ts;
+  }
+
+  if (typeof a.entrada_ts === "string") {
+    const t = new Date(a.entrada_ts).getTime();
+    return isNaN(t) ? 0 : t;
+  }
+
   return 0;
 }
 
 /**
- * Formatea hora desde timestamp
+ * Convierte timestamp (number o ISO) a hora formateada
  */
 function formatearHoraTS(ts) {
-  if (!ts || typeof ts !== "number") return "-";
 
-  return new Date(ts).toLocaleTimeString("es-MX", {
+  if (!ts) return "-";
+
+  let fecha;
+
+  if (typeof ts === "number") {
+    fecha = new Date(ts);
+  } else if (typeof ts === "string") {
+    fecha = new Date(ts);
+  } else {
+    return "-";
+  }
+
+  if (isNaN(fecha.getTime())) return "-";
+
+  return fecha.toLocaleTimeString("es-MX", {
     timeZone: "America/Mexico_City",
     hour: "2-digit",
     minute: "2-digit",
@@ -90,7 +114,7 @@ function cargarAsistencias() {
 }
 
 /* ======================================================
-   ===== CONTADOR AFORO ================================
+   ===== CONTADOR AFORO =================================
 ====================================================== */
 
 function actualizarContador() {
@@ -103,7 +127,7 @@ function actualizarContador() {
   const dentro = asistencias.filter(a =>
     a &&
     a.fecha === hoyFecha &&
-    typeof a.entrada_ts === "number" &&
+    a.entrada_ts &&
     !a.salida_ts
   ).length;
 
@@ -111,6 +135,7 @@ function actualizarContador() {
   if (!contador) return;
 
   const strong = contador.querySelector("strong");
+
   if (strong) {
     strong.textContent = dentro;
   } else {
