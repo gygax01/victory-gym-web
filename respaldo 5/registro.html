@@ -104,7 +104,6 @@
 <main class="main">
   <div class="card registro-pc">
 
-    <!-- COLUMNA IZQUIERDA -->
     <div class="registro-col">
       <h3>Datos del cliente</h3>
 
@@ -114,7 +113,6 @@
       <input id="telefono" type="tel" placeholder="Teléfono">
     </div>
 
-    <!-- COLUMNA DERECHA -->
     <div class="registro-col">
       <h3>Membresía</h3>
 
@@ -138,7 +136,6 @@
   </div>
 </main>
 
-<!-- NFC -->
 <div class="overlay" id="overlay">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
@@ -147,7 +144,6 @@
   </div>
 </div>
 
-<!-- CONFIRM -->
 <div class="confirmacion" id="confirmacion">
   <div class="box">
     <h1 id="tituloConfirm"></h1>
@@ -155,7 +151,6 @@
   </div>
 </div>
 
-<!-- CORE -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
@@ -255,7 +250,7 @@ function registrarCliente() {
   setTimeout(() => location.href = "index.html", 1800);
 }
 
-/* ===== OFFLINE + SUPABASE (CLAVE) ===== */
+/* ===== OFFLINE + SUPABASE ===== */
 function registrarClienteOffline(cliente) {
   const lista = obtenerClientes();
   lista.push(cliente);
@@ -274,27 +269,32 @@ function obtenerClientes() {
   return safeGet("clientes");
 }
 
-/* 🔥 SOLO ESTA FUNCIÓN CAMBIÓ */
+/* 🔥 VALIDACIÓN GLOBAL CLIENTES + EMPLEADOS */
 async function uidYaRegistrada(uid) {
 
-  if (obtenerClientes().some(c => c.tarjetaUID === uid)) {
-    return true;
-  }
+  const clientes = safeGet("clientes");
+  if (clientes.some(c => c.tarjetaUID === uid)) return true;
+
+  const empleados = safeGet("empleados");
+  if (empleados.some(e => e.tarjetaUID === uid)) return true;
 
   if (navigator.onLine && window.supabaseClient) {
 
-    const { data, error } = await supabaseClient
+    const { data: c1 } = await supabaseClient
       .from("clientes")
       .select("id")
       .eq("tarjeta_uid", uid)
       .maybeSingle();
 
-    if (error) {
-      console.error("Error validando UID:", error);
-      return false;
-    }
+    if (c1) return true;
 
-    if (data) return true;
+    const { data: c2 } = await supabaseClient
+      .from("empleados")
+      .select("id")
+      .eq("tarjeta_uid", uid)
+      .maybeSingle();
+
+    if (c2) return true;
   }
 
   return false;
