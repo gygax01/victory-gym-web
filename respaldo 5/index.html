@@ -77,6 +77,12 @@ function obtenerSesion() {
   return getSession();
 }
 
+/* ================= FIX CRÍTICO (NO ROMPE NADA) ================= */
+/* Evita que el index se rompa y permite iniciar el lector NFC */
+function syncOfflineQueue() {
+  // Stub seguro
+}
+
 /* ================= DOM ================= */
 const estadoLector = document.getElementById("estadoLector");
 const estadoConexion = document.getElementById("estadoConexion");
