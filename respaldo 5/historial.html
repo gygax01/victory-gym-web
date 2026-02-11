@@ -25,9 +25,20 @@
 <!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
+
+<!-- CREA window.supabaseClient -->
 <script src="js/realtime.js"></script>
 
 <script>
+/* ================= ALIAS CRÍTICOS ================= */
+function obtenerClientes() {
+  return safeGet("clientes");
+}
+
+function obtenerAsistencias() {
+  return safeGet("asistencias");
+}
+
 /* ================= DOM ================= */
 const listaHistorial = document.getElementById("listaHistorial");
 const busqueda = document.getElementById("busqueda");
@@ -39,18 +50,42 @@ let asistencias = [];
 /* ================= INIT ================= */
 window.addEventListener("load", initHistorial);
 
-function initHistorial() {
+async function initHistorial() {
   if (!verificarSesion()) return;
   if (!can("history_view")) return;
 
   busqueda.addEventListener("input", filtrar);
 
+  if (navigator.onLine && window.supabaseClient) {
+    await cargarAsistenciasIniciales();
+  }
+
   iniciarSyncHistorial();
   cargarHistorial();
+}
 
-  if (navigator.onLine && typeof iniciarRealtime === "function") {
-    iniciarRealtime();
+/* ================= SUPABASE → ASISTENCIAS ================= */
+async function cargarAsistenciasIniciales() {
+  const { data, error } = await supabaseClient
+    .from("asistencias")
+    .select("*");
+
+  if (error) {
+    console.error("❌ Error cargando asistencias:", error);
+    return;
   }
+
+  const normalizadas = (data || []).map(a => ({
+    id: a.id,
+    tarjetaUID: a.tarjeta_uid,
+    nombre: a.nombre,
+    entrada: a.entrada,
+    salida: a.salida,
+    fecha: a.fecha
+  }));
+
+  safeSet("asistencias", normalizadas);
+  new BroadcastChannel("victory-data").postMessage("asistencias");
 }
 
 /* ================= SINCRONIZACIÓN ================= */
@@ -58,20 +93,15 @@ function iniciarSyncHistorial() {
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = e => {
-    if (["asistencias","clientes"].includes(e.data)) {
+    if (["asistencias", "clientes"].includes(e.data)) {
       cargarHistorial();
     }
   };
 
   window.addEventListener("storage", e => {
-    if (["asistencias","clientes"].includes(e.key)) {
+    if (["asistencias", "clientes"].includes(e.key)) {
       cargarHistorial();
     }
-  });
-
-  window.addEventListener("online", () => {
-    syncOfflineQueue();
-    cargarHistorial();
   });
 }
 
@@ -130,7 +160,7 @@ function cargarHistorial() {
   render(clientes);
 }
 
-/* ================= RENDER ================= */
+/* ================= RENDER (NO TOCADO) ================= */
 function render(lista) {
   listaHistorial.innerHTML = "";
 
