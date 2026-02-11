@@ -78,7 +78,7 @@ function obtenerSesion() {
 }
 
 /* ================= FIXES CRÍTICOS ================= */
-/* asistencias.js espera estas funciones */
+/* asistencias.js y index esperan estas funciones */
 
 function obtenerAsistencias() {
   return safeGet("asistencias");
@@ -86,6 +86,11 @@ function obtenerAsistencias() {
 
 function syncOfflineQueue() {
   // Stub seguro: evita que el flujo se rompa
+}
+
+function buscarEmpleadoPorTarjeta(uid) {
+  const empleados = safeGet("empleados");
+  return empleados.some(e => e.tarjetaUID === uid);
 }
 
 /* ================= DOM ================= */
