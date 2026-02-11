@@ -72,7 +72,7 @@ let leyendoTarjeta = false;
 /* ================= INIT ================= */
 window.addEventListener("load", () => {
   if (!verificarSesion()) return;
-  if (!requirePermission("clients_view")) return;
+  if (!can("clients_view")) return;
 
   busqueda.oninput = filtrar;
   btnConfirmarBorrado.onclick = confirmarBorrado;
@@ -230,3 +230,4 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
