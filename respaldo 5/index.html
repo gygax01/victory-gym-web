@@ -82,7 +82,6 @@ function obtenerAsistencias() { return safeGet("asistencias"); }
 /* ================= INIT ================= */
 window.addEventListener("load", () => {
 
-  // DOM seguro (después de cargar)
   const estadoLector = document.getElementById("estadoLector");
   const estadoConexion = document.getElementById("estadoConexion");
   const btnUsuarios = document.getElementById("btnUsuarios");
@@ -173,7 +172,7 @@ function procesarTarjeta(uid) {
   if (!abierta) {
 
     const nueva = {
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID(), // sigue existiendo para uso local
       tarjetaUID: uid,
       nombre: cliente.nombre,
       fecha: fechaHoy,
@@ -183,6 +182,7 @@ function procesarTarjeta(uid) {
 
     asistencias.push(nueva);
     safeSet("asistencias", asistencias);
+
     subirEntradaSupabase(nueva);
 
     mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
@@ -191,6 +191,7 @@ function procesarTarjeta(uid) {
 
     abierta.salida_ts = ahoraTS;
     safeSet("asistencias", asistencias);
+
     subirSalidaSupabase(abierta);
 
     mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
@@ -208,8 +209,8 @@ function procesarTarjeta(uid) {
 async function subirEntradaSupabase(a) {
   if (!window.supabaseClient || !navigator.onLine) return;
 
+  // 🔥 YA NO MANDAMOS EL ID
   await supabaseClient.from("asistencias").insert({
-    id: a.id,
     tarjeta_uid: a.tarjetaUID,
     nombre: a.nombre,
     fecha: a.fecha,
@@ -224,7 +225,9 @@ async function subirSalidaSupabase(a) {
   await supabaseClient
     .from("asistencias")
     .update({ salida_ts: a.salida_ts })
-    .eq("id", a.id);
+    .eq("tarjeta_uid", a.tarjetaUID)
+    .eq("fecha", a.fecha)
+    .is("salida_ts", null);
 }
 
 </script>
