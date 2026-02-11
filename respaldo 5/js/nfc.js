@@ -33,11 +33,38 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
         schema: "public",
         table: "nfc_events"
       },
-      payload => {
+      async payload => {
         if (!escuchando) return;
 
         const uid = payload.new?.uid;
-        if (!uid) return;
+        const eventId = payload.new?.id;
+
+        if (!uid || !eventId) return;
+
+        /* ==========================================
+           🔒 FIX MULTI-DISPOSITIVO (NO ROMPE NADA)
+        ========================================== */
+
+        const { data, error } = await window.supabaseClient
+          .from("nfc_events")
+          .update({ processed: true })
+          .eq("id", eventId)
+          .eq("processed", false)
+          .select();
+
+        if (error) {
+          console.error("❌ Error marcando processed:", error);
+          return;
+        }
+
+        // Si no actualizó nada, otro dispositivo ya lo tomó
+        if (!data || data.length === 0) {
+          return;
+        }
+
+        /* ==========================================
+           SOLO EL DISPOSITIVO GANADOR PROCESA
+        ========================================== */
 
         const ahora = Date.now();
         if (uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) return;
