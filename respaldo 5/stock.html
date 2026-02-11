@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stock</title>
 
 <link rel="stylesheet" href="css/styles.css">
@@ -9,6 +10,102 @@
 <!-- SUPABASE (ESTA ES LA BUENA) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@1.35.7/dist/umd/supabase.min.js"></script>
 
+<!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+<style>
+@media (max-width:768px){
+
+  .header-brand{
+    flex-direction:column;
+    gap:14px;
+    padding:18px;
+    text-align:center;
+  }
+
+  .brand{
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .brand img{
+    height:70px;
+  }
+
+  .brand h2{
+    font-size:20px;
+  }
+
+  .header-brand > div:last-child{
+    flex-direction:column;
+    width:100%;
+  }
+
+  .header-brand button{
+    width:100%;
+  }
+
+  .card.stock-nuevo{
+    width:92%;
+    margin:20px auto;
+    padding:24px 18px;
+  }
+
+  .card.stock-nuevo .stock-form{
+    grid-template-columns:1fr !important;
+    gap:12px;
+  }
+
+  .card.stock-nuevo input,
+  .card.stock-nuevo button{
+    width:100% !important;
+    height:46px;
+    font-size:14px;
+  }
+
+  .search-bar{
+    width:92%;
+  }
+
+  .search-bar input{
+    height:46px;
+    font-size:15px;
+  }
+
+  .stock-grid{
+    width:92%;
+    grid-template-columns:1fr;
+  }
+
+  .stock-card{
+    padding:18px;
+  }
+
+  .stock-card h4{
+    font-size:16px;
+  }
+
+  .stock-card input{
+    height:44px;
+    font-size:14px;
+    margin-top:6px;
+  }
+
+  .stock-footer{
+    width:92%;
+    text-align:center;
+  }
+
+  .stock-footer button{
+    width:100%;
+    margin-top:10px;
+    height:46px;
+  }
+
+  .modal-card{
+    width:92%;
+  }
+
+}
+</style>
 </head>
 
 <body onload="initStock()">
@@ -319,4 +416,3 @@ function filtrarStock() {
 
 </body>
 </html>
-
