@@ -131,10 +131,16 @@ let leyendoNFC = false;
 let timeoutNFC = null;
 
 /* ================= INIT ================= */
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
+
   if (getSession()) {
     location.href = "index.html";
     return;
+  }
+
+  // 🔥 CARGA EMPLEADOS ANTES DE USAR NFC
+  if (navigator.onLine && typeof cargarEmpleadosIniciales === "function") {
+    await cargarEmpleadosIniciales();
   }
 
   actualizarEstadoConexion();
@@ -176,7 +182,9 @@ function iniciarSyncUsuarios() {
   });
 
   window.addEventListener("online", () => {
-    syncOfflineQueue();
+    if (typeof cargarEmpleadosIniciales === "function") {
+      cargarEmpleadosIniciales();
+    }
   });
 }
 
@@ -189,7 +197,7 @@ function ocultarOverlays() {
 btnLogin.onclick = () => {
   ocultarOverlays();
 
-  const r = login(inputUser.value.trim(), inputPass.value, 0);
+  const r = login(inputUser.value.trim(), inputPass.value);
 
   if (r === "NO_USER") {
     overlayUsuario.style.display = "flex";
@@ -205,13 +213,8 @@ btnLogin.onclick = () => {
 
   if (r === "OK") {
     overlayLoader.style.display = "flex";
-    estadoLoader.className = "estado amarillo";
-    estadoLoader.textContent = "Accediendo…";
-
-    setTimeout(() => {
-      estadoLoader.className = "estado verde";
-      estadoLoader.textContent = "Acceso correcto";
-    }, 400);
+    estadoLoader.className = "estado verde";
+    estadoLoader.textContent = "Acceso correcto";
   }
 };
 
@@ -233,10 +236,14 @@ btnNFC.onclick = () => {
   }, 10000);
 
   iniciarNFCControlado({
-    onUID: uid => {
+    onUID: async uid => {
+
       clearTimeout(timeoutNFC);
 
-      const emp = obtenerEmpleados().find(e => e.tarjetaUID === uid);
+      const empleados = obtenerEmpleados();
+
+      const emp = empleados.find(e => e.tarjetaUID === uid);
+
       if (!emp) {
         estadoNFC.className = "estado rojo";
         estadoNFC.textContent = "Tarjeta no registrada";
@@ -249,10 +256,7 @@ btnNFC.onclick = () => {
 
       setTimeout(() => {
         resetNFC();
-        overlayLoader.style.display = "flex";
-        estadoLoader.className = "estado verde";
-        estadoLoader.textContent = "Acceso correcto";
-        login(emp.usuario, emp.password, 0);
+        login(emp.usuario, emp.password);
       }, 700);
     }
   });
