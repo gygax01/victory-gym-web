@@ -1,5 +1,5 @@
 /* ======================================================
-   ===== SUPABASE REALTIME (STOCK FINAL) ================
+   ===== SUPABASE REALTIME (STOCK + CLIENTES) ===========
 ====================================================== */
 
 const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
@@ -16,6 +16,10 @@ window.supabaseClient = supabaseClient;
 
 const bc = new BroadcastChannel("victory-data");
 let realtimeChannel = null;
+
+/* ======================================================
+   ===== PRODUCTOS (NO TOCAR) ===========================
+====================================================== */
 
 /* ================= CARGA INICIAL ================= */
 async function cargarProductosIniciales() {
@@ -66,7 +70,7 @@ async function borrarProductoSupabase(id) {
   if (error) console.error("❌ Error delete:", error);
 }
 
-/* ================= REALTIME ================= */
+/* ================= REALTIME PRODUCTOS ================= */
 function iniciarRealtime() {
   if (realtimeChannel) return;
 
@@ -97,11 +101,82 @@ function iniciarRealtime() {
     });
 }
 
-/* ================= INIT ================= */
+/* ======================================================
+   ===== CLIENTES (NUEVO - SOURCE OF TRUTH) ==============
+====================================================== */
+
+/* ================= CARGA INICIAL CLIENTES ================= */
+async function cargarClientesIniciales() {
+  const { data, error } = await supabaseClient
+    .from("clientes")
+    .select("*");
+
+  if (error) {
+    console.error("❌ Error carga clientes:", error);
+    return;
+  }
+
+  const clientesNormalizados = (data || []).map(c => ({
+    id: c.id,
+    nombre: c.nombre,
+    tarjetaUID: c.tarjeta_uid,
+    fechaRegistro: c.fecha_registro,
+    membresiaExpira: c.membresia_expira
+  }));
+
+  localStorage.setItem("clientes", JSON.stringify(clientesNormalizados));
+  bc.postMessage("clientes");
+
+  console.log("✅ Clientes cargados:", clientesNormalizados.length);
+}
+
+/* ================= REALTIME CLIENTES ================= */
+function iniciarRealtimeClientes() {
+  supabaseClient
+    .channel("rt-clientes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "clientes" },
+      payload => {
+        let clientes = JSON.parse(localStorage.getItem("clientes") || "[]");
+
+        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+          const nuevo = {
+            id: payload.new.id,
+            nombre: payload.new.nombre,
+            tarjetaUID: payload.new.tarjeta_uid,
+            fechaRegistro: payload.new.fecha_registro,
+            membresiaExpira: payload.new.membresia_expira
+          };
+
+          const i = clientes.findIndex(c => c.id === nuevo.id);
+          if (i >= 0) clientes[i] = nuevo;
+          else clientes.push(nuevo);
+        }
+
+        if (payload.eventType === "DELETE") {
+          clientes = clientes.filter(c => c.id !== payload.old.id);
+        }
+
+        localStorage.setItem("clientes", JSON.stringify(clientes));
+        bc.postMessage("clientes");
+      }
+    )
+    .subscribe(() => {
+      console.log("📡 Realtime clientes activo");
+    });
+}
+
+/* ======================================================
+   ===== INIT GLOBAL (NO TOCAR) =========================
+====================================================== */
+
 window.addEventListener("load", () => {
   if (navigator.onLine) {
     cargarProductosIniciales();
-    iniciarRealtime();
+    cargarClientesIniciales();     // 👈 CLIENTES
+    iniciarRealtime();             // 👈 PRODUCTOS
+    iniciarRealtimeClientes();     // 👈 CLIENTES
   }
 });
 
