@@ -72,15 +72,20 @@
 <script src="js/bluetooth.js"></script>
 
 <script>
-/* ================= ALIAS SESIÓN (NO TOCAR AUTH) ================= */
+/* ================= ALIAS SESIÓN ================= */
 function obtenerSesion() {
   return getSession();
 }
 
-/* ================= FIX CRÍTICO (NO ROMPE NADA) ================= */
-/* Evita que el index se rompa y permite iniciar el lector NFC */
+/* ================= FIXES CRÍTICOS ================= */
+/* asistencias.js espera estas funciones */
+
+function obtenerAsistencias() {
+  return safeGet("asistencias");
+}
+
 function syncOfflineQueue() {
-  // Stub seguro
+  // Stub seguro: evita que el flujo se rompa
 }
 
 /* ================= DOM ================= */
