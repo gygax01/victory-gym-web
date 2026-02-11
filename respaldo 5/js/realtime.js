@@ -102,10 +102,9 @@ function iniciarRealtime() {
 }
 
 /* ======================================================
-   ===== CLIENTES (NUEVO - SOURCE OF TRUTH) ==============
+   ===== CLIENTES (NO TOCAR) ============================
 ====================================================== */
 
-/* ================= CARGA INICIAL CLIENTES ================= */
 async function cargarClientesIniciales() {
   const { data, error } = await supabaseClient
     .from("clientes")
@@ -130,7 +129,6 @@ async function cargarClientesIniciales() {
   console.log("✅ Clientes cargados:", clientesNormalizados.length);
 }
 
-/* ================= REALTIME CLIENTES ================= */
 function iniciarRealtimeClientes() {
   supabaseClient
     .channel("rt-clientes")
@@ -168,20 +166,70 @@ function iniciarRealtimeClientes() {
 }
 
 /* ======================================================
-   ===== INIT GLOBAL (NO TOCAR) =========================
+   ===== NUEVO: REALTIME ASISTENCIAS (SOLO ESTO NUEVO)
+====================================================== */
+
+function iniciarRealtimeAsistencias() {
+  supabaseClient
+    .channel("rt-asistencias")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "asistencias" },
+      payload => {
+
+        let asistencias = JSON.parse(localStorage.getItem("asistencias") || "[]");
+
+        if (payload.eventType === "INSERT") {
+          const nueva = {
+            id: payload.new.id,
+            tarjetaUID: payload.new.tarjeta_uid,
+            nombre: payload.new.nombre,
+            fecha: payload.new.fecha,
+            entrada_ts: payload.new.entrada_ts,
+            salida_ts: payload.new.salida_ts
+          };
+
+          const existe = asistencias.find(a => a.id === nueva.id);
+          if (!existe) asistencias.push(nueva);
+        }
+
+        if (payload.eventType === "UPDATE") {
+          const i = asistencias.findIndex(a => a.id === payload.new.id);
+          if (i >= 0) asistencias[i].salida_ts = payload.new.salida_ts;
+        }
+
+        if (payload.eventType === "DELETE") {
+          asistencias = asistencias.filter(a => a.id !== payload.old.id);
+        }
+
+        localStorage.setItem("asistencias", JSON.stringify(asistencias));
+
+        if (typeof notificarCambioAsistencias === "function") {
+          notificarCambioAsistencias();
+        }
+      }
+    )
+    .subscribe(() => {
+      console.log("📡 Realtime asistencias activo");
+    });
+}
+
+/* ======================================================
+   ===== INIT GLOBAL (SOLO UNA LÍNEA AGREGADA)
 ====================================================== */
 
 window.addEventListener("load", () => {
   if (navigator.onLine) {
     cargarProductosIniciales();
-    cargarClientesIniciales();     // 👈 CLIENTES
-    iniciarRealtime();             // 👈 PRODUCTOS
-    iniciarRealtimeClientes();     // 👈 CLIENTES
+    cargarClientesIniciales();
+    iniciarRealtime();
+    iniciarRealtimeClientes();
+    iniciarRealtimeAsistencias(); // 👈 ÚNICA LÍNEA NUEVA
   }
 });
 
 /* ======================================================
-   ===== HISTORIAL STOCK (AUDITORÍA PRO) =================
+   ===== HISTORIAL STOCK (NO TOCAR) =====================
 ====================================================== */
 
 async function pushHistorialStock(cambios) {
@@ -215,7 +263,9 @@ async function pushHistorialStock(cambios) {
     console.error("❌ Error pushHistorialStock:", e);
   }
 }
-/* ================= CLIENTES → SUPABASE ================= */
+
+/* ================= CLIENTES → SUPABASE (NO TOCAR) ================= */
+
 async function insertarClienteSupabase(cliente) {
   if (!navigator.onLine || !window.supabaseClient) return;
 
