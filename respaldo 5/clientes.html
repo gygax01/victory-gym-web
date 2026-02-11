@@ -143,14 +143,10 @@
 <script src="js/realtime.js"></script>
 
 <script>
-/* ======================================================
-   ===== FIX CRÍTICO: ALIAS CLIENTES =====================
-====================================================== */
 function obtenerClientes() {
   return safeGet("clientes");
 }
 
-/* ================= DOM ================= */
 const listaClientes = document.getElementById("listaClientes");
 const busqueda = document.getElementById("busqueda");
 const confirmBorrar = document.getElementById("confirmBorrar");
@@ -161,13 +157,11 @@ const btnConfirmarBorrado = document.getElementById("btnConfirmarBorrado");
 const btnCancelarBorrado = document.getElementById("btnCancelarBorrado");
 const btnCancelarReasignar = document.getElementById("btnCancelarReasignar");
 
-/* ================= ESTADO ================= */
 let clientes = [];
 let clienteUIDEliminar = null;
 let clienteUIDReasignar = null;
 let leyendoTarjeta = false;
 
-/* ================= INIT ================= */
 window.addEventListener("load", () => {
   if (!verificarSesion()) return;
   if (!can("clients_view")) return;
@@ -181,7 +175,6 @@ window.addEventListener("load", () => {
   cargarClientes();
 });
 
-/* ================= SYNC ================= */
 function iniciarSyncClientes() {
   const bc = new BroadcastChannel("victory-data");
 
@@ -194,7 +187,6 @@ function iniciarSyncClientes() {
   });
 }
 
-/* ================= CARGA ================= */
 function cargarClientes() {
   clientes = obtenerClientes()
     .filter(c => c && typeof c.nombre === "string")
@@ -203,7 +195,6 @@ function cargarClientes() {
   render(clientes);
 }
 
-/* ================= RENDER ================= */
 function render(lista) {
   listaClientes.innerHTML = "";
 
@@ -236,13 +227,11 @@ function render(lista) {
   });
 }
 
-/* ================= FILTRO ================= */
 function filtrar() {
   const q = busqueda.value.toLowerCase();
   render(clientes.filter(c => c.nombre.toLowerCase().includes(q)));
 }
 
-/* ================= ELIMINAR ================= */
 function pedirConfirmacion(uid) {
   clienteUIDEliminar = uid;
   confirmBorrar.style.display = "flex";
@@ -265,7 +254,7 @@ function confirmarBorrado() {
   cargarClientes();
 }
 
-/* ================= REASIGNAR NFC ================= */
+/* ================= REASIGNAR NFC (CORREGIDO) ================= */
 function iniciarReasignacion(uid) {
   clienteUIDReasignar = uid;
   leyendoTarjeta = false;
@@ -279,15 +268,23 @@ function iniciarReasignacion(uid) {
       if (leyendoTarjeta) return;
       leyendoTarjeta = true;
 
+      let clienteActualizado = null;
+
       const lista = obtenerClientes().map(c => {
         if (c.tarjetaUID === clienteUIDReasignar) {
           c.tarjetaUID = uidNuevo;
+          clienteActualizado = c;
         }
         return c;
       });
 
       safeSet("clientes", lista);
       new BroadcastChannel("victory-data").postMessage("clientes");
+
+      // 🔥 ACTUALIZA TAMBIÉN EN SUPABASE
+      if (clienteActualizado && typeof actualizarClienteSupabase === "function") {
+        actualizarClienteSupabase(clienteActualizado);
+      }
 
       estadoTarjeta.className = "estado verde";
       estadoTarjeta.textContent = "Tarjeta reasignada";
