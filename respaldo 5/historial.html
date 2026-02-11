@@ -56,36 +56,41 @@ async function initHistorial() {
 
   busqueda.addEventListener("input", filtrar);
 
-  if (navigator.onLine && window.supabaseClient) {
-    await cargarAsistenciasIniciales();
-  }
+  // 🔥 CARGA REAL DESDE SUPABASE
+  await cargarAsistenciasDesdeSupabase();
 
   iniciarSyncHistorial();
   cargarHistorial();
 }
 
 /* ================= SUPABASE → ASISTENCIAS ================= */
-async function cargarAsistenciasIniciales() {
+async function cargarAsistenciasDesdeSupabase() {
+  if (!navigator.onLine || !window.supabaseClient) {
+    asistencias = obtenerAsistencias();
+    return;
+  }
+
   const { data, error } = await supabaseClient
     .from("asistencias")
     .select("*");
 
   if (error) {
     console.error("❌ Error cargando asistencias:", error);
+    asistencias = obtenerAsistencias();
     return;
   }
 
-  const normalizadas = (data || []).map(a => ({
+  asistencias = (data || []).map(a => ({
     id: a.id,
     tarjetaUID: a.tarjeta_uid,
     nombre: a.nombre,
-    entrada: a.entrada,
-    salida: a.salida,
+    entrada: a.entrada, // UTC
+    salida: a.salida,   // UTC
     fecha: a.fecha
   }));
 
-  safeSet("asistencias", normalizadas);
-  new BroadcastChannel("victory-data").postMessage("asistencias");
+  // Cache offline
+  safeSet("asistencias", asistencias);
 }
 
 /* ================= SINCRONIZACIÓN ================= */
@@ -147,6 +152,18 @@ function calcularRachas(uid) {
   return { actual, max };
 }
 
+/* ================= HORA UTC → LOCAL ================= */
+function horaLocal(horaUTC) {
+  if (!horaUTC) return "-";
+  const hoy = new Date().toISOString().slice(0, 10);
+  const d = new Date(`${hoy}T${horaUTC}Z`);
+  return d.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
 /* ================= CARGA ================= */
 function cargarHistorial() {
   clientes = obtenerClientes().filter(c => c && typeof c.nombre === "string");
@@ -160,7 +177,7 @@ function cargarHistorial() {
   render(clientes);
 }
 
-/* ================= RENDER (NO TOCADO) ================= */
+/* ================= RENDER ================= */
 function render(lista) {
   listaHistorial.innerHTML = "";
 
@@ -211,8 +228,8 @@ function render(lista) {
               registros.map((r, i) => `
                 <tr class="${i % 2 ? 'alt' : ''}">
                   <td>${r.fecha}</td>
-                  <td>${r.entrada}</td>
-                  <td>${r.salida ?? "-"}</td>
+                  <td>${horaLocal(r.entrada)}</td>
+                  <td>${r.salida ? horaLocal(r.salida) : "-"}</td>
                 </tr>
               `).join("")
             }
