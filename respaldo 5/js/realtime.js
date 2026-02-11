@@ -352,3 +352,42 @@ async function actualizarClienteSupabase(cliente) {
     console.error("❌ Error actualizar cliente:", error);
   }
 }
+/* ======================================================
+   ===== EMPLEADOS SYNC (NUEVO)
+====================================================== */
+
+async function insertarEmpleadoSupabase(emp) {
+  if (!navigator.onLine || !window.supabaseClient) return;
+
+  const { error } = await supabaseClient
+    .from("empleados")
+    .insert({
+      id: emp.id,
+      nombre: emp.nombre,
+      usuario: emp.usuario,
+      password: emp.password,
+      rol: emp.rol
+    });
+
+  if (error) {
+    console.error("❌ Error insertar empleado:", error);
+  } else {
+    console.log("☁️ Empleado guardado en Supabase");
+  }
+}
+
+async function cargarEmpleadosIniciales() {
+  const { data, error } = await supabaseClient
+    .from("empleados")
+    .select("*");
+
+  if (error) {
+    console.error("❌ Error carga empleados:", error);
+    return;
+  }
+
+  localStorage.setItem("empleados", JSON.stringify(data || []));
+  bc.postMessage("empleados");
+
+  console.log("✅ Empleados sincronizados:", data.length);
+}
