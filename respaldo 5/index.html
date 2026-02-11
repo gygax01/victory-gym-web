@@ -182,12 +182,14 @@ async function procesarTarjeta(uid) {
         return;
       }
 
-      // 🔥 AQUÍ ESTÁ LA ANIMACIÓN RESTAURADA
-      if (data?.accion === "entrada") {
-        mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
-      } else if (data?.accion === "salida") {
-        mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
+      const resultado = Array.isArray(data) ? data[0] : data;
+
+      if (resultado?.accion === "entrada") {
+       mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
+      } else if (resultado?.accion === "salida") {
+      mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
       }
+
 
     } else {
 
@@ -241,3 +243,4 @@ async function sincronizarPendientesAttendance() {
 
 </body>
 </html>
+
