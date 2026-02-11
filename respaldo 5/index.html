@@ -67,11 +67,16 @@
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/asistencias.js"></script>
-<script src="js/nfc.js"></script>
 <script src="js/realtime.js"></script>
+<script src="js/nfc.js"></script>
 <script src="js/bluetooth.js"></script>
 
 <script>
+/* ================= ALIAS SESIÓN (NO TOCAR AUTH) ================= */
+function obtenerSesion() {
+  return getSession();
+}
+
 /* ================= DOM ================= */
 const estadoLector = document.getElementById("estadoLector");
 const estadoConexion = document.getElementById("estadoConexion");
@@ -94,12 +99,10 @@ function initIndex() {
   iniciarLecturaNFCIndex();
   iniciarSyncLocal();
 
-  // 🌐 Realtime Supabase
   if (navigator.onLine && typeof iniciarRealtime === "function") {
     iniciarRealtime();
   }
 
-  // 🔵 Bluetooth automático si no hay internet
   if (!navigator.onLine) {
     conectarBluetooth().catch(() => {});
   }
@@ -129,7 +132,6 @@ window.addEventListener("online", () => {
   actualizarEstadoConexion();
   if (typeof iniciarRealtime === "function") iniciarRealtime();
 });
-
 window.addEventListener("offline", actualizarEstadoConexion);
 
 /* ================= SYNC LOCAL ================= */
@@ -191,32 +193,63 @@ function procesarTarjeta(uid) {
   }
 
   const asistencias = obtenerAsistencias();
-  const hoyFecha = hoy();
+  const fechaHoy = hoy();
 
   const delDia = asistencias
-    .filter(a => a.tarjetaUID === uid && a.fecha === hoyFecha)
+    .filter(a => a.tarjetaUID === uid && a.fecha === fechaHoy)
     .sort((a,b)=>a.entrada.localeCompare(b.entrada));
 
   const ultima = delDia[delDia.length - 1] || null;
 
   if (!ultima || ultima.salida !== null) {
-    registrarAsistencia({
+    const nueva = {
+      id: crypto.randomUUID(),
       tarjetaUID: uid,
       nombre: cliente.nombre,
       entrada: horaActual(),
       salida: null,
-      fecha: hoyFecha
-    });
+      fecha: fechaHoy
+    };
+
+    registrarAsistencia(nueva);
+    subirEntradaSupabase(nueva);
     mostrarConfirmacion("entrada","Bienvenido",cliente.nombre);
+
   } else {
     ultima.salida = horaActual();
     safeSet("asistencias", asistencias);
+    subirSalidaSupabase(ultima);
     mostrarConfirmacion("salida","Hasta luego",cliente.nombre);
   }
 
   notificarCambioAsistencias();
   cargarAsistencias();
   actualizarContador();
+}
+
+/* ================= SUPABASE ASISTENCIAS ================= */
+async function subirEntradaSupabase(a) {
+  if (!window.supabaseClient || !navigator.onLine) return;
+
+  await supabaseClient.from("asistencias").insert({
+    id: a.id,
+    tarjeta_uid: a.tarjetaUID,
+    nombre: a.nombre,
+    entrada: a.entrada,
+    salida: null,
+    fecha: a.fecha
+  });
+}
+
+async function subirSalidaSupabase(a) {
+  if (!window.supabaseClient || !navigator.onLine) return;
+
+  await supabaseClient
+    .from("asistencias")
+    .update({ salida: a.salida })
+    .eq("tarjeta_uid", a.tarjetaUID)
+    .eq("fecha", a.fecha)
+    .is("salida", null);
 }
 </script>
 
