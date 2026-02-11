@@ -100,13 +100,11 @@ window.addEventListener("load", () => {
 
   actualizarEstadoConexion(estadoConexion);
 
-  // ⚠️ temporal mientras migramos UI
   cargarAsistencias();
   actualizarContador();
 
   iniciarLecturaNFCIndex(estadoLector);
 
-  // sincronizar pendientes al iniciar si hay internet
   if (navigator.onLine) {
     sincronizarPendientesAttendance();
   }
@@ -181,13 +179,24 @@ async function procesarTarjeta(uid) {
 
     if (navigator.onLine) {
 
-      await supabaseClient.rpc("registrar_asistencia", {
+      const { data, error } = await window.supabaseClient.rpc("registrar_asistencia", {
         p_id: id,
         p_uid: uid,
         p_created_at: ahoraISO,
         p_source: source,
         p_device_id: deviceId
       });
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      if (data?.accion === "entrada") {
+        mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
+      } else if (data?.accion === "salida") {
+        mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
+      }
 
     } else {
 
@@ -202,9 +211,9 @@ async function procesarTarjeta(uid) {
       });
 
       safeSet("attendance_offline", pendientes);
-    }
 
-    mostrarConfirmacion("entrada", "Registro guardado", cliente.nombre);
+      mostrarConfirmacion("entrada", "Guardado offline", cliente.nombre);
+    }
 
   } catch (err) {
     console.error("❌ Error RPC:", err);
@@ -222,7 +231,7 @@ async function sincronizarPendientesAttendance() {
   for (const e of pendientes) {
 
     try {
-      await supabaseClient.rpc("registrar_asistencia", {
+      await window.supabaseClient.rpc("registrar_asistencia", {
         p_id: e.id,
         p_uid: e.uid,
         p_created_at: e.created_at,
@@ -231,7 +240,7 @@ async function sincronizarPendientesAttendance() {
       });
     } catch (err) {
       console.error("Error sync attendance:", err);
-      return; // detener si falla
+      return;
     }
   }
 
