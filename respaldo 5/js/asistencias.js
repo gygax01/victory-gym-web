@@ -1,10 +1,7 @@
 /* ======================================================
-   ===== ASISTENCIAS GYM (SYNC + TS COMPATIBLE) =========
-   ====================================================== */
+   ===== ASISTENCIAS GYM (COMPATIBLE STORAGE NUEVO) =====
+====================================================== */
 
-/* ===============================
-   ===== INIT GLOBAL =====
-=============================== */
 (function initAsistenciasSync() {
 
   const bc = new BroadcastChannel("victory-data");
@@ -23,63 +20,38 @@
     }
   });
 
-  window.addEventListener("online", () => {
-    if (typeof syncOfflineQueue === "function") {
-      syncOfflineQueue();
-    }
-    cargarAsistencias();
-    actualizarContador();
-  });
-
 })();
 
-/* ===============================
-   ===== UTILIDADES INTERNAS =====
-=============================== */
+/* ======================================================
+   ===== UTILIDADES ===============================
+====================================================== */
 
-const APP_TZ = localStorage.getItem("APP_TIMEZONE") || "America/Mexico_City";
-
+/**
+ * Devuelve timestamp seguro para ordenar
+ */
 function obtenerTimestampSeguro(a) {
-  if (a.entrada_ts) return a.entrada_ts;
-
-  if (a.entrada && a.fecha) {
-    return new Date(`${a.fecha}T${a.entrada}`).getTime();
-  }
-
+  if (typeof a.entrada_ts === "number") return a.entrada_ts;
   return 0;
 }
 
-function formatearHora(a, tipo) {
-  if (tipo === "entrada") {
-    if (a.entrada_ts) {
-      return new Date(a.entrada_ts).toLocaleTimeString("es-MX", {
-        timeZone: APP_TZ,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
-      });
-    }
-    return a.entrada || "-";
-  }
+/**
+ * Formatea hora desde timestamp
+ */
+function formatearHoraTS(ts) {
+  if (!ts || typeof ts !== "number") return "-";
 
-  if (tipo === "salida") {
-    if (a.salida_ts) {
-      return new Date(a.salida_ts).toLocaleTimeString("es-MX", {
-        timeZone: APP_TZ,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
-      });
-    }
-    return a.salida || "-";
-  }
-
-  return "-";
+  return new Date(ts).toLocaleTimeString("es-MX", {
+    timeZone: "America/Mexico_City",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
 
-/* ===============================
-   ===== CARGAR TABLA =====
-=============================== */
+/* ======================================================
+   ===== CARGAR TABLA ===================================
+====================================================== */
+
 function cargarAsistencias() {
 
   const asistencias = obtenerAsistencias();
@@ -96,7 +68,9 @@ function cargarAsistencias() {
       a.fecha === hoyFecha &&
       typeof a.nombre === "string"
     )
-    .sort((a, b) => obtenerTimestampSeguro(b) - obtenerTimestampSeguro(a))
+    .sort((a, b) =>
+      obtenerTimestampSeguro(b) - obtenerTimestampSeguro(a)
+    )
     .forEach(a => {
 
       const tr = document.createElement("tr");
@@ -105,19 +79,20 @@ function cargarAsistencias() {
       tdNombre.textContent = a.nombre;
 
       const tdEntrada = document.createElement("td");
-      tdEntrada.textContent = formatearHora(a, "entrada");
+      tdEntrada.textContent = formatearHoraTS(a.entrada_ts);
 
       const tdSalida = document.createElement("td");
-      tdSalida.textContent = formatearHora(a, "salida");
+      tdSalida.textContent = formatearHoraTS(a.salida_ts);
 
       tr.append(tdNombre, tdEntrada, tdSalida);
       tbody.appendChild(tr);
     });
 }
 
-/* ===============================
-   ===== CONTADOR AFORO =====
-=============================== */
+/* ======================================================
+   ===== CONTADOR AFORO ================================
+====================================================== */
+
 function actualizarContador() {
 
   const asistencias = obtenerAsistencias();
@@ -128,23 +103,25 @@ function actualizarContador() {
   const dentro = asistencias.filter(a =>
     a &&
     a.fecha === hoyFecha &&
-    (
-      (a.entrada_ts && !a.salida_ts) ||
-      (a.entrada && a.salida === null)
-    )
+    typeof a.entrada_ts === "number" &&
+    !a.salida_ts
   ).length;
 
   const contador = document.getElementById("contadorAforo");
   if (!contador) return;
 
   const strong = contador.querySelector("strong");
-  if (strong) strong.textContent = dentro;
-  else contador.textContent = `Dentro: ${dentro}`;
+  if (strong) {
+    strong.textContent = dentro;
+  } else {
+    contador.textContent = `Dentro: ${dentro}`;
+  }
 }
 
-/* ===============================
-   ===== NOTIFICADOR GLOBAL =====
-=============================== */
+/* ======================================================
+   ===== NOTIFICADOR GLOBAL =============================
+====================================================== */
+
 function notificarCambioAsistencias() {
   new BroadcastChannel("victory-data").postMessage("asistencias");
 }
