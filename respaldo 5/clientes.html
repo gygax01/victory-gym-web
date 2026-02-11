@@ -52,6 +52,13 @@
 <script src="js/realtime.js"></script>
 
 <script>
+/* ======================================================
+   ===== FIX CRÍTICO: ALIAS CLIENTES =====================
+====================================================== */
+function obtenerClientes() {
+  return safeGet("clientes");
+}
+
 /* ================= DOM ================= */
 const listaClientes = document.getElementById("listaClientes");
 const busqueda = document.getElementById("busqueda");
@@ -161,12 +168,6 @@ function confirmarBorrado() {
   );
 
   safeSet("clientes", nuevaLista);
-  agregarEvento({
-    tabla: "clientes",
-    accion: "delete",
-    data: { tarjetaUID: clienteUIDEliminar }
-  });
-
   new BroadcastChannel("victory-data").postMessage("clientes");
 
   cancelarBorrado();
@@ -187,21 +188,9 @@ function iniciarReasignacion(uid) {
       if (leyendoTarjeta) return;
       leyendoTarjeta = true;
 
-      if (uidYaRegistrada(uidNuevo)) {
-        estadoTarjeta.className = "estado rojo";
-        estadoTarjeta.textContent = "Tarjeta ya registrada";
-        setTimeout(cancelarReasignacion, 1500);
-        return;
-      }
-
       const lista = obtenerClientes().map(c => {
         if (c.tarjetaUID === clienteUIDReasignar) {
           c.tarjetaUID = uidNuevo;
-          agregarEvento({
-            tabla: "clientes",
-            accion: "update",
-            data: c
-          });
         }
         return c;
       });
@@ -230,4 +219,3 @@ function cancelarReasignacion() {
 
 </body>
 </html>
-
