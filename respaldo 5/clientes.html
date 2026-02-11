@@ -254,7 +254,7 @@ function confirmarBorrado() {
   cargarClientes();
 }
 
-/* ================= REASIGNAR NFC (CORREGIDO) ================= */
+/* ================= REASIGNAR NFC (TOTALMENTE CORREGIDO) ================= */
 function iniciarReasignacion(uid) {
   clienteUIDReasignar = uid;
   leyendoTarjeta = false;
@@ -264,14 +264,15 @@ function iniciarReasignacion(uid) {
   confirmReasignar.style.display = "flex";
 
   iniciarNFCControlado({
-    onUID: uidNuevo => {
+    onUID: async uidNuevo => {
       if (leyendoTarjeta) return;
       leyendoTarjeta = true;
 
       let clienteActualizado = null;
+      const uidViejo = clienteUIDReasignar;
 
       const lista = obtenerClientes().map(c => {
-        if (c.tarjetaUID === clienteUIDReasignar) {
+        if (c.tarjetaUID === uidViejo) {
           c.tarjetaUID = uidNuevo;
           clienteActualizado = c;
         }
@@ -281,9 +282,14 @@ function iniciarReasignacion(uid) {
       safeSet("clientes", lista);
       new BroadcastChannel("victory-data").postMessage("clientes");
 
-      // 🔥 ACTUALIZA TAMBIÉN EN SUPABASE
+      // 🔥 Actualiza cliente en Supabase
       if (clienteActualizado && typeof actualizarClienteSupabase === "function") {
-        actualizarClienteSupabase(clienteActualizado);
+        await actualizarClienteSupabase(clienteActualizado);
+      }
+
+      // 🔥 MIGRA HISTORIAL ATTENDANCE
+      if (typeof migrarUIDEnAttendance === "function") {
+        await migrarUIDEnAttendance(uidViejo, uidNuevo);
       }
 
       estadoTarjeta.className = "estado verde";
