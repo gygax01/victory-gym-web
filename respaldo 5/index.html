@@ -54,6 +54,7 @@
   </table>
 </div>
 
+<!-- CONFIRMACIÓN (RESTAURADA) -->
 <div class="confirmacion" id="confirmacion">
   <div class="box">
     <h1 id="tituloConfirmacion"></h1>
@@ -70,17 +71,8 @@
 <script src="js/bluetooth.js"></script>
 
 <script>
-/* ================= ZONA HORARIA GLOBAL ================= */
+/* ================= ZONA HORARIA ================= */
 const APP_TZ = localStorage.getItem("APP_TIMEZONE") || "America/Mexico_City";
-
-function horaDesdeTS(ts) {
-  return new Date(ts).toLocaleTimeString("es-MX", {
-    timeZone: APP_TZ,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  });
-}
 
 /* ================= ALIAS ================= */
 function obtenerClientes() { return safeGet("clientes"); }
@@ -120,6 +112,18 @@ function actualizarEstadoConexion() {
   }
 }
 
+/* ================= CONFIRMACIÓN (FIX CLAVE) ================= */
+function mostrarConfirmacion(tipo, titulo, mensaje) {
+  const box = document.getElementById("confirmacion");
+  document.getElementById("tituloConfirmacion").textContent = titulo;
+  document.getElementById("mensajeConfirmacion").textContent = mensaje;
+
+  box.className = "confirmacion " + tipo;
+  box.style.display = "flex";
+
+  setTimeout(() => box.style.display = "none", 2200);
+}
+
 /* ================= NFC ================= */
 function iniciarLecturaNFCIndex() {
   estadoLector.className = "lector on";
@@ -132,7 +136,7 @@ function iniciarLecturaNFCIndex() {
   });
 }
 
-/* ================= ENTRADA / SALIDA (FIX REAL) ================= */
+/* ================= ENTRADA / SALIDA ================= */
 function procesarTarjeta(uid) {
   const cliente = obtenerClientes().find(c => c.tarjetaUID === uid);
   if (!cliente) {
@@ -142,13 +146,13 @@ function procesarTarjeta(uid) {
 
   const asistencias = obtenerAsistencias();
   const fechaHoy = hoy();
-
-  // Buscar SOLO la última abierta
-  const abierta = [...asistencias]
-    .reverse()
-    .find(a => a.tarjetaUID === uid && a.fecha === fechaHoy && a.salida_ts === null);
-
   const ahoraTS = Date.now();
+
+  const abierta = [...asistencias].reverse().find(a =>
+    a.tarjetaUID === uid &&
+    a.fecha === fechaHoy &&
+    a.salida_ts === null
+  );
 
   if (!abierta) {
     const nueva = {
