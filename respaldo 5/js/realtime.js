@@ -11,7 +11,6 @@ const supabaseClient = window.supabase.createClient(
   SUPABASE_ANON_KEY
 );
 
-// 👇 EXPONER GLOBAL (CLAVE PARA NFC)
 window.supabaseClient = supabaseClient;
 
 const bc = new BroadcastChannel("victory-data");
@@ -21,7 +20,6 @@ let realtimeChannel = null;
    ===== PRODUCTOS (NO TOCAR) ===========================
 ====================================================== */
 
-/* ================= CARGA INICIAL ================= */
 async function cargarProductosIniciales() {
   const { data, error } = await supabaseClient
     .from("productos")
@@ -37,7 +35,6 @@ async function cargarProductosIniciales() {
   console.log("✅ Productos iniciales:", data.length);
 }
 
-/* ================= UPDATE STOCK ================= */
 async function actualizarStockSupabase(id, nuevoStock) {
   const { error } = await supabaseClient
     .from("productos")
@@ -51,7 +48,6 @@ async function actualizarStockSupabase(id, nuevoStock) {
   return true;
 }
 
-/* ================= INSERT ================= */
 async function insertarProductoSupabase(prod) {
   const { error } = await supabaseClient
     .from("productos")
@@ -60,7 +56,6 @@ async function insertarProductoSupabase(prod) {
   if (error) console.error("❌ Error insert:", error);
 }
 
-/* ================= DELETE ================= */
 async function borrarProductoSupabase(id) {
   const { error } = await supabaseClient
     .from("productos")
@@ -70,7 +65,6 @@ async function borrarProductoSupabase(id) {
   if (error) console.error("❌ Error delete:", error);
 }
 
-/* ================= REALTIME PRODUCTOS ================= */
 function iniciarRealtime() {
   if (realtimeChannel) return;
 
@@ -166,56 +160,91 @@ function iniciarRealtimeClientes() {
 }
 
 /* ======================================================
-   ===== NUEVO: REALTIME ASISTENCIAS (SOLO ESTO NUEVO)
+   ===== NUEVO: REALTIME ATTENDANCE (MODELO EVENTOS)
 ====================================================== */
 
-function iniciarRealtimeAsistencias() {
+async function reconstruirAsistenciasHoy() {
+
+  const hoyFecha = new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await supabaseClient
+    .from("attendance")
+    .select("*")
+    .gte("created_at", hoyFecha + "T00:00:00")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("❌ Error cargar attendance:", error);
+    return;
+  }
+
+  const clientes = JSON.parse(localStorage.getItem("clientes") || "[]");
+
+  const sesiones = {};
+  const resultado = [];
+
+  for (const e of data) {
+
+    if (!sesiones[e.uid]) {
+      sesiones[e.uid] = [];
+    }
+
+    sesiones[e.uid].push(e);
+  }
+
+  Object.keys(sesiones).forEach(uid => {
+
+    const eventos = sesiones[uid];
+    let entradaActiva = null;
+
+    eventos.forEach(ev => {
+
+      if (ev.type === "entrada") {
+        entradaActiva = {
+          id: ev.id,
+          tarjetaUID: uid,
+          nombre: clientes.find(c => c.tarjetaUID === uid)?.nombre || uid,
+          fecha: hoyFecha,
+          entrada_ts: new Date(ev.created_at).getTime(),
+          salida_ts: null
+        };
+        resultado.push(entradaActiva);
+      }
+
+      if (ev.type === "salida" && entradaActiva) {
+        entradaActiva.salida_ts = new Date(ev.created_at).getTime();
+        entradaActiva = null;
+      }
+
+    });
+
+  });
+
+  localStorage.setItem("asistencias", JSON.stringify(resultado));
+
+  if (typeof notificarCambioAsistencias === "function") {
+    notificarCambioAsistencias();
+  }
+}
+
+function iniciarRealtimeAttendance() {
+
   supabaseClient
-    .channel("rt-asistencias")
+    .channel("rt-attendance")
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "asistencias" },
-      payload => {
-
-        let asistencias = JSON.parse(localStorage.getItem("asistencias") || "[]");
-
-        if (payload.eventType === "INSERT") {
-          const nueva = {
-            id: payload.new.id,
-            tarjetaUID: payload.new.tarjeta_uid,
-            nombre: payload.new.nombre,
-            fecha: payload.new.fecha,
-            entrada_ts: payload.new.entrada_ts,
-            salida_ts: payload.new.salida_ts
-          };
-
-          const existe = asistencias.find(a => a.id === nueva.id);
-          if (!existe) asistencias.push(nueva);
-        }
-
-        if (payload.eventType === "UPDATE") {
-          const i = asistencias.findIndex(a => a.id === payload.new.id);
-          if (i >= 0) asistencias[i].salida_ts = payload.new.salida_ts;
-        }
-
-        if (payload.eventType === "DELETE") {
-          asistencias = asistencias.filter(a => a.id !== payload.old.id);
-        }
-
-        localStorage.setItem("asistencias", JSON.stringify(asistencias));
-
-        if (typeof notificarCambioAsistencias === "function") {
-          notificarCambioAsistencias();
-        }
+      { event: "*", schema: "public", table: "attendance" },
+      async () => {
+        await reconstruirAsistenciasHoy();
       }
     )
     .subscribe(() => {
-      console.log("📡 Realtime asistencias activo");
+      console.log("📡 Realtime attendance activo");
     });
 }
 
 /* ======================================================
-   ===== INIT GLOBAL (SOLO UNA LÍNEA AGREGADA)
+   ===== INIT GLOBAL
 ====================================================== */
 
 window.addEventListener("load", () => {
@@ -224,7 +253,9 @@ window.addEventListener("load", () => {
     cargarClientesIniciales();
     iniciarRealtime();
     iniciarRealtimeClientes();
-    iniciarRealtimeAsistencias(); // 👈 ÚNICA LÍNEA NUEVA
+
+    iniciarRealtimeAttendance();
+    reconstruirAsistenciasHoy();
   }
 });
 
@@ -263,8 +294,6 @@ async function pushHistorialStock(cambios) {
     console.error("❌ Error pushHistorialStock:", e);
   }
 }
-
-/* ================= CLIENTES → SUPABASE (NO TOCAR) ================= */
 
 async function insertarClienteSupabase(cliente) {
   if (!navigator.onLine || !window.supabaseClient) return;
