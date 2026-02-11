@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Usuarios</title>
   <link rel="stylesheet" href="css/styles.css">
 
@@ -13,6 +14,88 @@
   <script src="js/auth.js"></script>
   <script src="js/nfc.js"></script>
   <script src="js/realtime.js"></script>
+
+  <!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+  <style>
+  @media (max-width:768px){
+
+    .header-brand{
+      flex-direction:column;
+      gap:14px;
+      padding:18px;
+      text-align:center;
+    }
+
+    .brand{
+      flex-direction:column;
+      gap:8px;
+    }
+
+    .brand img{
+      height:70px;
+    }
+
+    .brand h2{
+      font-size:20px;
+    }
+
+    header button{
+      width:100%;
+      margin-left:0;
+    }
+
+    .card.usuarios-pc{
+      grid-template-columns:1fr !important;
+      padding:28px 20px;
+      gap:20px;
+    }
+
+    .usuarios-col input,
+    .usuarios-col select{
+      height:46px;
+      font-size:15px;
+    }
+
+    .usuarios-col button{
+      width:100%;
+      margin-top:10px;
+      height:46px;
+      font-size:15px;
+    }
+
+    #buscador{
+      width:92%;
+    }
+
+    #buscador input{
+      height:46px;
+      font-size:15px;
+    }
+
+    .historial-container{
+      width:92%;
+    }
+
+    .cliente{
+      padding:16px;
+    }
+
+    .cliente h3{
+      font-size:18px;
+    }
+
+    .confirmacion .box{
+      width:92%;
+      padding:40px 20px;
+    }
+
+    .popup{
+      width:92%;
+      padding:30px 20px;
+    }
+
+  }
+  </style>
 </head>
 
 <body onload="initUsuarios()">
