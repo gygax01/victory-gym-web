@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -52,6 +54,7 @@
   </table>
 </div>
 
+<!-- CONFIRMACIÓN -->
 <div class="confirmacion" id="confirmacion">
   <div class="box">
     <h1 id="tituloConfirmacion"></h1>
@@ -59,6 +62,7 @@
   </div>
 </div>
 
+<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/asistencias.js"></script>
@@ -68,9 +72,14 @@
 
 <script>
 
+/* ================= ZONA HORARIA ================= */
+const APP_TZ = localStorage.getItem("APP_TIMEZONE") || "America/Mexico_City";
+
+/* ================= ALIAS ================= */
 function obtenerClientes() { return safeGet("clientes"); }
 function obtenerAsistencias() { return safeGet("asistencias"); }
 
+/* ================= INIT ================= */
 window.addEventListener("load", () => {
 
   const estadoLector = document.getElementById("estadoLector");
@@ -93,9 +102,11 @@ window.addEventListener("load", () => {
   actualizarEstadoConexion(estadoConexion);
   cargarAsistencias();
   actualizarContador();
+
   iniciarLecturaNFCIndex(estadoLector);
 });
 
+/* ================= CONEXIÓN ================= */
 function actualizarEstadoConexion(el) {
   if (!el) return;
 
@@ -108,16 +119,20 @@ function actualizarEstadoConexion(el) {
   }
 }
 
+/* ================= CONFIRMACIÓN ================= */
 function mostrarConfirmacion(tipo, titulo, mensaje) {
   const box = document.getElementById("confirmacion");
+
   document.getElementById("tituloConfirmacion").textContent = titulo;
   document.getElementById("mensajeConfirmacion").textContent = mensaje;
 
   box.className = "confirmacion " + tipo;
   box.style.display = "flex";
+
   setTimeout(() => box.style.display = "none", 2200);
 }
 
+/* ================= NFC ================= */
 function iniciarLecturaNFCIndex(estadoLector) {
 
   if (!estadoLector) return;
@@ -134,6 +149,7 @@ function iniciarLecturaNFCIndex(estadoLector) {
   }
 }
 
+/* ================= ENTRADA / SALIDA ================= */
 function procesarTarjeta(uid) {
 
   const cliente = obtenerClientes().find(c => c.tarjetaUID === uid);
@@ -167,13 +183,7 @@ function procesarTarjeta(uid) {
     asistencias.push(nueva);
     safeSet("asistencias", asistencias);
 
-    await supabaseClient.from("asistencias").insert({
-      tarjeta_uid: uid,
-      nombre: cliente.nombre,
-      fecha: fechaHoy,
-      entrada_ts: new Date(ahoraTS).toISOString(),
-      salida_ts: null
-    });
+    subirEntradaSupabase(nueva);
 
     mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
 
@@ -182,19 +192,58 @@ function procesarTarjeta(uid) {
     abierta.salida_ts = ahoraTS;
     safeSet("asistencias", asistencias);
 
-    await supabaseClient
-      .from("asistencias")
-      .update({ salida_ts: new Date(ahoraTS).toISOString() })
-      .eq("tarjeta_uid", uid)
-      .eq("fecha", fechaHoy)
-      .is("salida_ts", null);
+    subirSalidaSupabase(abierta);
 
     mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
   }
 
-  notificarCambioAsistencias();
+  if (typeof notificarCambioAsistencias === "function") {
+    notificarCambioAsistencias();
+  }
+
   cargarAsistencias();
   actualizarContador();
+}
+
+/* ================= SUPABASE ================= */
+
+async function subirEntradaSupabase(a) {
+
+  if (!window.supabaseClient || !navigator.onLine) return;
+
+  try {
+
+    await supabaseClient
+      .from("asistencias")
+      .insert({
+        tarjeta_uid: a.tarjetaUID,
+        nombre: a.nombre,
+        fecha: a.fecha,
+        entrada_ts: a.entrada_ts,
+        salida_ts: null
+      });
+
+  } catch (err) {
+    console.error("❌ Error insert asistencia:", err);
+  }
+}
+
+async function subirSalidaSupabase(a) {
+
+  if (!window.supabaseClient || !navigator.onLine) return;
+
+  try {
+
+    await supabaseClient
+      .from("asistencias")
+      .update({ salida_ts: a.salida_ts })
+      .eq("tarjeta_uid", a.tarjetaUID)
+      .eq("fecha", a.fecha)
+      .is("salida_ts", null);
+
+  } catch (err) {
+    console.error("❌ Error update salida:", err);
+  }
 }
 
 </script>
