@@ -2,11 +2,102 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clientes</title>
   <link rel="stylesheet" href="css/styles.css">
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+  <style>
+  @media (max-width: 768px){
+
+    .header-brand{
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px;
+      text-align:center;
+    }
+
+    .brand{
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .brand img{
+      height: 70px;
+    }
+
+    .brand h2{
+      font-size: 20px;
+    }
+
+    header button{
+      width: 100%;
+      margin-left: 0;
+    }
+
+    .search-bar{
+      width: 92%;
+    }
+
+    .search-bar input{
+      height: 46px;
+      font-size: 15px;
+    }
+
+    .historial-container{
+      width: 94%;
+    }
+
+    .cliente{
+      padding: 16px;
+    }
+
+    .cliente-header{
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .cliente h3{
+      font-size: 20px;
+    }
+
+    .acciones{
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .acciones button{
+      width: 100%;
+      font-size: 15px;
+      padding: 14px;
+    }
+
+    .confirmacion .box{
+      width: 92%;
+      padding: 36px 20px;
+    }
+
+    .confirmacion h1{
+      font-size: 28px;
+    }
+
+    .confirmacion p{
+      font-size: 16px;
+    }
+
+    .confirmacion button{
+      width: 100%;
+      margin-top: 10px;
+    }
+
+  }
+  </style>
 </head>
 
 <body>
