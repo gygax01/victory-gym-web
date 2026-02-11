@@ -4,17 +4,6 @@
 <meta charset="UTF-8">
 <title>Historial</title>
 <link rel="stylesheet" href="css/styles.css">
-<style>
-  .debug-box {
-    background:#111;
-    color:#0f0;
-    padding:10px;
-    font-size:12px;
-    margin:10px;
-    border-radius:6px;
-    font-family: monospace;
-  }
-</style>
 </head>
 
 <body>
@@ -27,11 +16,6 @@
   <button onclick="location.href='index.html'">← Inicio</button>
 </header>
 
-<!-- DEBUG VISIBLE -->
-<div id="debug" class="debug-box">
-  Iniciando…
-</div>
-
 <div class="search-bar">
   <input id="busqueda" placeholder="Buscar cliente...">
 </div>
@@ -42,14 +26,18 @@
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
+<!-- ✅ SUPABASE (ESTO FALTABA) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <!-- CREA window.supabaseClient -->
 <script src="js/realtime.js"></script>
 
 <script>
-/* ================= ALIAS ================= */
+/* ================= ALIAS CRÍTICOS ================= */
 function obtenerClientes() {
   return safeGet("clientes");
 }
+
 function obtenerAsistencias() {
   return safeGet("asistencias");
 }
@@ -57,7 +45,6 @@ function obtenerAsistencias() {
 /* ================= DOM ================= */
 const listaHistorial = document.getElementById("listaHistorial");
 const busqueda = document.getElementById("busqueda");
-const debug = document.getElementById("debug");
 
 /* ================= ESTADO ================= */
 let clientes = [];
@@ -67,46 +54,31 @@ let asistencias = [];
 window.addEventListener("load", initHistorial);
 
 async function initHistorial() {
-  debug.textContent = "Init…";
-
-  if (!verificarSesion()) {
-    debug.textContent = "❌ Sin sesión";
-    return;
-  }
-
-  if (!can("history_view")) {
-    debug.textContent = "❌ Sin permiso history_view";
-    return;
-  }
+  if (!verificarSesion()) return;
+  if (!can("history_view")) return;
 
   busqueda.addEventListener("input", filtrar);
 
   if (navigator.onLine && window.supabaseClient) {
     await cargarAsistenciasDesdeSupabase();
-  } else {
-    debug.textContent += "\n⚠️ Offline o sin Supabase";
   }
 
   iniciarSyncHistorial();
   cargarHistorial();
 }
 
-/* ================= SUPABASE ================= */
+/* ================= SUPABASE → ASISTENCIAS ================= */
 async function cargarAsistenciasDesdeSupabase() {
-  debug.textContent = "📡 Consultando Supabase…";
-
   const { data, error } = await supabaseClient
     .from("asistencias")
     .select("*");
 
   if (error) {
-    debug.textContent += "\n❌ Error Supabase";
+    console.error("❌ Error cargando asistencias:", error);
     return;
   }
 
-  debug.textContent += `\n✅ Supabase registros: ${data.length}`;
-
-  asistencias = (data || []).map(a => ({
+  const normalizadas = (data || []).map(a => ({
     id: a.id,
     tarjetaUID: a.tarjeta_uid,
     nombre: a.nombre,
@@ -117,28 +89,28 @@ async function cargarAsistenciasDesdeSupabase() {
     salida: a.salida ?? null
   }));
 
-  safeSet("asistencias", asistencias);
-  debug.textContent += `\n💾 Guardados en localStorage: ${asistencias.length}`;
+  safeSet("asistencias", normalizadas);
+  new BroadcastChannel("victory-data").postMessage("asistencias");
 }
 
-/* ================= SYNC ================= */
+/* ================= SINCRONIZACIÓN ================= */
 function iniciarSyncHistorial() {
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = e => {
-    if (["asistencias","clientes"].includes(e.data)) {
+    if (["asistencias", "clientes"].includes(e.data)) {
       cargarHistorial();
     }
   };
 
   window.addEventListener("storage", e => {
-    if (["asistencias","clientes"].includes(e.key)) {
+    if (["asistencias", "clientes"].includes(e.key)) {
       cargarHistorial();
     }
   });
 }
 
-/* ================= UTIL ================= */
+/* ================= UTILIDADES ================= */
 function diasEntre(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
 }
@@ -173,18 +145,24 @@ function calcularRachas(uid) {
   return { actual, max };
 }
 
-function horaLocal(ts) {
+function horaLocalDesdeTS(ts) {
   if (!ts) return "-";
-  return new Date(ts).toLocaleTimeString();
+  return new Date(ts).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
 
 /* ================= CARGA ================= */
 function cargarHistorial() {
-  clientes = obtenerClientes();
+  clientes = obtenerClientes().filter(c => c && typeof c.nombre === "string");
   asistencias = obtenerAsistencias();
 
-  debug.textContent += `\n👥 Clientes: ${clientes.length}`;
-  debug.textContent += `\n📊 Asistencias en memoria: ${asistencias.length}`;
+  clientes.sort((a, b) =>
+    ultimaVisita(b.tarjetaUID)
+      .localeCompare(ultimaVisita(a.tarjetaUID))
+  );
 
   render(clientes);
 }
@@ -199,25 +177,46 @@ function render(lista) {
   }
 
   lista.forEach(c => {
-    const registros = asistencias.filter(a => a.tarjetaUID === c.tarjetaUID);
+    const registros = asistencias
+      .filter(a => a.tarjetaUID === c.tarjetaUID)
+      .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+    const { actual, max } = calcularRachas(c.tarjetaUID);
 
     const card = document.createElement("div");
     card.className = "cliente";
 
     card.innerHTML = `
-      <div class="cliente-header">
-        <h3>${c.nombre}</h3>
+      <div class="cliente-header" aria-expanded="false">
+        <div class="info-wrapper">
+          <div class="info-bloque">
+            <h3>${c.nombre}</h3>
+            <div class="meta">
+              <span class="racha actual">Racha actual: ${actual} días</span>
+              &nbsp; · &nbsp;
+              <span class="racha maxima">Racha máxima: ${max} días</span>
+            </div>
+          </div>
+        </div>
+        <div class="flecha">▾</div>
       </div>
+
       <div class="historial">
         <table>
-          <thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Entrada</th>
+              <th>Salida</th>
+            </tr>
+          </thead>
           <tbody>
             ${
-              registros.map(r => `
-                <tr>
+              registros.map((r, i) => `
+                <tr class="${i % 2 ? 'alt' : ''}">
                   <td>${r.fecha}</td>
-                  <td>${r.entrada_ts ? horaLocal(r.entrada_ts) : r.entrada}</td>
-                  <td>${r.salida_ts ? horaLocal(r.salida_ts) : (r.salida ?? "-")}</td>
+                  <td>${r.entrada_ts ? horaLocalDesdeTS(r.entrada_ts) : (r.entrada ?? "-")}</td>
+                  <td>${r.salida_ts ? horaLocalDesdeTS(r.salida_ts) : (r.salida ?? "-")}</td>
                 </tr>
               `).join("")
             }
@@ -226,6 +225,22 @@ function render(lista) {
       </div>
     `;
 
+    const header = card.querySelector(".cliente-header");
+    const panel = card.querySelector(".historial");
+
+    header.onclick = () => {
+      document.querySelectorAll(".cliente.abierto").forEach(o => {
+        if (o !== card) {
+          o.classList.remove("abierto");
+          o.querySelector(".historial")?.classList.remove("abierto");
+        }
+      });
+
+      const abierto = card.classList.toggle("abierto");
+      panel.classList.toggle("abierto");
+      header.setAttribute("aria-expanded", abierto);
+    };
+
     listaHistorial.appendChild(card);
   });
 }
@@ -233,7 +248,9 @@ function render(lista) {
 /* ================= FILTRO ================= */
 function filtrar() {
   const q = busqueda.value.toLowerCase();
-  render(clientes.filter(c => c.nombre.toLowerCase().includes(q)));
+  render(clientes.filter(c =>
+    c.nombre.toLowerCase().includes(q)
+  ));
 }
 </script>
 
