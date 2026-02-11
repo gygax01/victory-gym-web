@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
-
-  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -54,7 +52,7 @@
   </table>
 </div>
 
-<!-- CONFIRMACIÓN -->
+<!-- CONFIRMACIÓN GRANDE -->
 <div class="confirmacion" id="confirmacion">
   <div class="box">
     <h1 id="tituloConfirmacion"></h1>
@@ -62,7 +60,6 @@
   </div>
 </div>
 
-<!-- ===== JS BASE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/asistencias.js"></script>
@@ -71,12 +68,6 @@
 <script src="js/bluetooth.js"></script>
 
 <script>
-
-/* ================= ZONA HORARIA ================= */
-const APP_TZ = localStorage.getItem("APP_TIMEZONE") || "America/Mexico_City";
-
-/* ================= ALIAS ================= */
-function obtenerClientes() { return safeGet("clientes"); }
 
 /* ================= INIT ================= */
 window.addEventListener("load", () => {
@@ -125,7 +116,7 @@ function actualizarEstadoConexion(el) {
 
 window.addEventListener("online", sincronizarPendientesAttendance);
 
-/* ================= CONFIRMACIÓN ================= */
+/* ================= CONFIRMACION ================= */
 function mostrarConfirmacion(tipo, titulo, mensaje) {
   const box = document.getElementById("confirmacion");
 
@@ -135,7 +126,9 @@ function mostrarConfirmacion(tipo, titulo, mensaje) {
   box.className = "confirmacion " + tipo;
   box.style.display = "flex";
 
-  setTimeout(() => box.style.display = "none", 2200);
+  setTimeout(() => {
+    box.style.display = "none";
+  }, 2200);
 }
 
 /* ================= NFC ================= */
@@ -155,10 +148,10 @@ function iniciarLecturaNFCIndex(estadoLector) {
   }
 }
 
-/* ================= NUEVO MODELO EVENTOS + RPC ================= */
+/* ================= PROCESAR TARJETA ================= */
 async function procesarTarjeta(uid) {
 
-  const cliente = obtenerClientes().find(c => c.tarjetaUID === uid);
+  const cliente = safeGet("clientes").find(c => c.tarjetaUID === uid);
 
   if (!cliente) {
     mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepción");
@@ -170,10 +163,7 @@ async function procesarTarjeta(uid) {
   const source = navigator.onLine ? "wifi" : "bluetooth";
   const deviceId = "pc_principal";
 
-  if (!window.supabaseClient) {
-    console.error("Supabase no listo");
-    return;
-  }
+  if (!window.supabaseClient) return;
 
   try {
 
@@ -192,6 +182,7 @@ async function procesarTarjeta(uid) {
         return;
       }
 
+      // 🔥 AQUÍ ESTÁ LA ANIMACIÓN RESTAURADA
       if (data?.accion === "entrada") {
         mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
       } else if (data?.accion === "salida") {
@@ -229,7 +220,6 @@ async function sincronizarPendientesAttendance() {
   if (!pendientes.length) return;
 
   for (const e of pendientes) {
-
     try {
       await window.supabaseClient.rpc("registrar_asistencia", {
         p_id: e.id,
