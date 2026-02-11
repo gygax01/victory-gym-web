@@ -160,6 +160,25 @@ function iniciarRealtimeClientes() {
 }
 
 /* ======================================================
+   ===== MIGRAR UID EN ATTENDANCE (NUEVO) ===============
+====================================================== */
+
+async function migrarUIDEnAttendance(uidViejo, uidNuevo) {
+  if (!navigator.onLine || !window.supabaseClient) return;
+
+  const { error } = await supabaseClient
+    .from("attendance")
+    .update({ uid: uidNuevo })
+    .eq("uid", uidViejo);
+
+  if (error) {
+    console.error("❌ Error migrando UID attendance:", error);
+  } else {
+    console.log("🔁 Attendance actualizado al nuevo UID");
+  }
+}
+
+/* ======================================================
    ===== NUEVO: REALTIME ATTENDANCE (MODELO EVENTOS)
 ====================================================== */
 
@@ -253,7 +272,6 @@ window.addEventListener("load", () => {
     cargarClientesIniciales();
     iniciarRealtime();
     iniciarRealtimeClientes();
-
     iniciarRealtimeAttendance();
     reconstruirAsistenciasHoy();
   }
