@@ -1,91 +1,22 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Inicio - Victory Pro Fitness</title>
-  <link rel="stylesheet" href="css/styles.css">
-
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-
-<body>
-
-<header class="header-brand">
-  <div class="brand">
-    <img src="img/logo.png">
-    <h2>Asistencias del día</h2>
-  </div>
-
-  <div class="estado-sistema">
-    <span id="contadorAforo" class="contador">
-      Dentro: <strong>0</strong>
-    </span>
-
-    <span id="estadoLector" class="lector off">Lector inactivo</span>
-    <span id="estadoConexion" class="lector off">Offline</span>
-
-    <button id="btnLogout">Salir</button>
-  </div>
-</header>
-
-<div class="panel-acciones">
-  <button class="destacado" onclick="location.href='registro.html'">Registro</button>
-  <button onclick="location.href='pos.html'">Ventas</button>
-  <button onclick="location.href='stock.html'">Stock</button>
-  <button onclick="location.href='membresias.html'">Membresías</button>
-  <button onclick="location.href='clientes.html'">Clientes</button>
-  <button onclick="location.href='historial.html'">Historial</button>
-  <button id="btnUsuarios" style="display:none" onclick="location.href='usuarios.html'">
-    Usuarios
-  </button>
-</div>
-
-<div id="contenedorTabla" style="max-height:70vh; overflow-y:auto;">
-  <table>
-    <thead>
-      <tr>
-        <th>Cliente</th>
-        <th>Entrada</th>
-        <th>Salida</th>
-      </tr>
-    </thead>
-    <tbody id="tablaAsistencias"></tbody>
-  </table>
-</div>
-
-<!-- CONFIRMACIÓN (RESTAURADA) -->
-<div class="confirmacion" id="confirmacion">
-  <div class="box">
-    <h1 id="tituloConfirmacion"></h1>
-    <p id="mensajeConfirmacion"></p>
-  </div>
-</div>
-
-<!-- ===== JS BASE ===== -->
-<script src="js/storage.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/asistencias.js"></script>
-<script src="js/realtime.js"></script>
-<script src="js/nfc.js"></script>
-<script src="js/bluetooth.js"></script>
-
 <script>
-/* ================= ZONA HORARIA ================= */
-const APP_TZ = localStorage.getItem("APP_TIMEZONE") || "America/Mexico_City";
 
 /* ================= ALIAS ================= */
+
 function obtenerClientes() { return safeGet("clientes"); }
 function obtenerAsistencias() { return safeGet("asistencias"); }
+function guardarAsistencias(data) { safeSet("asistencias", data); }
 
 /* ================= DOM ================= */
+
 const estadoLector = document.getElementById("estadoLector");
 const estadoConexion = document.getElementById("estadoConexion");
 const btnUsuarios = document.getElementById("btnUsuarios");
 const btnLogout = document.getElementById("btnLogout");
 
 /* ================= INIT ================= */
+
 window.addEventListener("load", () => {
+
   if (!verificarSesion()) return;
 
   const s = getSession();
@@ -94,6 +25,7 @@ window.addEventListener("load", () => {
   }
 
   btnLogout.onclick = logout;
+
   actualizarEstadoConexion();
   cargarAsistencias();
   actualizarContador();
@@ -102,6 +34,7 @@ window.addEventListener("load", () => {
 });
 
 /* ================= CONEXIÓN ================= */
+
 function actualizarEstadoConexion() {
   if (navigator.onLine) {
     estadoConexion.textContent = "Online";
@@ -112,9 +45,12 @@ function actualizarEstadoConexion() {
   }
 }
 
-/* ================= CONFIRMACIÓN (FIX CLAVE) ================= */
+/* ================= CONFIRMACIÓN ================= */
+
 function mostrarConfirmacion(tipo, titulo, mensaje) {
+
   const box = document.getElementById("confirmacion");
+
   document.getElementById("tituloConfirmacion").textContent = titulo;
   document.getElementById("mensajeConfirmacion").textContent = mensaje;
 
@@ -125,7 +61,9 @@ function mostrarConfirmacion(tipo, titulo, mensaje) {
 }
 
 /* ================= NFC ================= */
+
 function iniciarLecturaNFCIndex() {
+
   estadoLector.className = "lector on";
   estadoLector.textContent = "Lector activo";
 
@@ -136,9 +74,14 @@ function iniciarLecturaNFCIndex() {
   });
 }
 
-/* ================= ENTRADA / SALIDA ================= */
+/* ======================================================
+   ===== ENTRADA / SALIDA (BLINDADO DEFINITIVO) =========
+====================================================== */
+
 function procesarTarjeta(uid) {
+
   const cliente = obtenerClientes().find(c => c.tarjetaUID === uid);
+
   if (!cliente) {
     mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepción");
     return;
@@ -148,13 +91,34 @@ function procesarTarjeta(uid) {
   const fechaHoy = hoy();
   const ahoraTS = Date.now();
 
-  const abierta = [...asistencias].reverse().find(a =>
+  /* ===== BUSCAR ABIERTAS DEL DÍA ===== */
+
+  const abiertasHoy = asistencias.filter(a =>
     a.tarjetaUID === uid &&
     a.fecha === fechaHoy &&
-    a.salida_ts === null
+    typeof a.entrada_ts === "number" &&
+    !a.salida_ts
   );
 
+  /* ===== AUTOCORRECCIÓN SI HAY MÁS DE UNA ===== */
+
+  if (abiertasHoy.length > 1) {
+
+    abiertasHoy
+      .sort((a, b) => b.entrada_ts - a.entrada_ts)
+      .slice(1)
+      .forEach(a => {
+        a.salida_ts = ahoraTS;
+      });
+  }
+
+  const abierta = abiertasHoy
+    .sort((a, b) => b.entrada_ts - a.entrada_ts)[0];
+
+  /* ===== SI NO HAY ABIERTA → ENTRADA ===== */
+
   if (!abierta) {
+
     const nueva = {
       id: crypto.randomUUID(),
       tarjetaUID: uid,
@@ -165,14 +129,23 @@ function procesarTarjeta(uid) {
     };
 
     asistencias.push(nueva);
-    safeSet("asistencias", asistencias);
+
+    guardarAsistencias(asistencias);
+
     subirEntradaSupabase(nueva);
+
     mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
 
-  } else {
+  }
+  /* ===== SI HAY ABIERTA → SALIDA ===== */
+  else {
+
     abierta.salida_ts = ahoraTS;
-    safeSet("asistencias", asistencias);
+
+    guardarAsistencias(asistencias);
+
     subirSalidaSupabase(abierta);
+
     mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
   }
 
@@ -182,7 +155,9 @@ function procesarTarjeta(uid) {
 }
 
 /* ================= SUPABASE ================= */
+
 async function subirEntradaSupabase(a) {
+
   if (!window.supabaseClient || !navigator.onLine) return;
 
   await supabaseClient.from("asistencias").insert({
@@ -196,6 +171,7 @@ async function subirEntradaSupabase(a) {
 }
 
 async function subirSalidaSupabase(a) {
+
   if (!window.supabaseClient || !navigator.onLine) return;
 
   await supabaseClient
@@ -203,7 +179,5 @@ async function subirSalidaSupabase(a) {
     .update({ salida_ts: a.salida_ts })
     .eq("id", a.id);
 }
-</script>
 
-</body>
-</html>
+</script>
