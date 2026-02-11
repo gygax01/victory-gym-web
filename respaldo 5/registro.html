@@ -158,11 +158,7 @@
 <!-- CORE -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
-
-<!-- CREA window.supabaseClient + funciones clientes -->
 <script src="js/realtime.js"></script>
-
-<!-- NFC -->
 <script src="js/nfc.js"></script>
 
 <script>
@@ -193,8 +189,9 @@ function abrirPopup() {
   uidTexto.innerText = "";
 
   iniciarNFCControlado({
-    onUID: uid => {
-      if (uidYaRegistrada(uid)) {
+    onUID: async uid => {
+
+      if (await uidYaRegistrada(uid)) {
         estado.className = "estado rojo";
         estado.innerText = "Tarjeta ya registrada";
         uidTexto.innerText = "UID: " + uid;
@@ -277,8 +274,30 @@ function obtenerClientes() {
   return safeGet("clientes");
 }
 
-function uidYaRegistrada(uid) {
-  return obtenerClientes().some(c => c.tarjetaUID === uid);
+/* 🔥 SOLO ESTA FUNCIÓN CAMBIÓ */
+async function uidYaRegistrada(uid) {
+
+  if (obtenerClientes().some(c => c.tarjetaUID === uid)) {
+    return true;
+  }
+
+  if (navigator.onLine && window.supabaseClient) {
+
+    const { data, error } = await supabaseClient
+      .from("clientes")
+      .select("id")
+      .eq("tarjeta_uid", uid)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error validando UID:", error);
+      return false;
+    }
+
+    if (data) return true;
+  }
+
+  return false;
 }
 
 /* ===== CONFIRM ===== */
