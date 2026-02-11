@@ -2,11 +2,52 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
 
   <!-- Supabase SOLO para NFC / realtime -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+  <style>
+  @media (max-width: 768px){
+
+    body.centered{
+      padding: 20px;
+    }
+
+    .login-card{
+      width: 100%;
+      max-width: 420px;
+      padding: 28px 22px;
+    }
+
+    .login-logo img{
+      width: 240px;
+    }
+
+    .login-card input{
+      height: 48px;
+      font-size: 16px;
+    }
+
+    .login-card button{
+      padding: 14px;
+      font-size: 15px;
+    }
+
+    .popup{
+      width: 92%;
+      padding: 30px 20px;
+    }
+
+    .popup h2{
+      font-size: 22px;
+    }
+
+  }
+  </style>
 </head>
 
 <body class="centered login-bg">
@@ -227,4 +268,3 @@ function resetNFC() {
 
 </body>
 </html>
-
