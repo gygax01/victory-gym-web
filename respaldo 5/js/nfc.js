@@ -43,6 +43,7 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
 
         /* ==========================================
            🔒 FIX MULTI-DISPOSITIVO (NO ROMPE NADA)
+           Solo UN dispositivo puede marcar processed=false → true
         ========================================== */
 
         const { data, error } = await window.supabaseClient
@@ -57,7 +58,7 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
           return;
         }
 
-        // Si no actualizó nada, otro dispositivo ya lo tomó
+        // Si no actualizó nada, otro dispositivo ya procesó este evento
         if (!data || data.length === 0) {
           return;
         }
@@ -72,7 +73,9 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
         ultimoUID = uid;
         ultimoTiempo = ahora;
 
-        if (typeof onUID === "function") onUID(uid);
+        if (typeof onUID === "function") {
+          onUID(uid);
+        }
       }
     )
     .subscribe(() => {
