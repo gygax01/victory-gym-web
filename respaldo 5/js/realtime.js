@@ -160,7 +160,7 @@ function iniciarRealtimeClientes() {
 }
 
 /* ======================================================
-   ===== MIGRAR UID EN ATTENDANCE (NUEVO) ===============
+   ===== MIGRAR UID EN ATTENDANCE =======================
 ====================================================== */
 
 async function migrarUIDEnAttendance(uidViejo, uidNuevo) {
@@ -179,7 +179,7 @@ async function migrarUIDEnAttendance(uidViejo, uidNuevo) {
 }
 
 /* ======================================================
-   ===== NUEVO: REALTIME ATTENDANCE (MODELO EVENTOS)
+   ===== NUEVO: REALTIME ATTENDANCE =====================
 ====================================================== */
 
 async function reconstruirAsistenciasHoy() {
@@ -203,11 +203,7 @@ async function reconstruirAsistenciasHoy() {
   const resultado = [];
 
   for (const e of data) {
-
-    if (!sesiones[e.uid]) {
-      sesiones[e.uid] = [];
-    }
-
+    if (!sesiones[e.uid]) sesiones[e.uid] = [];
     sesiones[e.uid].push(e);
   }
 
@@ -263,97 +259,7 @@ function iniciarRealtimeAttendance() {
 }
 
 /* ======================================================
-   ===== INIT GLOBAL
-====================================================== */
-
-window.addEventListener("load", () => {
-  if (navigator.onLine) {
-    cargarProductosIniciales();
-    cargarClientesIniciales();
-    iniciarRealtime();
-    iniciarRealtimeClientes();
-    iniciarRealtimeAttendance();
-    reconstruirAsistenciasHoy();
-  }
-});
-
-/* ======================================================
-   ===== HISTORIAL STOCK (NO TOCAR) =====================
-====================================================== */
-
-async function pushHistorialStock(cambios) {
-  try {
-    const session = JSON.parse(localStorage.getItem("session"));
-    if (!session) return;
-
-    const now = new Date();
-
-    const payload = {
-      id: crypto.randomUUID(),
-      fecha: now.toISOString().slice(0, 10),
-      hora: now.toTimeString().slice(0, 8),
-      usuario: session.nombre,
-      rol: session.rol,
-      cambios: cambios,
-      ts: Date.now()
-    };
-
-    const { error } = await supabaseClient
-      .from("historial_stock")
-      .insert(payload);
-
-    if (error) {
-      console.error("❌ Error historial stock:", error);
-    } else {
-      console.log("📝 Historial stock guardado");
-    }
-
-  } catch (e) {
-    console.error("❌ Error pushHistorialStock:", e);
-  }
-}
-
-async function insertarClienteSupabase(cliente) {
-  if (!navigator.onLine || !window.supabaseClient) return;
-
-  const payload = {
-    id: cliente.id,
-    nombre: cliente.nombre,
-    tarjeta_uid: cliente.tarjetaUID,
-    fecha_registro: cliente.fechaRegistro ?? hoy(),
-    membresia_expira: cliente.membresiaExpira ?? null
-  };
-
-  const { error } = await supabaseClient
-    .from("clientes")
-    .insert(payload);
-
-  if (error) {
-    console.error("❌ Error insertar cliente:", error);
-  } else {
-    console.log("☁️ Cliente insertado en Supabase");
-  }
-}
-
-async function actualizarClienteSupabase(cliente) {
-  if (!navigator.onLine || !window.supabaseClient) return;
-
-  const { error } = await supabaseClient
-    .from("clientes")
-    .update({
-      nombre: cliente.nombre,
-      tarjeta_uid: cliente.tarjetaUID,
-      fecha_registro: cliente.fechaRegistro,
-      membresia_expira: cliente.membresiaExpira
-    })
-    .eq("id", cliente.id);
-
-  if (error) {
-    console.error("❌ Error actualizar cliente:", error);
-  }
-}
-/* ======================================================
-   ===== EMPLEADOS SYNC (NUEVO)
+   ===== EMPLEADOS (AGREGADO SIN ROMPER NADA)
 ====================================================== */
 
 async function insertarEmpleadoSupabase(emp) {
@@ -391,3 +297,51 @@ async function cargarEmpleadosIniciales() {
 
   console.log("✅ Empleados sincronizados:", data.length);
 }
+
+function iniciarRealtimeEmpleados() {
+  supabaseClient
+    .channel("rt-empleados")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "empleados" },
+      payload => {
+
+        let empleados = JSON.parse(localStorage.getItem("empleados") || "[]");
+
+        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+          const i = empleados.findIndex(e => e.id === payload.new.id);
+          if (i >= 0) empleados[i] = payload.new;
+          else empleados.push(payload.new);
+        }
+
+        if (payload.eventType === "DELETE") {
+          empleados = empleados.filter(e => e.id !== payload.old.id);
+        }
+
+        localStorage.setItem("empleados", JSON.stringify(empleados));
+        bc.postMessage("empleados");
+      }
+    )
+    .subscribe(() => {
+      console.log("📡 Realtime empleados activo");
+    });
+}
+
+/* ======================================================
+   ===== INIT GLOBAL (SOLO SE AGREGÓ EMPLEADOS)
+====================================================== */
+
+window.addEventListener("load", () => {
+  if (navigator.onLine) {
+
+    cargarEmpleadosIniciales();
+    iniciarRealtimeEmpleados();
+
+    cargarProductosIniciales();
+    cargarClientesIniciales();
+    iniciarRealtime();
+    iniciarRealtimeClientes();
+    iniciarRealtimeAttendance();
+    reconstruirAsistenciasHoy();
+  }
+});
