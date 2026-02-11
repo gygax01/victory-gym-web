@@ -77,7 +77,6 @@ const APP_TZ = localStorage.getItem("APP_TIMEZONE") || "America/Mexico_City";
 
 /* ================= ALIAS ================= */
 function obtenerClientes() { return safeGet("clientes"); }
-function obtenerAsistencias() { return safeGet("asistencias"); }
 
 /* ================= INIT ================= */
 window.addEventListener("load", () => {
@@ -100,10 +99,17 @@ window.addEventListener("load", () => {
   btnLogout.onclick = logout;
 
   actualizarEstadoConexion(estadoConexion);
+
+  // ⚠️ temporal mientras migramos UI
   cargarAsistencias();
   actualizarContador();
 
   iniciarLecturaNFCIndex(estadoLector);
+
+  // sincronizar pendientes al iniciar si hay internet
+  if (navigator.onLine) {
+    sincronizarPendientesAttendance();
+  }
 });
 
 /* ================= CONEXIÓN ================= */
@@ -118,6 +124,8 @@ function actualizarEstadoConexion(el) {
     el.className = "lector off";
   }
 }
+
+window.addEventListener("online", sincronizarPendientesAttendance);
 
 /* ================= CONFIRMACIÓN ================= */
 function mostrarConfirmacion(tipo, titulo, mensaje) {
@@ -149,8 +157,8 @@ function iniciarLecturaNFCIndex(estadoLector) {
   }
 }
 
-/* ================= ENTRADA / SALIDA ================= */
-function procesarTarjeta(uid) {
+/* ================= NUEVO MODELO EVENTOS + RPC ================= */
+async function procesarTarjeta(uid) {
 
   const cliente = obtenerClientes().find(c => c.tarjetaUID === uid);
 
@@ -159,91 +167,75 @@ function procesarTarjeta(uid) {
     return;
   }
 
-  const asistencias = obtenerAsistencias();
-  const fechaHoy = hoy();
-  const ahoraTS = Date.now();
+  const id = crypto.randomUUID();
+  const ahoraISO = new Date().toISOString();
+  const source = navigator.onLine ? "wifi" : "bluetooth";
+  const deviceId = "pc_principal";
 
-  const abierta = [...asistencias].reverse().find(a =>
-    a.tarjetaUID === uid &&
-    a.fecha === fechaHoy &&
-    a.salida_ts === null
-  );
-
-  if (!abierta) {
-
-    const nueva = {
-      id: crypto.randomUUID(),
-      tarjetaUID: uid,
-      nombre: cliente.nombre,
-      fecha: fechaHoy,
-      entrada_ts: ahoraTS,
-      salida_ts: null
-    };
-
-    asistencias.push(nueva);
-    safeSet("asistencias", asistencias);
-
-    subirEntradaSupabase(nueva);
-
-    mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
-
-  } else {
-
-    abierta.salida_ts = ahoraTS;
-    safeSet("asistencias", asistencias);
-
-    subirSalidaSupabase(abierta);
-
-    mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
+  if (!window.supabaseClient) {
+    console.error("Supabase no listo");
+    return;
   }
-
-  if (typeof notificarCambioAsistencias === "function") {
-    notificarCambioAsistencias();
-  }
-
-  cargarAsistencias();
-  actualizarContador();
-}
-
-/* ================= SUPABASE ================= */
-
-async function subirEntradaSupabase(a) {
-
-  if (!window.supabaseClient || !navigator.onLine) return;
 
   try {
 
-    await supabaseClient
-      .from("asistencias")
-      .insert({
-        tarjeta_uid: a.tarjetaUID,
-        nombre: a.nombre,
-        fecha: a.fecha,
-        entrada_ts: a.entrada_ts,
-        salida_ts: null
+    if (navigator.onLine) {
+
+      await supabaseClient.rpc("registrar_asistencia", {
+        p_id: id,
+        p_uid: uid,
+        p_created_at: ahoraISO,
+        p_source: source,
+        p_device_id: deviceId
       });
 
+    } else {
+
+      const pendientes = safeGet("attendance_offline");
+
+      pendientes.push({
+        id,
+        uid,
+        created_at: ahoraISO,
+        source,
+        device_id: deviceId
+      });
+
+      safeSet("attendance_offline", pendientes);
+    }
+
+    mostrarConfirmacion("entrada", "Registro guardado", cliente.nombre);
+
   } catch (err) {
-    console.error("❌ Error insert asistencia:", err);
+    console.error("❌ Error RPC:", err);
   }
 }
 
-async function subirSalidaSupabase(a) {
+/* ================= SINCRONIZAR OFFLINE ================= */
+async function sincronizarPendientesAttendance() {
 
-  if (!window.supabaseClient || !navigator.onLine) return;
+  if (!navigator.onLine || !window.supabaseClient) return;
 
-  try {
+  const pendientes = safeGet("attendance_offline");
+  if (!pendientes.length) return;
 
-    await supabaseClient
-      .from("asistencias")
-      .update({ salida_ts: a.salida_ts })
-      .eq("tarjeta_uid", a.tarjetaUID)
-      .eq("fecha", a.fecha)
-      .is("salida_ts", null);
+  for (const e of pendientes) {
 
-  } catch (err) {
-    console.error("❌ Error update salida:", err);
+    try {
+      await supabaseClient.rpc("registrar_asistencia", {
+        p_id: e.id,
+        p_uid: e.uid,
+        p_created_at: e.created_at,
+        p_source: e.source,
+        p_device_id: e.device_id
+      });
+    } catch (err) {
+      console.error("Error sync attendance:", err);
+      return; // detener si falla
+    }
   }
+
+  safeSet("attendance_offline", []);
 }
 
 </script>
