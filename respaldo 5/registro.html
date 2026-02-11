@@ -2,11 +2,90 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Registro de Cliente</title>
   <link rel="stylesheet" href="css/styles.css">
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+  <style>
+  @media (max-width: 768px){
+
+    .header-brand{
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px;
+      text-align:center;
+    }
+
+    .brand{
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .brand img{
+      height: 70px;
+    }
+
+    .brand h2{
+      font-size: 20px;
+    }
+
+    header button{
+      width: 100%;
+      margin-left: 0;
+    }
+
+    .card.registro-pc{
+      grid-template-columns: 1fr !important;
+      padding: 28px 20px;
+      gap: 24px;
+    }
+
+    .registro-col h3{
+      text-align:center;
+    }
+
+    .registro-col input{
+      height: 48px;
+      font-size: 15px;
+    }
+
+    .membresias-grid{
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .membresias-grid button{
+      padding: 14px;
+      font-size: 14px;
+    }
+
+    .registro-acciones{
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .registro-acciones button{
+      width: 100%;
+      height: 46px;
+      font-size: 15px;
+    }
+
+    .popup{
+      width: 92%;
+      padding: 30px 20px;
+    }
+
+    .confirmacion .box{
+      width: 92%;
+      padding: 40px 20px;
+    }
+
+  }
+  </style>
 </head>
 
 <body onload="verificarSesion()">
@@ -188,7 +267,6 @@ function registrarClienteOffline(cliente) {
 
   new BroadcastChannel("victory-data").postMessage("clientes");
 
-  // 🔥 SUBIR A SUPABASE (SOURCE OF TRUTH)
   if (typeof insertarClienteSupabase === "function") {
     insertarClienteSupabase(cliente);
   }
