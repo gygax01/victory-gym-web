@@ -1,6 +1,6 @@
 /* ======================================================
    ===== STORAGE OFFLINE FIRST (SOURCE OF TRUTH) =====
-   ====================================================== */
+====================================================== */
 
 /* ================= UTIL BASE ================= */
 function safeGet(key) {
@@ -50,7 +50,7 @@ function guardarEventoStock(evento) {
   historial.push({
     id: evento.id || crypto.randomUUID(),
     fecha: evento.fecha,            // YYYY-MM-DD
-    hora: evento.hora,              // HH:mm:ss
+    hora: evento.hora,              // HH:mm:ss (UTC)
     usuario: evento.usuario,        // username
     rol: evento.rol,                // admin / superadmin
     cambios: evento.cambios,        // array de cambios
@@ -107,8 +107,12 @@ function hoy() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * HORA EN UTC (CRÍTICO PARA MULTI-DISPOSITIVO)
+ * Devuelve HH:mm:ss en UTC
+ */
 function horaActual() {
-  return new Date().toTimeString().slice(0, 8);
+  return new Date().toISOString().slice(11, 19);
 }
 
 /* ======================================================
@@ -126,7 +130,11 @@ function agregarEvento(evento) {
     });
 
     // Si hay internet y existe supabase, sincroniza
-    if (navigator.onLine && window.supabase && typeof actualizarStockSupabase === "function") {
+    if (
+      navigator.onLine &&
+      window.supabase &&
+      typeof actualizarStockSupabase === "function"
+    ) {
       if (evento.tabla === "productos" && evento.accion === "update") {
         actualizarStockSupabase(evento.data.id, evento.data.stock);
       }
