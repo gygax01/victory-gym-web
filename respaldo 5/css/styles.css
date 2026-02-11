@@ -1426,3 +1426,32 @@ button.nfc {
   from { transform: scale(.85); opacity: 0; }
   to   { transform: scale(1); opacity: 1; }
 }
+
+/* =========================================
+   FIX ANIMACIÓN CONFIRMACION (REPLAY REAL)
+========================================= */
+
+/* Forzamos reinicio limpio */
+.confirmacion .box {
+  animation: none;
+}
+
+/* Cuando está visible, ejecuta animación */
+.confirmacion.entrada .box,
+.confirmacion.salida .box,
+.confirmacion.error .box {
+  animation: zoomBig .6s cubic-bezier(.25,.8,.25,1);
+}
+
+/* Extra punch visual como lo tenías antes */
+.confirmacion.entrada .box {
+  box-shadow:
+    0 0 60px rgba(46,204,113,.65),
+    0 0 140px rgba(46,204,113,.35);
+}
+
+.confirmacion.salida .box {
+  box-shadow:
+    0 0 60px rgba(52,152,219,.65),
+    0 0 140px rgba(52,152,219,.35);
+}
