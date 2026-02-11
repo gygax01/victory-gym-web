@@ -56,8 +56,9 @@ async function initHistorial() {
 
   busqueda.addEventListener("input", filtrar);
 
-  // 🔥 CARGA REAL DESDE SUPABASE
-  await cargarAsistenciasDesdeSupabase();
+  if (navigator.onLine && window.supabaseClient) {
+    await cargarAsistenciasDesdeSupabase();
+  }
 
   iniciarSyncHistorial();
   cargarHistorial();
@@ -65,32 +66,32 @@ async function initHistorial() {
 
 /* ================= SUPABASE → ASISTENCIAS ================= */
 async function cargarAsistenciasDesdeSupabase() {
-  if (!navigator.onLine || !window.supabaseClient) {
-    asistencias = obtenerAsistencias();
-    return;
-  }
-
   const { data, error } = await supabaseClient
     .from("asistencias")
     .select("*");
 
   if (error) {
     console.error("❌ Error cargando asistencias:", error);
-    asistencias = obtenerAsistencias();
     return;
   }
 
-  asistencias = (data || []).map(a => ({
+  const normalizadas = (data || []).map(a => ({
     id: a.id,
     tarjetaUID: a.tarjeta_uid,
     nombre: a.nombre,
-    entrada: a.entrada, // UTC
-    salida: a.salida,   // UTC
-    fecha: a.fecha
+    fecha: a.fecha,
+
+    // NUEVO (CORRECTO)
+    entrada_ts: a.entrada_ts ?? null,
+    salida_ts: a.salida_ts ?? null,
+
+    // LEGADO (NO SE ROMPE)
+    entrada: a.entrada ?? null,
+    salida: a.salida ?? null
   }));
 
-  // Cache offline
-  safeSet("asistencias", asistencias);
+  safeSet("asistencias", normalizadas);
+  new BroadcastChannel("victory-data").postMessage("asistencias");
 }
 
 /* ================= SINCRONIZACIÓN ================= */
@@ -152,12 +153,16 @@ function calcularRachas(uid) {
   return { actual, max };
 }
 
-/* ================= HORA UTC → LOCAL ================= */
-function horaLocal(horaUTC) {
-  if (!horaUTC) return "-";
-  const hoy = new Date().toISOString().slice(0, 10);
-  const d = new Date(`${hoy}T${horaUTC}Z`);
-  return d.toLocaleTimeString([], {
+/* ================= HORA SEGURA MULTI-DISPOSITIVO ================= */
+function horaSegura(reg) {
+  // PRIORIDAD: timestamptz (CORRECTO)
+  if (reg.entrada_ts || reg.salida_ts) return null;
+  return reg;
+}
+
+function horaLocalDesdeTS(ts) {
+  if (!ts) return "-";
+  return new Date(ts).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"
@@ -228,8 +233,22 @@ function render(lista) {
               registros.map((r, i) => `
                 <tr class="${i % 2 ? 'alt' : ''}">
                   <td>${r.fecha}</td>
-                  <td>${horaLocal(r.entrada)}</td>
-                  <td>${r.salida ? horaLocal(r.salida) : "-"}</td>
+
+                  <td>
+                    ${
+                      r.entrada_ts
+                        ? horaLocalDesdeTS(r.entrada_ts)
+                        : (r.entrada ?? "-")
+                    }
+                  </td>
+
+                  <td>
+                    ${
+                      r.salida_ts
+                        ? horaLocalDesdeTS(r.salida_ts)
+                        : (r.salida ?? "-")
+                    }
+                  </td>
                 </tr>
               `).join("")
             }
