@@ -215,3 +215,43 @@ async function pushHistorialStock(cambios) {
     console.error("❌ Error pushHistorialStock:", e);
   }
 }
+/* ================= CLIENTES → SUPABASE ================= */
+async function insertarClienteSupabase(cliente) {
+  if (!navigator.onLine || !window.supabaseClient) return;
+
+  const payload = {
+    id: cliente.id,
+    nombre: cliente.nombre,
+    tarjeta_uid: cliente.tarjetaUID,
+    fecha_registro: cliente.fechaRegistro ?? hoy(),
+    membresia_expira: cliente.membresiaExpira ?? null
+  };
+
+  const { error } = await supabaseClient
+    .from("clientes")
+    .insert(payload);
+
+  if (error) {
+    console.error("❌ Error insertar cliente:", error);
+  } else {
+    console.log("☁️ Cliente insertado en Supabase");
+  }
+}
+
+async function actualizarClienteSupabase(cliente) {
+  if (!navigator.onLine || !window.supabaseClient) return;
+
+  const { error } = await supabaseClient
+    .from("clientes")
+    .update({
+      nombre: cliente.nombre,
+      tarjeta_uid: cliente.tarjetaUID,
+      fecha_registro: cliente.fechaRegistro,
+      membresia_expira: cliente.membresiaExpira
+    })
+    .eq("id", cliente.id);
+
+  if (error) {
+    console.error("❌ Error actualizar cliente:", error);
+  }
+}
