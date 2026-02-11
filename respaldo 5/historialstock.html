@@ -2,11 +2,86 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Historial de Stock</title>
 <link rel="stylesheet" href="css/styles.css">
 
 <!-- SUPABASE (ESTA ES LA BUENA) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@1.35.7/dist/umd/supabase.min.js"></script>
+
+<!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+<style>
+@media (max-width: 768px){
+
+  .header-brand{
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    text-align:center;
+  }
+
+  .brand{
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .brand img{
+    height: 70px;
+  }
+
+  .brand h2{
+    font-size: 20px;
+  }
+
+  header button{
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .search-bar{
+    width: 92%;
+  }
+
+  .search-bar input{
+    height: 46px;
+    font-size: 15px;
+  }
+
+  .historial-container{
+    width: 94%;
+  }
+
+  .cliente{
+    padding: 16px;
+  }
+
+  .cliente h3{
+    font-size: 18px;
+  }
+
+  .racha{
+    font-size: 13px;
+  }
+
+  .flecha{
+    font-size: 20px;
+  }
+
+  .historial{
+    overflow-x: auto;
+  }
+
+  .historial table{
+    font-size: 13px;
+  }
+
+  .historial th,
+  .historial td{
+    padding: 8px 6px;
+  }
+
+}
+</style>
 
 </head>
 
