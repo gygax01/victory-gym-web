@@ -1455,3 +1455,186 @@ button.nfc {
     0 0 60px rgba(52,152,219,.65),
     0 0 140px rgba(52,152,219,.35);
 }
+
+/* ======================================================
+   ===== MOBILE PRO ADAPTATION – GYM SYSTEM =====
+   ====================================================== */
+
+@media (max-width: 768px) {
+
+  /* ================= HEADER ================= */
+
+  header,
+  .header-brand {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .brand {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .brand img {
+    height: 70px;
+  }
+
+  .brand h2 {
+    font-size: 22px;
+  }
+
+  /* ================= PANEL PRINCIPAL ================= */
+
+  .panel-acciones {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-acciones button {
+    padding: 20px;
+    font-size: 16px;
+  }
+
+  /* ================= TABLAS ================= */
+
+  table {
+    width: 100%;
+    font-size: 13px;
+  }
+
+  .historial-container,
+  .search-bar {
+    width: 95%;
+  }
+
+  .historial {
+    overflow-x: auto;
+  }
+
+  /* ================= TARJETAS CLIENTES ================= */
+
+  .cliente {
+    padding: 14px;
+  }
+
+  .cliente h3 {
+    font-size: 20px;
+  }
+
+  .flecha {
+    font-size: 20px;
+  }
+
+  .btn-borrar {
+    margin-right: 24px;
+  }
+
+  /* ================= STOCK ================= */
+
+  .stock-nuevo {
+    padding: 24px;
+  }
+
+  .stock-form {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stock-form button {
+    width: 100%;
+  }
+
+  .stock-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-footer {
+    text-align: center;
+  }
+
+  .btn-guardar {
+    width: 100%;
+  }
+
+  /* ================= POS ================= */
+
+  .pos-wrap {
+    grid-template-columns: 1fr !important;
+  }
+
+  .prod {
+    font-size: 14px;
+  }
+
+  .carrito {
+    margin-top: 20px;
+  }
+
+  .carrito button {
+    width: 100%;
+  }
+
+  /* ================= REGISTRO CLIENTE ================= */
+
+  .registro-datos {
+    grid-template-columns: 1fr !important;
+  }
+
+  .membresia-botones {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .registro-acciones {
+    flex-direction: column;
+  }
+
+  .registro-acciones button {
+    width: 100%;
+  }
+
+  /* ================= LOGIN ================= */
+
+  .login-card {
+    width: 92%;
+    padding: 28px;
+  }
+
+  .login-logo img {
+    width: 220px;
+  }
+
+  /* ================= MODALES ================= */
+
+  .modal-card {
+    width: 92%;
+  }
+
+  .popup {
+    width: 92%;
+    padding: 28px;
+  }
+
+  /* ================= CONFIRMACIONES GRANDES ================= */
+
+  .confirmacion .box {
+    width: 92%;
+    padding: 40px 20px;
+  }
+
+  .confirmacion h1 {
+    font-size: 34px;
+  }
+
+  .confirmacion p {
+    font-size: 18px;
+  }
+
+  /* ================= TOAST ================= */
+
+  .toast {
+    width: 90%;
+    text-align: center;
+    font-size: 16px;
+  }
+
+}
