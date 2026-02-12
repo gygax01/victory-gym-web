@@ -334,13 +334,13 @@ async function actualizarClienteSupabase(cliente) {
     console.error("❌ Error actualizar cliente:", error);
   }
 }
-async function borrarClienteSupabase(uid) {
+async function borrarClienteSupabase(id) {
   if (!navigator.onLine || !window.supabaseClient) return;
 
   const { error } = await supabaseClient
     .from("clientes")
     .delete()
-    .eq("tarjeta_uid", uid);   // 🔥 IMPORTANTE snake_case
+    .eq("id", id);   // 🔥 BORRAR POR ID (CLAVE PRIMARIA)
 
   if (error) {
     console.error("❌ Error borrando en Supabase:", error);
@@ -348,3 +348,5 @@ async function borrarClienteSupabase(uid) {
     console.log("🗑 Cliente borrado en Supabase");
   }
 }
+
+
