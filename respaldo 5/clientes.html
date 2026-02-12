@@ -164,7 +164,6 @@ let leyendoTarjeta = false;
 
 window.addEventListener("load", () => {
   if (!verificarSesion()) return;
-  if (!can("clients_view")) return;
 
   busqueda.oninput = filtrar;
   btnConfirmarBorrado.onclick = confirmarBorrado;
@@ -203,29 +202,28 @@ function render(lista) {
     return;
   }
 
-  lista.forEach(c => {
-    const cont = document.createElement("div");
-    cont.className = "cliente";
+lista.forEach(c => {
 
-    cont.innerHTML = `
-      <div class="cliente-header">
-        <h3>${c.nombre}</h3>
-        <div class="acciones">
-          <button onclick="iniciarReasignacion('${c.tarjetaUID}')">
-            Reasignar tarjeta
-          </button>
-          ${
-            can("clients_delete")
-              ? `<button onclick="pedirConfirmacion('${c.tarjetaUID}')">Eliminar</button>`
-              : ""
-          }
-        </div>
+  const cont = document.createElement("div");
+  cont.className = "cliente";
+
+  cont.innerHTML = `
+    <div class="cliente-header">
+      <h3>${c.nombre}</h3>
+      <div class="acciones">
+        <button onclick="iniciarReasignacion('${c.tarjetaUID}')">
+          Reasignar tarjeta
+        </button>
+        <button onclick="pedirConfirmacion('${c.tarjetaUID}')">
+          Eliminar
+        </button>
       </div>
-    `;
+    </div>
+  `;
 
-    listaClientes.appendChild(cont);
-  });
-}
+  listaClientes.appendChild(cont);
+
+});
 
 function filtrar() {
   const q = busqueda.value.toLowerCase();
@@ -313,3 +311,4 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
