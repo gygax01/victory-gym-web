@@ -340,7 +340,7 @@ async function borrarClienteSupabase(id) {
   const { error } = await supabaseClient
     .from("clientes")
     .delete()
-    .eq("id", id);   // 🔥 BORRAR POR ID (CLAVE PRIMARIA)
+    .eq("id", id);   // 🔥 BORRAR POR ID REAL
 
   if (error) {
     console.error("❌ Error borrando en Supabase:", error);
@@ -348,5 +348,3 @@ async function borrarClienteSupabase(id) {
     console.log("🗑 Cliente borrado en Supabase");
   }
 }
-
-
