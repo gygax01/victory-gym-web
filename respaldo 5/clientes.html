@@ -116,7 +116,6 @@
 
 <div class="historial-container" id="listaClientes"></div>
 
-<!-- ===== CONFIRMAR ELIMINAR ===== -->
 <div class="confirmacion error" id="confirmBorrar">
   <div class="box">
     <h1>Eliminar cliente</h1>
@@ -126,7 +125,6 @@
   </div>
 </div>
 
-<!-- ===== REASIGNAR TARJETA ===== -->
 <div class="confirmacion" id="confirmReasignar">
   <div class="box">
     <h1>Reasignar tarjeta</h1>
@@ -136,13 +134,13 @@
   </div>
 </div>
 
-<!-- ===== CORE ===== -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
+
 function obtenerClientes() {
   return safeGet("clientes");
 }
@@ -158,8 +156,8 @@ const btnCancelarBorrado = document.getElementById("btnCancelarBorrado");
 const btnCancelarReasignar = document.getElementById("btnCancelarReasignar");
 
 let clientes = [];
-let clienteUIDEliminar = null;
-let clienteUIDReasignar = null;
+let clienteIdEliminar = null;
+let clienteIdReasignar = null;
 let leyendoTarjeta = false;
 
 window.addEventListener("load", () => {
@@ -202,86 +200,75 @@ function render(lista) {
     return;
   }
 
-lista.forEach(c => {
+  lista.forEach(c => {
 
-  const cont = document.createElement("div");
-  cont.className = "cliente";
+    const cont = document.createElement("div");
+    cont.className = "cliente";
 
-  cont.innerHTML = `
-    <div class="cliente-header">
-      <h3>${c.nombre}</h3>
-      <div class="acciones">
-        <button onclick="iniciarReasignacion('${c.tarjetaUID}')">
-          Reasignar tarjeta
-        </button>
-        <button onclick="pedirConfirmacion('${c.tarjetaUID}')">
-          Eliminar
-        </button>
+    cont.innerHTML = `
+      <div class="cliente-header">
+        <h3>${c.nombre}</h3>
+        <div class="acciones">
+          <button onclick="iniciarReasignacion('${c.id}')">
+            Reasignar tarjeta
+          </button>
+          <button onclick="pedirConfirmacion('${c.id}')">
+            Eliminar
+          </button>
+        </div>
       </div>
-    </div>
-  `;
+    `;
 
-  listaClientes.appendChild(cont);
+    listaClientes.appendChild(cont);
 
-});
+  });
 }
+
 function filtrar() {
   const q = busqueda.value.toLowerCase();
   render(clientes.filter(c => c.nombre.toLowerCase().includes(q)));
 }
 
-function pedirConfirmacion(uid) {
-  clienteUIDEliminar = uid;
+/* 🔧 SOLO ESTA FUNCIÓN FUE CORREGIDA */
+
+function pedirConfirmacion(id) {
+  clienteIdEliminar = id;
   confirmBorrar.style.display = "flex";
 }
 
 function cancelarBorrado() {
-  clienteUIDEliminar = null;
+  clienteIdEliminar = null;
   confirmBorrar.style.display = "none";
 }
 
 async function confirmarBorrado() {
 
-  if (!clienteUIDEliminar) return;
+  if (!clienteIdEliminar) return;
 
   const listaLocal = obtenerClientes();
-
-  const cliente = listaLocal.find(
-    c => c.tarjetaUID === clienteUIDEliminar
-  );
+  const cliente = listaLocal.find(c => c.id === clienteIdEliminar);
 
   if (!cliente) return;
 
-  /* ===============================
-     1️⃣ BORRAR EN SUPABASE
-  =============================== */
-
   if (navigator.onLine && window.borrarClienteSupabase) {
-    await borrarClienteSupabase(cliente.id); // 🔥 USAR ID REAL
+    await borrarClienteSupabase(cliente.id);
   }
 
-  /* ===============================
-     2️⃣ BORRAR EN LOCAL
-  =============================== */
-
   const nuevaLista = listaLocal.filter(
-    c => c.id !== cliente.id   // 🔥 FILTRAR POR ID TAMBIÉN
+    c => c.id !== cliente.id
   );
 
   safeSet("clientes", nuevaLista);
-
   new BroadcastChannel("victory-data").postMessage("clientes");
 
   cancelarBorrado();
   cargarClientes();
 }
 
-  
-/* ================= REASIGNAR NFC (TOTALMENTE CORREGIDO) ================= */
+/* REASIGNACIÓN INTACTA */
 function iniciarReasignacion(uid) {
   clienteUIDReasignar = uid;
   leyendoTarjeta = false;
-
   estadoTarjeta.className = "estado amarillo";
   estadoTarjeta.textContent = "Esperando tarjeta…";
   confirmReasignar.style.display = "flex";
@@ -305,12 +292,10 @@ function iniciarReasignacion(uid) {
       safeSet("clientes", lista);
       new BroadcastChannel("victory-data").postMessage("clientes");
 
-      // 🔥 Actualiza cliente en Supabase
       if (clienteActualizado && typeof actualizarClienteSupabase === "function") {
         await actualizarClienteSupabase(clienteActualizado);
       }
 
-      // 🔥 MIGRA HISTORIAL ATTENDANCE
       if (typeof migrarUIDEnAttendance === "function") {
         await migrarUIDEnAttendance(uidViejo, uidNuevo);
       }
@@ -332,19 +317,8 @@ function cancelarReasignacion() {
   detenerNFC();
   confirmReasignar.style.display = "none";
 }
+
 </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
