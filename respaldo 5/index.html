@@ -6,86 +6,6 @@
   <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- ===== SOLO ADAPTACIÓN MÓVIL ===== -->
-  <style>
-  @media (max-width: 768px){
-
-    /* ===== HEADER ===== */
-    .header-brand{
-      flex-direction: column;
-      gap: 14px;
-      padding: 18px;
-      text-align:center;
-    }
-
-    .brand{
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .brand img{
-      height: 70px;
-    }
-
-    .brand h2{
-      font-size: 20px;
-    }
-
-    .estado-sistema{
-      flex-direction: column;
-      gap: 10px;
-      align-items:center;
-    }
-
-    .estado-sistema button{
-      width:100%;
-      margin-left:0;
-    }
-
-    /* ===== PANEL ACCIONES ===== */
-    .panel-acciones{
-      grid-template-columns: 1fr;
-      width: 92%;
-    }
-
-    .panel-acciones button{
-      font-size:16px;
-      padding:18px;
-    }
-
-    /* ===== TABLA ===== */
-    #contenedorTabla{
-      max-height: 60vh;
-      width: 95%;
-      margin: 0 auto;
-    }
-
-    table{
-      width:100%;
-      font-size:13px;
-    }
-
-    th, td{
-      padding:10px 6px;
-    }
-
-    /* ===== CONFIRMACION ===== */
-    .confirmacion .box{
-      width: 92%;
-      padding: 40px 20px;
-    }
-
-    .confirmacion h1{
-      font-size: 32px;
-    }
-
-    .confirmacion p{
-      font-size: 18px;
-    }
-  }
-  </style>
-
 </head>
 
 <body>
@@ -115,9 +35,7 @@
   <button onclick="location.href='membresias.html'">Membresías</button>
   <button onclick="location.href='clientes.html'">Clientes</button>
   <button onclick="location.href='historial.html'">Historial</button>
-  <button id="btnUsuarios" style="display:none" onclick="location.href='usuarios.html'">
-    Usuarios
-  </button>
+  <button onclick="location.href='usuarios.html'">Usuarios</button>
 </div>
 
 <div id="contenedorTabla" style="max-height:70vh; overflow-y:auto;">
@@ -133,7 +51,6 @@
   </table>
 </div>
 
-<!-- CONFIRMACIÓN GRANDE -->
 <div class="confirmacion" id="confirmacion">
   <div class="box">
     <h1 id="tituloConfirmacion"></h1>
@@ -142,7 +59,6 @@
 </div>
 
 <script src="js/storage.js"></script>
-<script src="js/auth.js"></script>
 <script src="js/asistencias.js"></script>
 <script src="js/realtime.js"></script>
 <script src="js/nfc.js"></script>
@@ -155,20 +71,9 @@ window.addEventListener("load", () => {
 
   const estadoLector = document.getElementById("estadoLector");
   const estadoConexion = document.getElementById("estadoConexion");
-  const btnUsuarios = document.getElementById("btnUsuarios");
   const btnLogout = document.getElementById("btnLogout");
 
-  if (typeof verificarSesion === "function") {
-    if (!verificarSesion()) return;
-  }
-
-  const s = typeof getSession === "function" ? getSession() : null;
-
-  if (s && (s.rol === "admin" || s.rol === "superadmin")) {
-    btnUsuarios.style.display = "inline-block";
-  }
-
-  btnLogout.onclick = logout;
+  btnLogout.onclick = () => location.href = "login.html";
 
   actualizarEstadoConexion(estadoConexion);
 
@@ -291,32 +196,6 @@ async function procesarTarjeta(uid) {
   } catch (err) {
     console.error("❌ Error RPC:", err);
   }
-}
-
-/* ================= SINCRONIZAR OFFLINE ================= */
-async function sincronizarPendientesAttendance() {
-
-  if (!navigator.onLine || !window.supabaseClient) return;
-
-  const pendientes = safeGet("attendance_offline");
-  if (!pendientes.length) return;
-
-  for (const e of pendientes) {
-    try {
-      await window.supabaseClient.rpc("registrar_asistencia", {
-        p_id: e.id,
-        p_uid: e.uid,
-        p_created_at: e.created_at,
-        p_source: e.source,
-        p_device_id: e.device_id
-      });
-    } catch (err) {
-      console.error("Error sync attendance:", err);
-      return;
-    }
-  }
-
-  safeSet("attendance_offline", []);
 }
 
 </script>
