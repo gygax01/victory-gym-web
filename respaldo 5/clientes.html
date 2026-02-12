@@ -252,12 +252,20 @@ async function confirmarBorrado() {
 
   if (!cliente) return;
 
-  /* 🔥 BORRAR EN SUPABASE */
-  await borrarClienteSupabase(cliente.id);
+  /* ===============================
+     1️⃣ BORRAR EN SUPABASE
+  =============================== */
 
-  /* 🔥 BORRAR EN LOCAL */
+  if (navigator.onLine && window.borrarClienteSupabase) {
+    await borrarClienteSupabase(cliente.id); // 🔥 USAR ID REAL
+  }
+
+  /* ===============================
+     2️⃣ BORRAR EN LOCAL
+  =============================== */
+
   const nuevaLista = listaLocal.filter(
-    c => c.id !== cliente.id
+    c => c.id !== cliente.id   // 🔥 FILTRAR POR ID TAMBIÉN
   );
 
   safeSet("clientes", nuevaLista);
@@ -267,6 +275,7 @@ async function confirmarBorrado() {
   cancelarBorrado();
   cargarClientes();
 }
+
   
 /* ================= REASIGNAR NFC (TOTALMENTE CORREGIDO) ================= */
 function iniciarReasignacion(uid) {
@@ -327,6 +336,7 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
 
 
 
