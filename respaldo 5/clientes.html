@@ -252,31 +252,12 @@ async function confirmarBorrado() {
 
   if (!cliente) return;
 
-  /* ===============================
-     1️⃣ BORRAR EN SUPABASE POR ID
-  =============================== */
+  /* 🔥 BORRAR EN SUPABASE */
+  await borrarClienteSupabase(cliente.id);
 
-  if (navigator.onLine && window.supabaseClient) {
-
-    const { error } = await window.supabaseClient
-      .from("clientes")
-      .delete()
-      .eq("id", cliente.id);   // 🔥 CAMBIO CLAVE
-
-    if (error) {
-      console.error("❌ Error borrando en Supabase:", error);
-      return;
-    } else {
-      console.log("🗑 Cliente borrado en Supabase");
-    }
-  }
-
-  /* ===============================
-     2️⃣ BORRAR EN LOCAL
-  =============================== */
-
+  /* 🔥 BORRAR EN LOCAL */
   const nuevaLista = listaLocal.filter(
-    c => c.id !== cliente.id   // 🔥 usar id también aquí
+    c => c.id !== cliente.id
   );
 
   safeSet("clientes", nuevaLista);
@@ -346,6 +327,7 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
 
 
 
