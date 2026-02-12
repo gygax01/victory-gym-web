@@ -253,7 +253,7 @@ async function confirmarBorrado() {
   if (!cliente) return;
 
   /* ===============================
-     1️⃣ BORRAR EN SUPABASE
+     1️⃣ BORRAR EN SUPABASE POR ID
   =============================== */
 
   if (navigator.onLine && window.supabaseClient) {
@@ -261,7 +261,7 @@ async function confirmarBorrado() {
     const { error } = await window.supabaseClient
       .from("clientes")
       .delete()
-      .eq("tarjeta_uid", clienteUIDEliminar); // 🔥 snake_case REAL
+      .eq("id", cliente.id);  // 🔥 BORRAR POR PRIMARY KEY
 
     if (error) {
       console.error("❌ Error borrando en Supabase:", error);
@@ -276,7 +276,7 @@ async function confirmarBorrado() {
   =============================== */
 
   const nuevaLista = listaLocal.filter(
-    c => c.tarjetaUID !== clienteUIDEliminar
+    c => c.id !== cliente.id
   );
 
   safeSet("clientes", nuevaLista);
@@ -286,6 +286,7 @@ async function confirmarBorrado() {
   cancelarBorrado();
   cargarClientes();
 }
+
 
 
 
@@ -348,6 +349,7 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
 
 
 
