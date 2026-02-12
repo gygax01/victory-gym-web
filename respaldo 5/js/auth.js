@@ -42,29 +42,7 @@ function seedSuperAdmin() {
 }
 
 /* ================= PERMISOS ================= */
-const ROLE_PERMISSIONS = {
-  employee: { stock_view: true },
-  admin: {
-    stock_view: true,
-    stock_add: true,
-    stock_delete: true,
-    products_create: true
-  },
-  superadmin: { system_all: true }
-};
-
-function can(permission) {
-  const s = getSession();
-  if (!s) return false;
-  if (s.rol === "superadmin") return true;
-  return ROLE_PERMISSIONS[s.rol]?.[permission] === true;
-}
-
-function applyPermissions() {
-  document.querySelectorAll("[data-permission]").forEach(el => {
-    el.style.display = can(el.dataset.permission) ? "" : "none";
-  });
-}
+///////
 
 /* ================= LOGIN ================= */
 function login(usuario, password) {
@@ -98,21 +76,12 @@ function logout() {
 
 /* ================= GUARDIA ================= */
 function verificarSesion() {
-  if (esPaginaPublica()) return true;
-
-  if (!getSession()) {
-    location.href = "login.html";
-    return false;
-  }
   return true;
 }
 
+
 /* ================= INIT ================= */
-window.addEventListener("load", () => {
-  seedSuperAdmin();
-  verificarSesion();
-  applyPermissions();
-});
+//
 
 /* ================= MASTER PASSWORD ================= */
 const MASTER_PASSWORD = "victory(profitness)";
@@ -120,3 +89,4 @@ const MASTER_PASSWORD = "victory(profitness)";
 function validarPasswordMaestra(input) {
   return input === MASTER_PASSWORD;
 }
+
