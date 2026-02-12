@@ -217,14 +217,15 @@ function registrarUsuario() {
 
   const empleados = obtenerEmpleados();
 
-  const nuevo = {
-    id: crypto.randomUUID(),
-    nombre: nombre.value.trim(),
-    usuario: usuario.value.trim(),
-    password: password.value,
-    rol: rol.value,
-    tarjetaUID
-  };
+const nuevo = {
+  id: crypto.randomUUID(),
+  nombre: nombre.value.trim(),
+  usuario: usuario.value.trim(),
+  password: password.value,
+  rol: rol.value,
+  tarjeta_uid: tarjetaUID   // 🔥 CAMBIAR AQUÍ
+};
+
 
   empleados.push(nuevo);
   guardarEmpleados(empleados);
@@ -290,3 +291,4 @@ function volver() {
 
 </body>
 </html>
+
