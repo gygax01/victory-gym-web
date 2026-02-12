@@ -245,7 +245,6 @@ async function confirmarBorrado() {
   if (!clienteUIDEliminar) return;
 
   const listaLocal = obtenerClientes();
-
   const cliente = listaLocal.find(
     c => c.tarjetaUID === clienteUIDEliminar
   );
@@ -253,42 +252,28 @@ async function confirmarBorrado() {
   if (!cliente) return;
 
   /* ===============================
-     1️⃣ BORRAR EN SUPABASE POR ID
+     1️⃣ BORRAR EN SUPABASE (FUNCIÓN CENTRAL)
   =============================== */
 
-  if (navigator.onLine && window.supabaseClient) {
-
-    const { error } = await window.supabaseClient
-      .from("clientes")
-      .delete()
-      .eq("id", cliente.id);  // 🔥 BORRAR POR PRIMARY KEY
-
-    if (error) {
-      console.error("❌ Error borrando en Supabase:", error);
-      return;
-    } else {
-      console.log("🗑 Cliente borrado en Supabase");
-    }
+  if (typeof borrarClienteSupabase === "function") {
+    await borrarClienteSupabase(clienteUIDEliminar);
   }
 
   /* ===============================
-     2️⃣ BORRAR EN LOCAL
+     2️⃣ BORRAR LOCAL (opcional)
+     Realtime lo hará solo, pero lo dejamos por seguridad
   =============================== */
 
   const nuevaLista = listaLocal.filter(
-    c => c.id !== cliente.id
+    c => c.tarjetaUID !== clienteUIDEliminar
   );
 
   safeSet("clientes", nuevaLista);
-
   new BroadcastChannel("victory-data").postMessage("clientes");
 
   cancelarBorrado();
   cargarClientes();
 }
-
-
-
 
 /* ================= REASIGNAR NFC (TOTALMENTE CORREGIDO) ================= */
 function iniciarReasignacion(uid) {
@@ -349,6 +334,7 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
 
 
 
