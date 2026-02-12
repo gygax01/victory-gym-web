@@ -253,7 +253,7 @@ async function confirmarBorrado() {
   if (!cliente) return;
 
   /* ===============================
-     1️⃣ BORRAR EN SUPABASE (por id)
+     1️⃣ BORRAR EN SUPABASE POR ID
   =============================== */
 
   if (navigator.onLine && window.supabaseClient) {
@@ -261,7 +261,7 @@ async function confirmarBorrado() {
     const { error } = await window.supabaseClient
       .from("clientes")
       .delete()
-      .eq("id", cliente.id);   // 🔥 PRIMARY KEY
+      .eq("id", cliente.id);   // 🔥 CAMBIO CLAVE
 
     if (error) {
       console.error("❌ Error borrando en Supabase:", error);
@@ -272,18 +272,14 @@ async function confirmarBorrado() {
   }
 
   /* ===============================
-     2️⃣ BORRAR EN LOCAL (INMEDIATO)
+     2️⃣ BORRAR EN LOCAL
   =============================== */
 
   const nuevaLista = listaLocal.filter(
-    c => c.id !== cliente.id
+    c => c.id !== cliente.id   // 🔥 usar id también aquí
   );
 
   safeSet("clientes", nuevaLista);
-
-  /* ===============================
-     3️⃣ NOTIFICAR Y RENDERIZAR
-  =============================== */
 
   new BroadcastChannel("victory-data").postMessage("clientes");
 
@@ -350,6 +346,7 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
 
 
 
