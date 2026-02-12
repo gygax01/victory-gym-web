@@ -240,17 +240,41 @@ function cancelarBorrado() {
   confirmBorrar.style.display = "none";
 }
 
-function confirmarBorrado() {
-  const nuevaLista = obtenerClientes().filter(
+async function confirmarBorrado() {
+
+  const listaLocal = obtenerClientes();
+  const cliente = listaLocal.find(
+    c => c.tarjetaUID === clienteUIDEliminar
+  );
+
+  if (!cliente) return;
+
+  // 🔥 1️⃣ Borrar en Supabase
+  if (typeof window.supabaseClient !== "undefined") {
+    const { error } = await window.supabaseClient
+      .from("clientes")
+      .delete()
+      .eq("tarjetaUID", clienteUIDEliminar);
+
+    if (error) {
+      console.error("Error borrando en Supabase:", error);
+      return;
+    }
+  }
+
+  // 🔥 2️⃣ Borrar en localStorage
+  const nuevaLista = listaLocal.filter(
     c => c.tarjetaUID !== clienteUIDEliminar
   );
 
   safeSet("clientes", nuevaLista);
+
   new BroadcastChannel("victory-data").postMessage("clientes");
 
   cancelarBorrado();
   cargarClientes();
 }
+
 
 /* ================= REASIGNAR NFC (TOTALMENTE CORREGIDO) ================= */
 function iniciarReasignacion(uid) {
@@ -311,5 +335,6 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
 
 
