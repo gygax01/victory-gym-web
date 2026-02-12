@@ -266,9 +266,9 @@ async function confirmarBorrado() {
     if (error) {
       console.error("❌ Error borrando en Supabase:", error);
       return;
+    } else {
+      console.log("🗑 Cliente borrado en Supabase");
     }
-
-    console.log("🗑 Cliente borrado en Supabase");
   }
 
   /* ===============================
@@ -346,6 +346,7 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
 
 
 
