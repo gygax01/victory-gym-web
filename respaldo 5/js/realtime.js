@@ -1,3 +1,4 @@
+
 /* ======================================================
    ===== SUPABASE REALTIME (STOCK + CLIENTES) ===========
 ====================================================== */
@@ -266,14 +267,13 @@ async function insertarEmpleadoSupabase(emp) {
   if (!navigator.onLine || !window.supabaseClient) return;
 
   const { error } = await supabaseClient
-    .from("empleados")   // 🔥 ESTA LÍNEA FALTABA
+    .from("empleados")
     .insert({
       id: emp.id,
       nombre: emp.nombre,
       usuario: emp.usuario,
       password: emp.password,
-      rol: emp.rol,
-      tarjeta_uid: emp.tarjeta_uid
+      rol: emp.rol
     });
 
   if (error) {
@@ -282,7 +282,6 @@ async function insertarEmpleadoSupabase(emp) {
     console.log("☁️ Empleado guardado en Supabase");
   }
 }
-
 
 async function cargarEmpleadosIniciales() {
   const { data, error } = await supabaseClient
