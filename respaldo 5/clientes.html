@@ -252,25 +252,45 @@ async function confirmarBorrado() {
 
   if (!cliente) return;
 
-  // 🔥 BORRAR POR ID (no por UID)
+  /* ===============================
+     1️⃣ BORRAR EN SUPABASE (por id)
+  =============================== */
+
   if (navigator.onLine && window.supabaseClient) {
 
     const { error } = await window.supabaseClient
       .from("clientes")
       .delete()
-      .eq("id", cliente.id);   // 🔥 CLAVE REAL
+      .eq("id", cliente.id);   // 🔥 PRIMARY KEY
 
     if (error) {
       console.error("❌ Error borrando en Supabase:", error);
       return;
-    } else {
-      console.log("🗑 Cliente borrado en Supabase");
     }
+
+    console.log("🗑 Cliente borrado en Supabase");
   }
 
-  cancelarBorrado();
-}
+  /* ===============================
+     2️⃣ BORRAR EN LOCAL (INMEDIATO)
+  =============================== */
 
+  const nuevaLista = listaLocal.filter(
+    c => c.id !== cliente.id
+  );
+
+  safeSet("clientes", nuevaLista);
+
+  /* ===============================
+     3️⃣ NOTIFICAR Y RENDERIZAR
+  =============================== */
+
+  new BroadcastChannel("victory-data").postMessage("clientes");
+
+  cancelarBorrado();
+  cargarClientes();
+}
+  
 /* ================= REASIGNAR NFC (TOTALMENTE CORREGIDO) ================= */
 function iniciarReasignacion(uid) {
   clienteUIDReasignar = uid;
@@ -330,6 +350,7 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
 
 
 
