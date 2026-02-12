@@ -89,7 +89,6 @@ window.addEventListener("load", initMembresias);
 
 function initMembresias() {
   if (!verificarSesion()) return;
-  if (!can("memberships_view")) return;
 
   iniciarSyncMembresias();
   cargarMembresias();
@@ -98,6 +97,7 @@ function initMembresias() {
     iniciarRealtime();
   }
 }
+
 
 /* ================= SYNC ================= */
 function iniciarSyncMembresias() {
@@ -157,7 +157,6 @@ function cargarMembresias() {
 
 /* ================= ACCIÓN ================= */
 function extenderMembresia(idCliente, dias) {
-  if (!can("memberships_extend")) return;
 
   const clientes = obtenerClientes();
   const c = clientes.find(x => x.id === idCliente);
@@ -165,15 +164,18 @@ function extenderMembresia(idCliente, dias) {
 
   const base = new Date(c.membresiaExpira || hoy());
   base.setDate(base.getDate() + dias);
+
   c.membresiaExpira = base.toISOString().split("T")[0];
 
   actualizarCliente(c);
 
   new BroadcastChannel("victory-data").postMessage("clientes");
+
   cargarMembresias();
 }
 </script>
 
 </body>
 </html>
+
 
