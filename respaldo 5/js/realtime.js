@@ -266,14 +266,15 @@ async function insertarEmpleadoSupabase(emp) {
   if (!navigator.onLine || !window.supabaseClient) return;
 
   const { error } = await supabaseClient
-    .from("empleados")
-    .insert({
-      id: emp.id,
-      nombre: emp.nombre,
-      usuario: emp.usuario,
-      password: emp.password,
-      rol: emp.rol
-    });
+   .insert({
+   id: emp.id,
+   nombre: emp.nombre,
+   usuario: emp.usuario,
+   password: emp.password,
+   rol: emp.rol,
+   tarjeta_uid: emp.tarjeta_uid   // 🔥 AGREGAR ESTA LÍNEA
+});
+
 
   if (error) {
     console.error("❌ Error insertar empleado:", error);
