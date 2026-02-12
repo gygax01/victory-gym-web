@@ -266,15 +266,15 @@ async function insertarEmpleadoSupabase(emp) {
   if (!navigator.onLine || !window.supabaseClient) return;
 
   const { error } = await supabaseClient
-   .insert({
-   id: emp.id,
-   nombre: emp.nombre,
-   usuario: emp.usuario,
-   password: emp.password,
-   rol: emp.rol,
-   tarjeta_uid: emp.tarjeta_uid   // 🔥 AGREGAR ESTA LÍNEA
-});
-
+    .from("empleados")   // 🔥 ESTA LÍNEA FALTABA
+    .insert({
+      id: emp.id,
+      nombre: emp.nombre,
+      usuario: emp.usuario,
+      password: emp.password,
+      rol: emp.rol,
+      tarjeta_uid: emp.tarjeta_uid
+    });
 
   if (error) {
     console.error("❌ Error insertar empleado:", error);
@@ -282,6 +282,7 @@ async function insertarEmpleadoSupabase(emp) {
     console.log("☁️ Empleado guardado en Supabase");
   }
 }
+
 
 async function cargarEmpleadosIniciales() {
   const { data, error } = await supabaseClient
