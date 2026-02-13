@@ -154,19 +154,32 @@ function cargarMembresias() {
 
 }
 
-/* ================= ACCIÓN ================= */
-function extenderMembresia(idCliente, dias) {
+/* ================= ACCIÓN AUMNETAR MEMBRESÍA ================= */
+async function extenderMembresia(idCliente, dias) {
 
-  const clientes = obtenerClientes();
+  const clientes = safeGet("clientes");
   const c = clientes.find(x => x.id === idCliente);
   if (!c) return;
 
-  const base = new Date(c.membresiaExpira || hoy());
+  const base = new Date(c.membresiaExpira || new Date());
   base.setDate(base.getDate() + dias);
 
-  c.membresiaExpira = base.toISOString().split("T")[0];
+  const nuevaFecha = base.toISOString().split("T")[0];
 
-  actualizarCliente(c);
+  // 🔥 Actualizar en Supabase
+  const { error } = await supabaseClient
+    .from("clientes")
+    .update({ membresiaExpira: nuevaFecha })
+    .eq("id", idCliente);
+
+  if (error) {
+    console.error("Error actualizando membresía:", error);
+    return;
+  }
+
+  // 🔥 Actualizar local
+  c.membresiaExpira = nuevaFecha;
+  safeSet("clientes", clientes);
 
   new BroadcastChannel("victory-data").postMessage("clientes");
 
@@ -176,6 +189,7 @@ function extenderMembresia(idCliente, dias) {
 
 </body>
 </html>
+
 
 
 
