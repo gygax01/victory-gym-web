@@ -133,23 +133,32 @@ async function initHistorial() {
 
   busqueda.addEventListener("input", filtrar);
 
+  let cargado = false;
+
   if (navigator.onLine && window.supabaseClient) {
-    await cargarAsistenciasDesdeSupabase();
+    cargado = await cargarAsistenciasDesdeSupabase();
   }
 
-  iniciarSyncHistorial();
+  // 🔥 Si Supabase falló, usar cache local
+  if (!cargado) {
+    console.warn("⚠️ Usando datos locales");
+  }
+
   cargarHistorial();
+  iniciarSyncHistorial();
 }
+
 
 /* ================= SUPABASE → ASISTENCIAS ================= */
 async function cargarAsistenciasDesdeSupabase() {
   const { data, error } = await supabaseClient
     .from("asistencias")
-    .select("*");
+    .select("*")
+    .order("fecha", { ascending: false });
 
   if (error) {
     console.error("❌ Error cargando asistencias:", error);
-    return;
+    return false;
   }
 
   const normalizadas = (data || []).map(a => ({
@@ -163,17 +172,10 @@ async function cargarAsistenciasDesdeSupabase() {
     salida: a.salida ?? null
   }));
 
-  // 🔥 MEZCLAR en lugar de reemplazar
-  const locales = safeGet("asistencias") || [];
-  const combinadas = [...locales, ...normalizadas];
+  // 🔥 Supabase es la verdad
+  safeSet("asistencias", normalizadas);
 
-  const unicas = Array.from(
-    new Map(combinadas.map(a => [a.id, a])).values()
-  );
-
-  safeSet("asistencias", unicas);
-
-  new BroadcastChannel("victory-data").postMessage("asistencias");
+  return true;
 }
 
 
@@ -340,5 +342,6 @@ function filtrar() {
 
 </body>
 </html>
+
 
 
