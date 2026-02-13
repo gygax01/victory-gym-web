@@ -263,11 +263,13 @@ window.addEventListener("load", () => {
 /* ======================================================
    ===== HISTORIAL STOCK (NO TOCAR) =====================
 ====================================================== */
-
 async function pushHistorialStock(cambios) {
   try {
-    const session = JSON.parse(localStorage.getItem("session"));
-    if (!session) return;
+
+    const session = JSON.parse(localStorage.getItem("session")) || {
+      nombre: "admin",
+      rol: "admin"
+    };
 
     const now = new Date();
 
