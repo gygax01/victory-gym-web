@@ -154,55 +154,42 @@ async function cargarAsistenciasDesdeSupabase() {
   const { data, error } = await supabaseClient
     .from("attendance")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: true });
 
   if (error) {
     console.error("❌ Error cargando asistencias:", error);
     return false;
   }
 
-  if (!data || !data.length) {
-    return false;
-  }
+  if (!data || !data.length) return false;
 
-  // 🔥 Convertir eventos entrada/salida en formato historial
-  const agrupado = {};
+  const sesiones = [];
+  const abiertas = {};
 
   data.forEach(row => {
-    const fecha = new Date(row.created_at).toISOString().split("T")[0];
+    const uid = row.uid;
 
-    if (!agrupado[row.uid]) agrupado[row.uid] = {};
-    if (!agrupado[row.uid][fecha]) {
-      agrupado[row.uid][fecha] = {
+    if (row.type === "entrada") {
+      abiertas[uid] = {
         id: row.id,
-        tarjetaUID: row.uid,
-        fecha,
-        entrada_ts: null,
+        tarjetaUID: uid,
+        fecha: new Date(row.created_at).toISOString().split("T")[0],
+        entrada_ts: new Date(row.created_at).getTime(),
         salida_ts: null
       };
     }
 
-    if (row.type === "entrada") {
-      agrupado[row.uid][fecha].entrada_ts = new Date(row.created_at).getTime();
-    }
-
-    if (row.type === "salida") {
-      agrupado[row.uid][fecha].salida_ts = new Date(row.created_at).getTime();
+    if (row.type === "salida" && abiertas[uid]) {
+      abiertas[uid].salida_ts = new Date(row.created_at).getTime();
+      sesiones.push(abiertas[uid]);
+      delete abiertas[uid];
     }
   });
 
-  const normalizadas = [];
-
-  Object.values(agrupado).forEach(fechas => {
-    Object.values(fechas).forEach(reg => {
-      normalizadas.push(reg);
-    });
-  });
-
-  safeSet("asistencias", normalizadas);
-
+  safeSet("asistencias", sesiones);
   return true;
 }
+
 /* ================= SINCRONIZACIÓN ================= */
 function iniciarSyncHistorial() {
   const bc = new BroadcastChannel("victory-data");
@@ -219,7 +206,6 @@ function iniciarSyncHistorial() {
     }
   });
 }
-
 /* ================= UTILIDADES ================= */
 function diasEntre(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
@@ -366,6 +352,7 @@ function filtrar() {
 
 </body>
 </html>
+
 
 
 
