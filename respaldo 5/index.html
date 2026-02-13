@@ -137,26 +137,32 @@ function iniciarLecturaNFCIndex(estadoLector) {
 /* ================= PROCESAR TARJETA ================= */
 async function procesarTarjeta(uid) {
 
-  const cliente = safeGet("clientes").find(c => c.tarjetaUID === uid);
-
-  if (!cliente) {
-    mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepción");
-    return;
-  }
-
-  const id = crypto.randomUUID();
-  const ahoraISO = new Date().toISOString();
-  const source = navigator.onLine ? "wifi" : "bluetooth";
-  const deviceId = "pc_principal";
-
   if (!window.supabaseClient) return;
 
   try {
+
+    // 1️⃣ Buscar cliente directamente en Supabase
+    const { data: cliente, error: errorCliente } = await window.supabaseClient
+      .from("clientes")
+      .select("id, nombre")
+      .eq("tarjeta_uid", uid)
+      .single();
+
+    if (errorCliente || !cliente) {
+      mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepción");
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const ahoraISO = new Date().toISOString();
+    const source = navigator.onLine ? "wifi" : "bluetooth";
+    const deviceId = "pc_principal";
 
     if (navigator.onLine) {
 
       const { data, error } = await window.supabaseClient.rpc("registrar_asistencia", {
         p_id: id,
+        p_cliente_id: cliente.id,
         p_uid: uid,
         p_created_at: ahoraISO,
         p_source: source,
@@ -182,6 +188,7 @@ async function procesarTarjeta(uid) {
 
       pendientes.push({
         id,
+        cliente_id: cliente.id,
         uid,
         created_at: ahoraISO,
         source,
@@ -194,7 +201,7 @@ async function procesarTarjeta(uid) {
     }
 
   } catch (err) {
-    console.error("❌ Error RPC:", err);
+    console.error("❌ Error procesando tarjeta:", err);
   }
 }
 
@@ -202,3 +209,4 @@ async function procesarTarjeta(uid) {
 
 </body>
 </html>
+
