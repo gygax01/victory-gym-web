@@ -163,9 +163,19 @@ async function cargarAsistenciasDesdeSupabase() {
     salida: a.salida ?? null
   }));
 
-  safeSet("asistencias", normalizadas);
+  // 🔥 MEZCLAR en lugar de reemplazar
+  const locales = safeGet("asistencias") || [];
+  const combinadas = [...locales, ...normalizadas];
+
+  const unicas = Array.from(
+    new Map(combinadas.map(a => [a.id, a])).values()
+  );
+
+  safeSet("asistencias", unicas);
+
   new BroadcastChannel("victory-data").postMessage("asistencias");
 }
+
 
 /* ================= SINCRONIZACIÓN ================= */
 function iniciarSyncHistorial() {
@@ -330,4 +340,5 @@ function filtrar() {
 
 </body>
 </html>
+
 
