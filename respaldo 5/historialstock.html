@@ -121,7 +121,6 @@ let historialFiltrado = [];
 /* ================= INIT ================= */
 async function initHistorialStock() {
   if (!verificarSesion()) return;
-  if (!can("stock_view")) location.href = "index.html";
 
   document
     .getElementById("buscadorHistorial")
