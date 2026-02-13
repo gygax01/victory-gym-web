@@ -65,7 +65,7 @@
 
 <div class="historial-container" id="listaMembresias"></div>
 
-<!-- JS BASE -->
+<!-- JS BASE (NO TOCAR) -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
@@ -73,91 +73,64 @@
 <script>
 
 /* =====================================================
-   =============== VARIABLES DOM ========================
+   ================= VARIABLES DOM ======================
 ===================================================== */
 const listaMembresias = document.getElementById("listaMembresias");
 
 /* =====================================================
-   =============== INIT PRINCIPAL =======================
-   Se ejecuta al cargar la página
+   ================= INIT PRINCIPAL =====================
+   Se ejecuta cuando carga la página
 ===================================================== */
 window.addEventListener("load", initMembresias);
 
 async function initMembresias() {
 
-  // 🔐 Verifica sesión
+  // 🔐 Validar sesión
   if (!verificarSesion()) return;
 
-  // 🌐 Si hay internet, primero sincroniza desde Supabase
-  if (navigator.onLine && window.supabaseClient) {
-    await cargarClientesDesdeSupabase();
-  }
+  // 🔥 Siempre intentar traer datos reales primero
+  await sincronizarDesdeSupabase();
 
-  // 🔄 Activa sincronización entre pestañas
-  iniciarSyncMembresias();
+  // 🎨 Pintar tarjetas
+  renderMembresias();
 
-  // 🎨 Pinta tarjetas
-  cargarMembresias();
+  // 🔄 Activar sincronización entre pestañas
+  activarSyncLocal();
 
-  // 🔴 Activa realtime si existe
+  // 🔴 Activar realtime si existe
   if (navigator.onLine && typeof iniciarRealtime === "function") {
     iniciarRealtime();
   }
 }
 
 /* =====================================================
-   =============== SINCRONIZACIÓN LOCAL =================
+   =========== SINCRONIZAR DESDE SUPABASE ==============
+   Trae clientes reales y actualiza cache local
 ===================================================== */
-function iniciarSyncMembresias() {
+async function sincronizarDesdeSupabase() {
 
-  const bc = new BroadcastChannel("victory-data");
-
-  // 🔄 Cuando otra pestaña cambia clientes
-  bc.onmessage = e => {
-    if (e.data === "clientes") {
-      cargarMembresias();
-    }
-  };
-
-  // 🔄 Cuando cambia localStorage
-  window.addEventListener("storage", e => {
-    if (e.key === "clientes") {
-      cargarMembresias();
-    }
-  });
-
-  // 🔄 Cuando vuelve internet
-  window.addEventListener("online", async () => {
-    await cargarClientesDesdeSupabase();
-    cargarMembresias();
-  });
-}
-
-/* =====================================================
-   =============== CARGAR DESDE SUPABASE ===============
-   Trae clientes reales y los guarda en localStorage
-===================================================== */
-async function cargarClientesDesdeSupabase() {
+  if (!navigator.onLine || !window.supabaseClient) return;
 
   const { data, error } = await supabaseClient
     .from("clientes")
-    .select("*");
+    .select("*")
+    .order("created_at", { ascending: true });
 
   if (error) {
     console.error("Error cargando clientes:", error);
     return;
   }
 
-  // Guarda copia local
+  // Guardamos copia local para cache
   safeSet("clientes", data || []);
 }
 
 /* =====================================================
-   =============== PINTAR MEMBRESÍAS ====================
+   ================== RENDER UI =========================
 ===================================================== */
-function cargarMembresias() {
+function renderMembresias() {
 
-  const clientes = safeGet("clientes")
+  const clientes = (safeGet("clientes") || [])
     .filter(c => c && typeof c.nombre === "string");
 
   listaMembresias.innerHTML = "";
@@ -167,44 +140,57 @@ function cargarMembresias() {
     return;
   }
 
-  clientes.forEach(c => {
+  clientes.forEach(cliente => {
 
     const card = document.createElement("div");
     card.className = "cliente";
 
     card.innerHTML = `
-      <h3>${c.nombre}</h3>
-      <p>Expira: ${c.membresia_expira ?? "—"}</p>
+      <h3>${cliente.nombre}</h3>
+      <p>Expira: ${cliente.membresia_expira ?? "—"}</p>
       <button>+7 días</button>
       <button>+30 días</button>
     `;
 
-    const btns = card.querySelectorAll("button");
+    const botones = card.querySelectorAll("button");
 
-    btns[0].onclick = () => extenderMembresia(c.id, 7);
-    btns[1].onclick = () => extenderMembresia(c.id, 30);
+    botones[0].onclick = () => extenderMembresia(cliente.id, 7);
+    botones[1].onclick = () => extenderMembresia(cliente.id, 30);
 
     listaMembresias.appendChild(card);
   });
 }
 
 /* =====================================================
-   =============== EXTENDER MEMBRESÍA ===================
-   Actualiza Supabase + local
+   ============ EXTENDER MEMBRESÍA ======================
+   Supabase-first real
 ===================================================== */
 async function extenderMembresia(idCliente, dias) {
 
-  const clientes = safeGet("clientes");
-  const c = clientes.find(x => x.id === idCliente);
-  if (!c) return;
+  if (!navigator.onLine) {
+    alert("Sin conexión a internet");
+    return;
+  }
 
-  // 📅 Base = fecha actual o fecha existente
-  const base = new Date(c.membresia_expira || new Date());
+  // 🔎 Obtener fecha actual real desde Supabase
+  const { data, error: fetchError } = await supabaseClient
+    .from("clientes")
+    .select("membresia_expira")
+    .eq("id", idCliente)
+    .single();
+
+  if (fetchError) {
+    console.error("Error obteniendo cliente:", fetchError);
+    return;
+  }
+
+  // 📅 Calcular nueva fecha
+  const base = new Date(data.membresia_expira || new Date());
   base.setDate(base.getDate() + dias);
 
   const nuevaFecha = base.toISOString().split("T")[0];
 
-  // 🔥 Actualiza en Supabase
+  // 🔥 Actualizar en Supabase
   const { error } = await supabaseClient
     .from("clientes")
     .update({ membresia_expira: nuevaFecha })
@@ -215,15 +201,34 @@ async function extenderMembresia(idCliente, dias) {
     return;
   }
 
-  // 💾 Actualiza local
-  c.membresia_expira = nuevaFecha;
-  safeSet("clientes", clientes);
+  // 🔄 Volver a sincronizar
+  await sincronizarDesdeSupabase();
 
-  // 🔄 Notifica a otras pestañas
+  // 🔄 Refrescar UI
+  renderMembresias();
+
+  // 🔄 Avisar a otras pestañas
   new BroadcastChannel("victory-data").postMessage("clientes");
+}
 
-  // 🔄 Refresca UI
-  cargarMembresias();
+/* =====================================================
+   ============== SINCRONIZACIÓN LOCAL ==================
+===================================================== */
+function activarSyncLocal() {
+
+  const bc = new BroadcastChannel("victory-data");
+
+  bc.onmessage = async e => {
+    if (e.data === "clientes") {
+      await sincronizarDesdeSupabase();
+      renderMembresias();
+    }
+  };
+
+  window.addEventListener("online", async () => {
+    await sincronizarDesdeSupabase();
+    renderMembresias();
+  });
 }
 
 </script>
