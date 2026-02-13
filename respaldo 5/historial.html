@@ -152,7 +152,7 @@ async function initHistorial() {
 /* ================= SUPABASE → ASISTENCIAS ================= */
 async function cargarAsistenciasDesdeSupabase() {
   const { data, error } = await supabaseClient
-    .from("asistencias")
+    .from("attendance")
     .select("*")
     .order("fecha", { ascending: false });
 
@@ -163,7 +163,7 @@ async function cargarAsistenciasDesdeSupabase() {
 
   const normalizadas = (data || []).map(a => ({
     id: a.id,
-    tarjetaUID: a.tarjeta_uid,
+    tarjetaUID: a.uid, // 👈 aquí cambia según tu columna real
     nombre: a.nombre,
     fecha: a.fecha,
     entrada_ts: a.entrada_ts ?? null,
@@ -172,13 +172,10 @@ async function cargarAsistenciasDesdeSupabase() {
     salida: a.salida ?? null
   }));
 
-  // 🔥 Supabase es la verdad
   safeSet("asistencias", normalizadas);
 
   return true;
 }
-
-
 /* ================= SINCRONIZACIÓN ================= */
 function iniciarSyncHistorial() {
   const bc = new BroadcastChannel("victory-data");
@@ -342,6 +339,7 @@ function filtrar() {
 
 </body>
 </html>
+
 
 
 
