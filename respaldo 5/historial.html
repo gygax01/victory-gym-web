@@ -185,7 +185,7 @@ async function cargarAsistenciasDesdeSupabase() {
       delete abiertas[uid];
     }
   });
-
+  sesiones.sort((a, b) => b.entrada_ts - a.entrada_ts);
   safeSet("asistencias", sesiones);
   return true;
 }
@@ -352,6 +352,7 @@ function filtrar() {
 
 </body>
 </html>
+
 
 
 
