@@ -6,36 +6,9 @@
   <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <style>
-    /* BOTÓN FULLSCREEN ESTÉTICO */
-    #btnFullscreen {
-      position: fixed;
-      top: 18px;
-      left: 20px;
-      z-index: 9999;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      color: #fff;
-      padding: 6px 14px;
-      font-size: 13px;
-      border-radius: 20px;
-      backdrop-filter: blur(6px);
-      cursor: pointer;
-      transition: all .25s ease;
-    }
-
-    #btnFullscreen:hover {
-      background: rgba(255,255,255,0.12);
-      transform: scale(1.05);
-    }
-  </style>
 </head>
 
 <body>
-
-<!-- BOTÓN PANTALLA COMPLETA MEJORADO -->
-<button id="btnFullscreen">⛶ Pantalla completa</button>
 
 <header class="header-brand">
   <div class="brand">
@@ -44,6 +17,12 @@
   </div>
 
   <div class="estado-sistema">
+
+    <!-- BOTÓN FULLSCREEN INTEGRADO -->
+    <button id="btnFullscreen" class="btn-fullscreen" title="Pantalla completa">
+      ⛶
+    </button>
+
     <span id="contadorAforo" class="contador">
       Dentro: <strong>0</strong>
     </span>
@@ -51,7 +30,6 @@
     <span id="estadoLector" class="lector off">Lector inactivo</span>
     <span id="estadoConexion" class="lector off">Offline</span>
 
-    <!-- BOTÓN SALIR ELIMINADO -->
   </div>
 </header>
 
@@ -107,10 +85,10 @@ btnFullscreen.addEventListener("click", () => {
 document.addEventListener("fullscreenchange", () => {
   if (document.fullscreenElement) {
     panelAcciones.style.display = "none";
-    btnFullscreen.textContent = "⛶ Salir pantalla";
+    btnFullscreen.style.display = "none";
   } else {
     panelAcciones.style.display = "";
-    btnFullscreen.textContent = "⛶ Pantalla completa";
+    btnFullscreen.style.display = "";
   }
 });
 
