@@ -8,23 +8,33 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    /* BOTÓN PANTALLA COMPLETA */
+    /* BOTÓN FULLSCREEN ESTÉTICO */
     #btnFullscreen {
       position: fixed;
-      top: 10px;
-      left: 10px;
+      top: 18px;
+      left: 20px;
       z-index: 9999;
-      padding: 8px 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #fff;
+      padding: 6px 14px;
       font-size: 13px;
-      border-radius: 6px;
+      border-radius: 20px;
+      backdrop-filter: blur(6px);
       cursor: pointer;
+      transition: all .25s ease;
+    }
+
+    #btnFullscreen:hover {
+      background: rgba(255,255,255,0.12);
+      transform: scale(1.05);
     }
   </style>
 </head>
 
 <body>
 
-<!-- BOTÓN AGREGADO -->
+<!-- BOTÓN PANTALLA COMPLETA MEJORADO -->
 <button id="btnFullscreen">⛶ Pantalla completa</button>
 
 <header class="header-brand">
@@ -41,7 +51,7 @@
     <span id="estadoLector" class="lector off">Lector inactivo</span>
     <span id="estadoConexion" class="lector off">Offline</span>
 
-    <button id="btnLogout">Salir</button>
+    <!-- BOTÓN SALIR ELIMINADO -->
   </div>
 </header>
 
@@ -84,7 +94,6 @@
 
 /* ================= FULLSCREEN ================= */
 const btnFullscreen = document.getElementById("btnFullscreen");
-const header = document.querySelector(".header-brand");
 const panelAcciones = document.querySelector(".panel-acciones");
 
 btnFullscreen.addEventListener("click", () => {
@@ -97,11 +106,9 @@ btnFullscreen.addEventListener("click", () => {
 
 document.addEventListener("fullscreenchange", () => {
   if (document.fullscreenElement) {
-    header.style.display = "none";
     panelAcciones.style.display = "none";
     btnFullscreen.textContent = "⛶ Salir pantalla";
   } else {
-    header.style.display = "";
     panelAcciones.style.display = "";
     btnFullscreen.textContent = "⛶ Pantalla completa";
   }
@@ -112,9 +119,6 @@ window.addEventListener("load", () => {
 
   const estadoLector = document.getElementById("estadoLector");
   const estadoConexion = document.getElementById("estadoConexion");
-  const btnLogout = document.getElementById("btnLogout");
-
-  btnLogout.onclick = () => location.href = "login.html";
 
   actualizarEstadoConexion(estadoConexion);
 
