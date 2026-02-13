@@ -117,9 +117,16 @@
   </div>
 
   <div style="display:flex; gap:10px;">
+
+    <!-- ✅ BOTÓN AGREGADO -->
+    <button onclick="activarEdicion()">
+      ✏️ Editar Stock
+    </button>
+
     <button onclick="abrirModalHistorial()" style="opacity:.85">
       Historial de Cambios
     </button>
+
     <button onclick="location.href='index.html'">← Inicio</button>
   </div>
 </header>
@@ -170,11 +177,18 @@
 <script src="js/realtime.js"></script>
 
 <script>
+
 /* ================= STATE ================= */
 let productos = [];
 let productosFiltrados = [];
 let modoEdicion = false;
 let accionMaster = null;
+
+/* ================= FUNCIÓN AGREGADA ================= */
+function activarEdicion() {
+  modoEdicion = true;
+  renderStock();
+}
 
 /* ================= DOM ================= */
 const inputNombre   = document.getElementById("inputNombre");
@@ -221,6 +235,7 @@ function renderStock() {
 
   if (!productosFiltrados.length) {
     listaStock.innerHTML = "<p style='opacity:.6'>No hay productos</p>";
+    renderPanel(); // ✅ agregado para que funcione aun vacío
     return;
   }
 
@@ -410,10 +425,8 @@ function filtrarStock() {
   );
   renderStock();
 }
+
 </script>
 
 </body>
 </html>
-
-
-
