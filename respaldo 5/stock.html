@@ -188,7 +188,6 @@ const panelNuevoProducto = document.getElementById("panelNuevoProducto");
 /* ================= INIT ================= */
 function initStock() {
   if (!verificarSesion()) return;
-  if (!can("stock_view")) location.href = "index.html";
 
   buscadorStock.oninput = filtrarStock;
 
@@ -416,4 +415,5 @@ function filtrarStock() {
 
 </body>
 </html>
+
 
