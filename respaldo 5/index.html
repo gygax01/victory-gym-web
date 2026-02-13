@@ -6,9 +6,26 @@
   <title>Inicio - Victory Pro Fitness</title>
   <link rel="stylesheet" href="css/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* BOTÓN PANTALLA COMPLETA */
+    #btnFullscreen {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 9999;
+      padding: 8px 14px;
+      font-size: 13px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 
 <body>
+
+<!-- BOTÓN AGREGADO -->
+<button id="btnFullscreen">⛶ Pantalla completa</button>
 
 <header class="header-brand">
   <div class="brand">
@@ -64,6 +81,31 @@
 <script src="js/bluetooth.js"></script>
 
 <script>
+
+/* ================= FULLSCREEN ================= */
+const btnFullscreen = document.getElementById("btnFullscreen");
+const header = document.querySelector(".header-brand");
+const panelAcciones = document.querySelector(".panel-acciones");
+
+btnFullscreen.addEventListener("click", () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+});
+
+document.addEventListener("fullscreenchange", () => {
+  if (document.fullscreenElement) {
+    header.style.display = "none";
+    panelAcciones.style.display = "none";
+    btnFullscreen.textContent = "⛶ Salir pantalla";
+  } else {
+    header.style.display = "";
+    panelAcciones.style.display = "";
+    btnFullscreen.textContent = "⛶ Pantalla completa";
+  }
+});
 
 /* ================= INIT ================= */
 window.addEventListener("load", () => {
