@@ -6,11 +6,12 @@ const SUPABASE_URL = "https://pdzfnmrkxfyzhusmkljt.supabase.co";
 const SUPABASE_ANON_KEY =
   "sb_publishable_uV1OQab8AfWE3SzNkuleQw_W0xgyfER";
 
-const supabaseClient = window.supabase.createClient(
+const { createClient } = supabase;
+
+const supabaseClient = createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
 );
-
 window.supabaseClient = supabaseClient;
 
 const bc = new BroadcastChannel("victory-data");
