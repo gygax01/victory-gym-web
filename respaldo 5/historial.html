@@ -154,23 +154,50 @@ async function cargarAsistenciasDesdeSupabase() {
   const { data, error } = await supabaseClient
     .from("attendance")
     .select("*")
-    .order("fecha", { ascending: false });
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("❌ Error cargando asistencias:", error);
     return false;
   }
 
-  const normalizadas = (data || []).map(a => ({
-    id: a.id,
-    tarjetaUID: a.uid, // 👈 aquí cambia según tu columna real
-    nombre: a.nombre,
-    fecha: a.fecha,
-    entrada_ts: a.entrada_ts ?? null,
-    salida_ts: a.salida_ts ?? null,
-    entrada: a.entrada ?? null,
-    salida: a.salida ?? null
-  }));
+  if (!data || !data.length) {
+    return false;
+  }
+
+  // 🔥 Convertir eventos entrada/salida en formato historial
+  const agrupado = {};
+
+  data.forEach(row => {
+    const fecha = new Date(row.created_at).toISOString().split("T")[0];
+
+    if (!agrupado[row.uid]) agrupado[row.uid] = {};
+    if (!agrupado[row.uid][fecha]) {
+      agrupado[row.uid][fecha] = {
+        id: row.id,
+        tarjetaUID: row.uid,
+        fecha,
+        entrada_ts: null,
+        salida_ts: null
+      };
+    }
+
+    if (row.type === "entrada") {
+      agrupado[row.uid][fecha].entrada_ts = new Date(row.created_at).getTime();
+    }
+
+    if (row.type === "salida") {
+      agrupado[row.uid][fecha].salida_ts = new Date(row.created_at).getTime();
+    }
+  });
+
+  const normalizadas = [];
+
+  Object.values(agrupado).forEach(fechas => {
+    Object.values(fechas).forEach(reg => {
+      normalizadas.push(reg);
+    });
+  });
 
   safeSet("asistencias", normalizadas);
 
@@ -339,6 +366,7 @@ function filtrar() {
 
 </body>
 </html>
+
 
 
 
