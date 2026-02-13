@@ -163,7 +163,6 @@ function iniciarRealtimeClientes() {
 /* ======================================================
    ===== NUEVO: REALTIME ATTENDANCE (MODELO EVENTOS)
 ====================================================== */
-
 async function reconstruirAsistenciasHoy() {
 
   const hoyFecha = new Date().toISOString().slice(0, 10);
@@ -186,29 +185,35 @@ async function reconstruirAsistenciasHoy() {
 
   for (const e of data) {
 
-    if (!sesiones[e.uid]) {
-      sesiones[e.uid] = [];
+    const key = e.cliente_id; // 🔥 CAMBIO CLAVE
+
+    if (!sesiones[key]) {
+      sesiones[key] = [];
     }
 
-    sesiones[e.uid].push(e);
+    sesiones[key].push(e);
   }
 
-  Object.keys(sesiones).forEach(uid => {
+  Object.keys(sesiones).forEach(clienteId => {
 
-    const eventos = sesiones[uid];
+    const eventos = sesiones[clienteId];
     let entradaActiva = null;
 
     eventos.forEach(ev => {
 
+      const cliente = clientes.find(c => c.id === clienteId);
+
       if (ev.type === "entrada") {
+
         entradaActiva = {
           id: ev.id,
-          tarjetaUID: uid,
-          nombre: clientes.find(c => c.tarjetaUID === uid)?.nombre || uid,
+          cliente_id: clienteId,
+          nombre: cliente?.nombre || "Cliente",
           fecha: hoyFecha,
           entrada_ts: new Date(ev.created_at).getTime(),
           salida_ts: null
         };
+
         resultado.push(entradaActiva);
       }
 
