@@ -6,65 +6,55 @@
 <title>Membresías</title>
 <link rel="stylesheet" href="css/styles.css">
 
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-<!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+
 <style>
 @media (max-width: 768px){
-
   .header-brand{
     flex-direction: column;
     gap: 14px;
     padding: 18px;
     text-align:center;
   }
-
   .brand{
     flex-direction: column;
     gap: 8px;
   }
-
   .brand img{
     height: 70px;
   }
-
   .brand h2{
     font-size: 20px;
   }
-
   header button{
     width: 100%;
     margin-left: 0;
   }
-
   .historial-container{
     width: 94%;
   }
-
   .cliente{
     padding: 16px;
   }
-
   .cliente h3{
     font-size: 20px;
   }
-
   .cliente p{
     font-size: 14px;
   }
-
   .cliente button{
     width: 100%;
     margin-top: 10px;
     padding: 14px;
     font-size: 15px;
   }
-
 }
 </style>
 </head>
 
 <body>
+
 <header class="header-brand">
   <div class="brand">
     <img src="img/logo.png">
@@ -75,54 +65,98 @@
 
 <div class="historial-container" id="listaMembresias"></div>
 
-<!-- ===== JS BASE ===== -->
+<!-- JS BASE -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
-/* ================= DOM ================= */
+
+/* =====================================================
+   =============== VARIABLES DOM ========================
+===================================================== */
 const listaMembresias = document.getElementById("listaMembresias");
 
-/* ================= INIT ================= */
+/* =====================================================
+   =============== INIT PRINCIPAL =======================
+   Se ejecuta al cargar la página
+===================================================== */
 window.addEventListener("load", initMembresias);
 
-function initMembresias() {
+async function initMembresias() {
+
+  // 🔐 Verifica sesión
   if (!verificarSesion()) return;
 
+  // 🌐 Si hay internet, primero sincroniza desde Supabase
+  if (navigator.onLine && window.supabaseClient) {
+    await cargarClientesDesdeSupabase();
+  }
+
+  // 🔄 Activa sincronización entre pestañas
   iniciarSyncMembresias();
+
+  // 🎨 Pinta tarjetas
   cargarMembresias();
 
+  // 🔴 Activa realtime si existe
   if (navigator.onLine && typeof iniciarRealtime === "function") {
     iniciarRealtime();
   }
 }
 
-
-/* ================= SYNC ================= */
+/* =====================================================
+   =============== SINCRONIZACIÓN LOCAL =================
+===================================================== */
 function iniciarSyncMembresias() {
+
   const bc = new BroadcastChannel("victory-data");
 
+  // 🔄 Cuando otra pestaña cambia clientes
   bc.onmessage = e => {
     if (e.data === "clientes") {
       cargarMembresias();
     }
   };
 
+  // 🔄 Cuando cambia localStorage
   window.addEventListener("storage", e => {
     if (e.key === "clientes") {
       cargarMembresias();
     }
   });
 
-  window.addEventListener("online", () => {
-    syncOfflineQueue();
+  // 🔄 Cuando vuelve internet
+  window.addEventListener("online", async () => {
+    await cargarClientesDesdeSupabase();
     cargarMembresias();
   });
 }
 
-/* ================= CARGA ================= */
+/* =====================================================
+   =============== CARGAR DESDE SUPABASE ===============
+   Trae clientes reales y los guarda en localStorage
+===================================================== */
+async function cargarClientesDesdeSupabase() {
+
+  const { data, error } = await supabaseClient
+    .from("clientes")
+    .select("*");
+
+  if (error) {
+    console.error("Error cargando clientes:", error);
+    return;
+  }
+
+  // Guarda copia local
+  safeSet("clientes", data || []);
+}
+
+/* =====================================================
+   =============== PINTAR MEMBRESÍAS ====================
+===================================================== */
 function cargarMembresias() {
+
   const clientes = safeGet("clientes")
     .filter(c => c && typeof c.nombre === "string");
 
@@ -134,14 +168,15 @@ function cargarMembresias() {
   }
 
   clientes.forEach(c => {
+
     const card = document.createElement("div");
     card.className = "cliente";
 
     card.innerHTML = `
       <h3>${c.nombre}</h3>
-      <p>Expira: ${c.membresiaExpira ?? "—"}</p>
-      <button data-permission="memberships_extend">+7 días</button>
-      <button data-permission="memberships_extend">+30 días</button>
+      <p>Expira: ${c.membresia_expira ?? "—"}</p>
+      <button>+7 días</button>
+      <button>+30 días</button>
     `;
 
     const btns = card.querySelectorAll("button");
@@ -151,25 +186,28 @@ function cargarMembresias() {
 
     listaMembresias.appendChild(card);
   });
-
 }
 
-/* ================= ACCIÓN AUMNETAR MEMBRESÍA ================= */
+/* =====================================================
+   =============== EXTENDER MEMBRESÍA ===================
+   Actualiza Supabase + local
+===================================================== */
 async function extenderMembresia(idCliente, dias) {
 
   const clientes = safeGet("clientes");
   const c = clientes.find(x => x.id === idCliente);
   if (!c) return;
 
-  const base = new Date(c.membresiaExpira || new Date());
+  // 📅 Base = fecha actual o fecha existente
+  const base = new Date(c.membresia_expira || new Date());
   base.setDate(base.getDate() + dias);
 
   const nuevaFecha = base.toISOString().split("T")[0];
 
-  // 🔥 Actualizar en Supabase
+  // 🔥 Actualiza en Supabase
   const { error } = await supabaseClient
     .from("clientes")
-    .update({ membresiaExpira: nuevaFecha })
+    .update({ membresia_expira: nuevaFecha })
     .eq("id", idCliente);
 
   if (error) {
@@ -177,20 +215,18 @@ async function extenderMembresia(idCliente, dias) {
     return;
   }
 
-  // 🔥 Actualizar local
-  c.membresiaExpira = nuevaFecha;
+  // 💾 Actualiza local
+  c.membresia_expira = nuevaFecha;
   safeSet("clientes", clientes);
 
+  // 🔄 Notifica a otras pestañas
   new BroadcastChannel("victory-data").postMessage("clientes");
 
+  // 🔄 Refresca UI
   cargarMembresias();
 }
+
 </script>
 
 </body>
 </html>
-
-
-
-
-
