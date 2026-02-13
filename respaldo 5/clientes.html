@@ -266,26 +266,30 @@ async function confirmarBorrado() {
 }
 
 /* REASIGNACIÓN INTACTA */
-function iniciarReasignacion(uid) {
-  clienteUIDReasignar = uid;
+function iniciarReasignacion(clienteId) {
+
+  clienteIdReasignar = clienteId;
   leyendoTarjeta = false;
+
   estadoTarjeta.className = "estado amarillo";
   estadoTarjeta.textContent = "Esperando tarjeta…";
   confirmReasignar.style.display = "flex";
 
   iniciarNFCControlado({
     onUID: async uidNuevo => {
+
       if (leyendoTarjeta) return;
       leyendoTarjeta = true;
 
       let clienteActualizado = null;
-      const uidViejo = clienteUIDReasignar;
 
       const lista = obtenerClientes().map(c => {
-        if (c.tarjetaUID === uidViejo) {
+
+        if (c.id === clienteIdReasignar) {
           c.tarjetaUID = uidNuevo;
           clienteActualizado = c;
         }
+
         return c;
       });
 
@@ -296,8 +300,11 @@ function iniciarReasignacion(uid) {
         await actualizarClienteSupabase(clienteActualizado);
       }
 
-      if (typeof migrarUIDEnAttendance === "function") {
-        await migrarUIDEnAttendance(uidViejo, uidNuevo);
+      if (clienteActualizado && typeof migrarUIDEnAttendance === "function") {
+        await migrarUIDEnAttendance(
+          clienteActualizado.tarjetaUID,
+          uidNuevo
+        );
       }
 
       estadoTarjeta.className = "estado verde";
@@ -322,3 +329,4 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
