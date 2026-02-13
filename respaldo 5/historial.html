@@ -130,7 +130,6 @@ window.addEventListener("load", initHistorial);
 
 async function initHistorial() {
   if (!verificarSesion()) return;
-  if (!can("history_view")) return;
 
   busqueda.addEventListener("input", filtrar);
 
@@ -331,3 +330,4 @@ function filtrar() {
 
 </body>
 </html>
+
