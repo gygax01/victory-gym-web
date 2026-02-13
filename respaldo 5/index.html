@@ -35,7 +35,6 @@
   <button onclick="location.href='membresias.html'">Membresías</button>
   <button onclick="location.href='clientes.html'">Clientes</button>
   <button onclick="location.href='historial.html'">Historial</button>
-  <button onclick="location.href='usuarios.html'">Usuarios</button>
 </div>
 
 <div id="contenedorTabla" style="max-height:70vh; overflow-y:auto;">
@@ -81,10 +80,6 @@ window.addEventListener("load", () => {
   actualizarContador();
 
   iniciarLecturaNFCIndex(estadoLector);
-
-  if (navigator.onLine) {
-    sincronizarPendientesAttendance();
-  }
 });
 
 /* ================= CONEXIÓN ================= */
@@ -99,8 +94,6 @@ function actualizarEstadoConexion(el) {
     el.className = "lector off";
   }
 }
-
-window.addEventListener("online", sincronizarPendientesAttendance);
 
 /* ================= CONFIRMACION ================= */
 function mostrarConfirmacion(tipo, titulo, mensaje) {
@@ -141,7 +134,6 @@ async function procesarTarjeta(uid) {
 
   try {
 
-    // 1️⃣ Buscar cliente directamente en Supabase
     const { data: cliente, error: errorCliente } = await window.supabaseClient
       .from("clientes")
       .select("id, nombre")
@@ -155,49 +147,29 @@ async function procesarTarjeta(uid) {
 
     const id = crypto.randomUUID();
     const ahoraISO = new Date().toISOString();
-    const source = navigator.onLine ? "wifi" : "bluetooth";
+    const source = "wifi";
     const deviceId = "pc_principal";
 
-    if (navigator.onLine) {
+    const { data, error } = await window.supabaseClient.rpc("registrar_asistencia", {
+      p_id: id,
+      p_cliente_id: cliente.id,
+      p_uid: uid,
+      p_created_at: ahoraISO,
+      p_source: source,
+      p_device_id: deviceId
+    });
 
-      const { data, error } = await window.supabaseClient.rpc("registrar_asistencia", {
-        p_id: id,
-        p_cliente_id: cliente.id,
-        p_uid: uid,
-        p_created_at: ahoraISO,
-        p_source: source,
-        p_device_id: deviceId
-      });
+    if (error) {
+      console.error(error);
+      return;
+    }
 
-      if (error) {
-        console.error(error);
-        return;
-      }
+    const resultado = Array.isArray(data) ? data[0] : data;
 
-      const resultado = Array.isArray(data) ? data[0] : data;
-
-      if (resultado?.accion === "entrada") {
-        mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
-      } else if (resultado?.accion === "salida") {
-        mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
-      }
-
-    } else {
-
-      const pendientes = safeGet("attendance_offline");
-
-      pendientes.push({
-        id,
-        cliente_id: cliente.id,
-        uid,
-        created_at: ahoraISO,
-        source,
-        device_id: deviceId
-      });
-
-      safeSet("attendance_offline", pendientes);
-
-      mostrarConfirmacion("entrada", "Guardado offline", cliente.nombre);
+    if (resultado?.accion === "entrada") {
+      mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
+    } else if (resultado?.accion === "salida") {
+      mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
     }
 
   } catch (err) {
@@ -209,4 +181,3 @@ async function procesarTarjeta(uid) {
 
 </body>
 </html>
-
