@@ -12,12 +12,16 @@ const COOLDOWN_MS = 450;
 /* ===============================
    ===== INICIAR NFC
 =============================== */
-function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
-  if (escuchando) return;
+function iniciarNFCControlado({ onUID, onTimeout, onError, onStatus, onHeartbeat } = {}) {
+  if (escuchando) {
+    console.info("[NFC] Ya estaba escuchando");
+    return;
+  }
 
   if (!window.supabaseClient) {
-    console.error("❌ Supabase no inicializado");
+    console.error("[NFC] Supabase no inicializado");
     if (typeof onError === "function") onError("Supabase no listo");
+    if (typeof onStatus === "function") onStatus("ERROR_NO_SUPABASE");
     return;
   }
 
@@ -36,15 +40,18 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
       async payload => {
         if (!escuchando) return;
 
-        const uid = payload.new?.uid;
+        const uid = normalizarUID(payload.new?.uid);
         const eventId = payload.new?.id;
 
-        if (!uid || !eventId) return;
+        if (!uid || !eventId) {
+          console.warn("[NFC] Evento incompleto recibido", payload.new);
+          return;
+        }
 
-        /* ==========================================
-           🔒 FIX MULTI-DISPOSITIVO (NO ROMPE NADA)
-           Solo UN dispositivo puede marcar processed=false → true
-        ========================================== */
+        console.info(`[NFC] Evento recibido id=${eventId} uid=${uid}`);
+        if (typeof onHeartbeat === "function") {
+          onHeartbeat({ ts: Date.now(), uid, eventId });
+        }
 
         const { data, error } = await window.supabaseClient
           .from("nfc_events")
@@ -54,37 +61,49 @@ function iniciarNFCControlado({ onUID, onTimeout, onError } = {}) {
           .select();
 
         if (error) {
-          console.error("❌ Error marcando processed:", error);
+          console.error("[NFC] Error marcando processed:", error);
           return;
         }
 
-        // Si no actualizó nada, otro dispositivo ya procesó este evento
         if (!data || data.length === 0) {
+          console.info(`[NFC] Evento ya procesado por otro dispositivo id=${eventId}`);
           return;
         }
-
-        /* ==========================================
-           SOLO EL DISPOSITIVO GANADOR PROCESA
-        ========================================== */
 
         const ahora = Date.now();
-        if (uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) return;
+        if (uid === ultimoUID && ahora - ultimoTiempo < COOLDOWN_MS) {
+          console.info(`[NFC] UID ignorado por cooldown uid=${uid}`);
+          return;
+        }
 
         ultimoUID = uid;
         ultimoTiempo = ahora;
 
         if (typeof onUID === "function") {
+          console.info(`[NFC] UID aceptado uid=${uid}`);
           onUID(uid);
         }
       }
     )
-    .subscribe(() => {
-      console.log("📡 NFC escuchando (Supabase)");
+    .subscribe(status => {
+      console.log(`[NFC] Canal nfc-events: ${status}`);
+      if (typeof onStatus === "function") {
+        onStatus(status);
+      }
+      if (
+        ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(String(status || "")) &&
+        typeof onError === "function"
+      ) {
+        onError(status);
+      }
     });
 
   if (typeof onTimeout === "function") {
     setTimeout(() => {
-      if (escuchando) onTimeout();
+      if (escuchando) {
+        console.warn("[NFC] Timeout de lectura");
+        onTimeout();
+      }
     }, 12000);
   }
 }
@@ -101,4 +120,5 @@ function detenerNFC() {
   escuchando = false;
   ultimoUID = null;
   ultimoTiempo = 0;
+  console.info("[NFC] Lectura detenida");
 }
