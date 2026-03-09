@@ -9,7 +9,7 @@
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+  <!-- ===== ADAPTACION SOLO TAMANO MOVIL ===== -->
   <style>
   @media (max-width: 768px){
 
@@ -56,9 +56,7 @@
     }
 
     .cliente-header{
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 10px;
+      align-items: center;
     }
 
     .cliente h3{
@@ -67,8 +65,7 @@
 
     .acciones{
       width: 100%;
-      display: flex;
-      flex-direction: column;
+      display: grid;
       gap: 10px;
     }
 
@@ -96,6 +93,45 @@
       margin-top: 10px;
     }
 
+  }
+  </style>
+
+  <style>
+  .edit-form{
+    display:grid;
+    gap:10px;
+    margin-top: 12px;
+  }
+
+  .edit-form input{
+    width:100%;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.1);
+    background:#2c2e33;
+    color:#fff;
+  }
+
+  .cliente-panel{
+    padding-top: 12px;
+  }
+
+  .cliente-panel .acciones{
+    display:grid;
+    grid-template-columns: 1fr;
+    gap:10px;
+    margin-top: 0;
+    padding-top: 14px;
+    border-top: 1px solid rgba(243,114,44,.25);
+  }
+
+  .cliente-panel .acciones button{
+    margin:0;
+    background:#3f4147;
+  }
+
+  .cliente-panel .acciones button:hover{
+    background:#4a4d55;
   }
   </style>
 </head>
@@ -134,6 +170,21 @@
   </div>
 </div>
 
+<div class="confirmacion" id="confirmEditar">
+  <div class="box">
+    <h1>Editar cliente</h1>
+    <p>Actualiza los datos y guarda cambios</p>
+    <div class="edit-form">
+      <input id="editNombre" placeholder="Nombre completo">
+      <input id="editTelefono" placeholder="Teléfono">
+      <input id="editPeso" type="number" step="0.1" placeholder="Peso (kg)">
+      <input id="editAltura" type="number" step="0.01" placeholder="Altura (m)">
+    </div>
+    <button id="btnGuardarEdicion">Guardar</button>
+    <button id="btnCancelarEdicion">Cancelar</button>
+  </div>
+</div>
+
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nfc.js"></script>
@@ -145,28 +196,69 @@ function obtenerClientes() {
   return safeGet("clientes");
 }
 
+function valorCliente(c, key, fallback = 0) {
+  const map = {
+    telefono: ["telefono", "phone"],
+    peso: ["peso", "weight"],
+    altura: ["altura", "height"]
+  };
+
+  const keys = map[key] || [key];
+  for (const k of keys) {
+    if (c[k] !== undefined && c[k] !== null && c[k] !== "") return c[k];
+  }
+
+  return fallback;
+}
+
+function normalizarTexto(texto) {
+  return String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function escapeHTML(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const listaClientes = document.getElementById("listaClientes");
 const busqueda = document.getElementById("busqueda");
 const confirmBorrar = document.getElementById("confirmBorrar");
 const confirmReasignar = document.getElementById("confirmReasignar");
+const confirmEditar = document.getElementById("confirmEditar");
 const estadoTarjeta = document.getElementById("estadoTarjeta");
 
 const btnConfirmarBorrado = document.getElementById("btnConfirmarBorrado");
 const btnCancelarBorrado = document.getElementById("btnCancelarBorrado");
 const btnCancelarReasignar = document.getElementById("btnCancelarReasignar");
+const btnGuardarEdicion = document.getElementById("btnGuardarEdicion");
+const btnCancelarEdicion = document.getElementById("btnCancelarEdicion");
+
+const editNombre = document.getElementById("editNombre");
+const editTelefono = document.getElementById("editTelefono");
+const editPeso = document.getElementById("editPeso");
+const editAltura = document.getElementById("editAltura");
 
 let clientes = [];
 let clienteIdEliminar = null;
 let clienteIdReasignar = null;
+let clienteIdEditar = null;
 let leyendoTarjeta = false;
 
 window.addEventListener("load", () => {
-  if (!verificarSesion()) return;
 
   busqueda.oninput = filtrar;
   btnConfirmarBorrado.onclick = confirmarBorrado;
   btnCancelarBorrado.onclick = cancelarBorrado;
   btnCancelarReasignar.onclick = cancelarReasignacion;
+  btnGuardarEdicion.onclick = guardarEdicionCliente;
+  btnCancelarEdicion.onclick = cancelarEdicionCliente;
 
   iniciarSyncClientes();
   cargarClientes();
@@ -187,9 +279,11 @@ function iniciarSyncClientes() {
 function cargarClientes() {
   clientes = obtenerClientes()
     .filter(c => c && typeof c.nombre === "string")
-    .sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    .sort((a, b) =>
+      a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" })
+    );
 
-  render(clientes);
+  filtrar();
 }
 
 function render(lista) {
@@ -205,31 +299,133 @@ function render(lista) {
     const cont = document.createElement("div");
     cont.className = "cliente";
 
+    const nombre = escapeHTML(c.nombre);
+    const telefono = escapeHTML(valorCliente(c, "telefono", "0"));
+    const peso = escapeHTML(valorCliente(c, "peso", 0));
+    const altura = escapeHTML(valorCliente(c, "altura", 0));
+
     cont.innerHTML = `
-      <div class="cliente-header">
-        <h3>${c.nombre}</h3>
+      <div class="cliente-header" aria-expanded="false">
+        <div class="info-wrapper">
+          <div class="info-bloque">
+            <h3>${nombre}</h3>
+            <p class="meta">
+              <span class="racha actual">Tel: ${telefono}</span>
+              &nbsp; · &nbsp;
+              <span class="racha maxima">Peso: ${peso} · Altura: ${altura}</span>
+            </p>
+          </div>
+        </div>
+        <div class="flecha">&#9662;</div>
+      </div>
+      <div class="historial cliente-panel">
         <div class="acciones">
-          <button onclick="iniciarReasignacion('${c.id}')">
-            Reasignar tarjeta
-          </button>
-          <button onclick="pedirConfirmacion('${c.id}')">
-            Eliminar
-          </button>
+          <button type="button" class="accion-editar">Editar datos</button>
+          <button type="button" class="accion-reasignar">Reasignar tarjeta</button>
+          <button type="button" class="accion-eliminar">Eliminar</button>
         </div>
       </div>
     `;
+
+    const header = cont.querySelector(".cliente-header");
+    const panel = cont.querySelector(".historial");
+    const btnEditar = cont.querySelector(".accion-editar");
+    const btnReasignar = cont.querySelector(".accion-reasignar");
+    const btnEliminar = cont.querySelector(".accion-eliminar");
+
+    header.addEventListener("click", () => {
+      document.querySelectorAll(".cliente.abierto").forEach(actual => {
+        if (actual !== cont) {
+          actual.classList.remove("abierto");
+          actual.querySelector(".historial")?.classList.remove("abierto");
+          actual.querySelector(".cliente-header")?.setAttribute("aria-expanded", "false");
+        }
+      });
+
+      const abierto = cont.classList.toggle("abierto");
+      panel.classList.toggle("abierto");
+      header.setAttribute("aria-expanded", abierto ? "true" : "false");
+    });
+
+    btnEditar.addEventListener("click", () => abrirEditorCliente(c.id));
+    btnReasignar.addEventListener("click", () => iniciarReasignacion(c.id));
+    btnEliminar.addEventListener("click", () => pedirConfirmacion(c.id));
 
     listaClientes.appendChild(cont);
 
   });
 }
 
-function filtrar() {
-  const q = busqueda.value.toLowerCase();
-  render(clientes.filter(c => c.nombre.toLowerCase().includes(q)));
+function abrirEditorCliente(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+
+  clienteIdEditar = id;
+  editNombre.value = c.nombre || "";
+  editTelefono.value = valorCliente(c, "telefono", "0");
+  editPeso.value = valorCliente(c, "peso", 0);
+  editAltura.value = valorCliente(c, "altura", 0);
+  confirmEditar.style.display = "flex";
 }
 
-/* 🔧 SOLO ESTA FUNCIÓN FUE CORREGIDA */
+function cancelarEdicionCliente() {
+  clienteIdEditar = null;
+  confirmEditar.style.display = "none";
+}
+
+async function guardarEdicionCliente() {
+  if (!clienteIdEditar) return;
+
+  const nombre = editNombre.value.trim();
+  if (!nombre) {
+    alert("El nombre es obligatorio");
+    return;
+  }
+
+  const telefono = editTelefono.value.trim() || "0";
+  const pesoNum = Number(editPeso.value);
+  const alturaNum = Number(editAltura.value);
+  const peso = Number.isFinite(pesoNum) ? pesoNum : 0;
+  const altura = Number.isFinite(alturaNum) ? alturaNum : 0;
+
+  const lista = obtenerClientes();
+  let actualizado = null;
+
+  const nuevaLista = lista.map(c => {
+    if (c.id !== clienteIdEditar) return c;
+
+    actualizado = {
+      ...c,
+      nombre,
+      telefono,
+      peso,
+      altura
+    };
+
+    return actualizado;
+  });
+
+  if (!actualizado) return;
+
+  safeSet("clientes", nuevaLista);
+  new BroadcastChannel("victory-data").postMessage("clientes");
+
+  if (navigator.onLine && typeof actualizarClienteSupabase === "function") {
+    await actualizarClienteSupabase(actualizado);
+  }
+
+  cancelarEdicionCliente();
+  cargarClientes();
+}
+
+function filtrar() {
+  const q = normalizarTexto(busqueda.value);
+  render(clientes.filter(c =>
+    normalizarTexto(c.nombre).includes(q)
+  ));
+}
+
+/* Solo esta funcion fue corregida */
 
 function pedirConfirmacion(id) {
   clienteIdEliminar = id;
@@ -265,7 +461,7 @@ async function confirmarBorrado() {
   cargarClientes();
 }
 
-/* REASIGNACIÓN INTACTA */
+/* Reasignacion intacta */
 function iniciarReasignacion(clienteId) {
 
   clienteIdReasignar = clienteId;
@@ -277,15 +473,18 @@ function iniciarReasignacion(clienteId) {
 
   iniciarNFCControlado({
     onUID: async uidNuevo => {
+      uidNuevo = normalizarUID(uidNuevo);
 
       if (leyendoTarjeta) return;
       leyendoTarjeta = true;
 
       let clienteActualizado = null;
+      let uidAnterior = null;
 
       const lista = obtenerClientes().map(c => {
 
         if (c.id === clienteIdReasignar) {
+          uidAnterior = c.tarjetaUID;
           c.tarjetaUID = uidNuevo;
           clienteActualizado = c;
         }
@@ -302,7 +501,7 @@ function iniciarReasignacion(clienteId) {
 
       if (clienteActualizado && typeof migrarUIDEnAttendance === "function") {
         await migrarUIDEnAttendance(
-          clienteActualizado.tarjetaUID,
+          uidAnterior,
           uidNuevo
         );
       }
@@ -319,7 +518,7 @@ function iniciarReasignacion(clienteId) {
 }
 
 function cancelarReasignacion() {
-  clienteUIDReasignar = null;
+  clienteIdReasignar = null;
   leyendoTarjeta = false;
   detenerNFC();
   confirmReasignar.style.display = "none";
@@ -329,4 +528,5 @@ function cancelarReasignacion() {
 
 </body>
 </html>
+
 
