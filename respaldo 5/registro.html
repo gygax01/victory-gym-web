@@ -86,9 +86,21 @@
 
   }
   </style>
+
+  <style>
+  .membresias-grid input{
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: #3f4147;
+    color: #fff;
+    text-align: center;
+  }
+  </style>
 </head>
 
-<body onload="verificarSesion()">
+<body>
 
 <header class="header-brand">
   <div class="brand">
@@ -121,6 +133,16 @@
         <button onclick="setDias(15)">15 días</button>
         <button onclick="setDias(30)">1 mes</button>
         <button onclick="setDias(90)">3 meses</button>
+        <input
+          id="diasCustom"
+          type="number"
+          min="1"
+          step="1"
+          inputmode="numeric"
+          placeholder="Días personalizados"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+        >
+        <button onclick="setDiasCustom()">Aplicar días</button>
       </div>
 
       <p id="expiraTexto"></p>
@@ -160,6 +182,7 @@
 let tarjetaUID = null;
 let diasMembresia = 0;
 let leyendoNFC = false;
+const diasCustom = document.getElementById("diasCustom");
 
 /* ===== MEMBRESÍA ===== */
 function setDias(d) {
@@ -167,7 +190,17 @@ function setDias(d) {
   const expira = new Date();
   expira.setDate(expira.getDate() + d);
   expiraTexto.innerText =
-    "Expira el: " + expira.toLocaleDateString();
+    "Expira el: " + fechaDesdeTS(expira.getTime());
+}
+
+function setDiasCustom() {
+  const n = Number(diasCustom.value);
+  if (!Number.isInteger(n) || n <= 0) {
+    mostrarConfirm("Días inválidos", "Ingrese solo números mayores a 0");
+    return;
+  }
+
+  setDias(n);
 }
 
 /* ===== NFC ===== */
@@ -185,6 +218,7 @@ function abrirPopup() {
 
   iniciarNFCControlado({
     onUID: async uid => {
+      uid = normalizarUID(uid);
 
       if (await uidYaRegistrada(uid)) {
         estado.className = "estado rojo";
@@ -217,7 +251,6 @@ function cerrarPopup() {
 function registrarCliente() {
   if (
     !nombre.value.trim() ||
-    !telefono.value.trim() ||
     !tarjetaUID ||
     diasMembresia === 0
   ) {
@@ -229,14 +262,17 @@ function registrarCliente() {
   const expira = new Date();
   expira.setDate(expira.getDate() + diasMembresia);
 
+  const pesoNum = Number(peso.value);
+  const alturaNum = Number(altura.value);
+
   const cliente = {
     id: crypto.randomUUID(),
     nombre: nombre.value.trim(),
-    peso: peso.value,
-    altura: altura.value,
-    telefono: telefono.value,
+    peso: Number.isFinite(pesoNum) ? pesoNum : 0,
+    altura: Number.isFinite(alturaNum) ? alturaNum : 0,
+    telefono: telefono.value.trim() || "0",
     tarjetaUID,
-    membresiaExpira: expira.toISOString().split("T")[0],
+    membresiaExpira: fechaDesdeTS(expira.getTime()),
     fechaRegistro: hoy()
   };
 
@@ -271,19 +307,20 @@ function obtenerClientes() {
 
 /* 🔥 VALIDACIÓN GLOBAL CLIENTES + EMPLEADOS */
 async function uidYaRegistrada(uid) {
+  uid = normalizarUID(uid);
 
   const clientes = safeGet("clientes");
-  if (clientes.some(c => c.tarjetaUID === uid)) return true;
+  if (clientes.some(c => normalizarUID(c.tarjetaUID) === uid)) return true;
 
   const empleados = safeGet("empleados");
-  if (empleados.some(e => e.tarjetaUID === uid)) return true;
+  if (empleados.some(e => normalizarUID(e.tarjetaUID) === uid)) return true;
 
   if (navigator.onLine && window.supabaseClient) {
 
     const { data: c1 } = await supabaseClient
       .from("clientes")
       .select("id")
-      .eq("tarjeta_uid", uid)
+      .ilike("tarjeta_uid", uid)
       .maybeSingle();
 
     if (c1) return true;
@@ -291,7 +328,7 @@ async function uidYaRegistrada(uid) {
     const { data: c2 } = await supabaseClient
       .from("empleados")
       .select("id")
-      .eq("tarjeta_uid", uid)
+      .ilike("tarjeta_uid", uid)
       .maybeSingle();
 
     if (c2) return true;
