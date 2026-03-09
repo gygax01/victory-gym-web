@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Corte</title>
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+.filtros-grid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap:10px;
+}
+
+.filtros-grid input{
+  width:100%;
+  margin:0;
+  background:#3a3a3a;
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  padding:12px;
+  font-size:14px;
+}
+
+.filtros-grid button{
+  margin:0;
+}
+
+.corte-card{
+  background:linear-gradient(145deg,#2f3238,#26292e);
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:14px;
+}
+
+.corte-card h3{
+  margin:0 0 6px;
+}
+
+.meta-corte{
+  font-size:12px;
+  opacity:.85;
+  margin-bottom:10px;
+}
+
+.tabla-wrap{
+  overflow-x:auto;
+}
+
+.corte-table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+.corte-table th,
+.corte-table td{
+  border-bottom:1px solid rgba(255,255,255,.08);
+  padding:9px 8px;
+  text-align:left;
+  font-size:13px;
+}
+
+.corte-table th{
+  color:#f3722c;
+  font-weight:700;
+}
+
+.num{
+  text-align:right !important;
+}
+
+.tag{
+  display:inline-block;
+  font-size:11px;
+  padding:3px 8px;
+  border-radius:999px;
+  font-weight:700;
+}
+
+.tag-entrada{
+  background:rgba(46,204,113,.16);
+  color:#2ecc71;
+}
+
+.tag-salida{
+  background:rgba(52,152,219,.16);
+  color:#3498db;
+}
+
+.total-final{
+  text-align:right;
+  font-size:18px;
+  font-weight:700;
+  padding:16px;
+}
+
+.total-final strong{
+  color:#2ecc71;
+  font-size:28px;
+  margin-left:6px;
+}
+
+@media (max-width: 768px){
+  .header-brand{
+    flex-direction:column;
+    gap:14px;
+    padding:18px;
+    text-align:center;
+  }
+
+  .brand{
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .brand img{
+    height:70px;
+  }
+
+  .brand h2{
+    font-size:20px;
+  }
+
+  header button{
+    width:100%;
+    margin-left:0;
+  }
+
+  .search-bar{
+    width:92%;
+  }
+
+  .filtros-grid{
+    grid-template-columns:1fr;
+  }
+
+  .historial-container{
+    width:94%;
+  }
+
+  .corte-table th,
+  .corte-table td{
+    font-size:12px;
+  }
+
+  .total-final{
+    text-align:center;
+  }
+}
+</style>
+</head>
+
+<body onload="initCorte()">
+
+<header class="header-brand">
+  <div class="brand">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
+    <h2>Corte</h2>
+  </div>
+  <button onclick="location.href='stock.html'">Volver a Stock</button>
+</header>
+
+<div class="search-bar">
+  <div class="filtros-grid">
+    <input id="fechaDesde" type="date" title="Fecha desde">
+    <input id="fechaHasta" type="date" title="Fecha hasta">
+    <button id="btnActualizar" type="button">Actualizar corte</button>
+  </div>
+</div>
+
+<div class="historial-container">
+  <div class="corte-card">
+    <h3>1) Entradas y salidas</h3>
+    <div class="meta-corte" id="metaEntradasSalidas">Sin datos</div>
+    <div class="tabla-wrap">
+      <table class="corte-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Cliente</th>
+            <th>Movimiento</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyEntradasSalidas"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="corte-card">
+    <h3>2) Registros nuevos de clientes</h3>
+    <div class="meta-corte" id="metaClientesNuevos">Sin datos</div>
+    <div class="tabla-wrap">
+      <table class="corte-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Fecha registro</th>
+            <th>Nombre</th>
+            <th>Telefono</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyClientesNuevos"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="corte-card">
+    <h3>3) Ventas</h3>
+    <div class="meta-corte" id="metaVentas">Sin datos</div>
+    <div class="tabla-wrap">
+      <table class="corte-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Folio</th>
+            <th class="num">Productos</th>
+            <th class="num">Total</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyVentas"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="corte-card">
+    <h3>4) Productos vendidos</h3>
+    <div class="meta-corte" id="metaProductosVendidos">Sin datos</div>
+    <div class="tabla-wrap">
+      <table class="corte-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Producto</th>
+            <th class="num">Cantidad vendida</th>
+            <th class="num">Importe</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyProductosVendidos"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="search-bar">
+  <div class="corte-card total-final" id="totalVentasFinal">
+    Total de dinero de las ventas:<strong>$0.00</strong>
+  </div>
+</div>
+
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/realtime.js"></script>
+
+<script>
+function aNumero(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function fmtMoney(v) {
+  return `$${aNumero(v).toFixed(2)}`;
+}
+
+function escapeHTML(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function tsValido(ts) {
+  return Number.isFinite(ts) && ts > 0;
+}
+
+function tsDesdeFechaHora(fecha, hora = "00:00:00") {
+  const ts = new Date(`${fecha}T${hora}`).getTime();
+  return tsValido(ts) ? ts : 0;
+}
+
+function tsVenta(v) {
+  const ts = Number(v?.ts || 0);
+  if (tsValido(ts)) return ts;
+  return tsDesdeFechaHora(String(v?.fecha || ""), String(v?.hora || "00:00:00"));
+}
+
+function totalVenta(v) {
+  const total = aNumero(v?.total);
+  if (total > 0) return total;
+
+  const items = Array.isArray(v?.items) ? v.items : [];
+  return items.reduce((acc, it) => {
+    const cantidad = aNumero(it?.cantidad);
+    const precio = aNumero(it?.precio_unitario);
+    const subtotal = aNumero(it?.subtotal);
+    return acc + (subtotal > 0 ? subtotal : (precio * cantidad));
+  }, 0);
+}
+
+function folioVenta(v) {
+  const f = String(v?.folio || "").trim().toUpperCase();
+  if (f) return f;
+  const rawId = String(v?.id || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8);
+  return rawId ? `VTA-${rawId}` : "VTA-SIN-FOLIO";
+}
+
+function referenciaVenta(v) {
+  return String(v?.referencia || "").trim() || "Sin referencia";
+}
+
+function itemsVenta(v) {
+  return Array.isArray(v?.items) ? v.items : [];
+}
+
+function crearRango() {
+  const fechaDesde = document.getElementById("fechaDesde").value || hoy();
+  const fechaHasta = document.getElementById("fechaHasta").value || fechaDesde;
+
+  if (fechaDesde > fechaHasta) {
+    alert("La fecha desde no puede ser mayor que la fecha hasta.");
+    return null;
+  }
+
+  return {
+    fechaDesde,
+    fechaHasta,
+    tsDesde: tsDesdeFechaHora(fechaDesde, "00:00:00"),
+    tsHasta: tsDesdeFechaHora(fechaHasta, "23:59:59")
+  };
+}
+
+function enRangoTs(ts, rango) {
+  return tsValido(ts) && ts >= rango.tsDesde && ts <= rango.tsHasta;
+}
+
+function mapaClientesLocales() {
+  const porId = new Map();
+  const porUID = new Map();
+  const clientes = safeGet("clientes");
+
+  clientes.forEach(c => {
+    const nombre = String(c?.nombre || "").trim() || "Cliente";
+    if (c?.id) porId.set(String(c.id), nombre);
+
+    const uid = normalizarUID(c?.tarjetaUID || c?.tarjeta_uid);
+    if (uid) porUID.set(uid, nombre);
+  });
+
+  return { porId, porUID };
+}
+
+async function cargarEntradasSalidas(rango) {
+  const { porId, porUID } = mapaClientesLocales();
+  let eventos = [];
+  let remotoDisponible = false;
+
+  if (navigator.onLine && window.supabaseClient) {
+    const { data, error } = await supabaseClient
+      .from("attendance")
+      .select("cliente_id,uid,type,created_at")
+      .gte("created_at", new Date(rango.tsDesde).toISOString())
+      .lte("created_at", new Date(rango.tsHasta).toISOString())
+      .order("created_at", { ascending: true });
+
+    if (!error) {
+      remotoDisponible = true;
+      eventos = (data || [])
+        .map(row => {
+          const ts = new Date(row.created_at).getTime();
+          const uid = normalizarUID(row.uid);
+          const nombre = (
+            porId.get(String(row.cliente_id || "")) ||
+            porUID.get(uid) ||
+            "Cliente"
+          );
+
+          return {
+            ts,
+            fecha: fechaDesdeTS(ts),
+            hora: horaDesdeTS(ts),
+            cliente: nombre,
+            movimiento: String(row.type || "").toLowerCase()
+          };
+        })
+        .filter(ev => tsValido(ev.ts));
+    } else {
+      console.warn("[CORTE] Error leyendo attendance remoto:", error.message || error);
+    }
+  }
+
+  if (!remotoDisponible) {
+    const asistencias = safeGet("asistencias");
+    eventos = [];
+
+    asistencias.forEach(a => {
+      const nombre = String(
+        a?.nombre ||
+        porId.get(String(a?.cliente_id || "")) ||
+        porUID.get(normalizarUID(a?.tarjetaUID || a?.uid)) ||
+        "Cliente"
+      );
+
+      const entradaTs = Number(a?.entrada_ts || 0);
+      if (enRangoTs(entradaTs, rango)) {
+        eventos.push({
+          ts: entradaTs,
+          fecha: fechaDesdeTS(entradaTs),
+          hora: horaDesdeTS(entradaTs),
+          cliente: nombre,
+          movimiento: "entrada"
+        });
+      }
+
+      const salidaTs = Number(a?.salida_ts || 0);
+      if (enRangoTs(salidaTs, rango)) {
+        eventos.push({
+          ts: salidaTs,
+          fecha: fechaDesdeTS(salidaTs),
+          hora: horaDesdeTS(salidaTs),
+          cliente: nombre,
+          movimiento: "salida"
+        });
+      }
+    });
+
+    eventos.sort((a, b) => a.ts - b.ts);
+  }
+
+  return eventos;
+}
+
+async function cargarClientesNuevos(rango) {
+  let lista = [];
+  let remotoDisponible = false;
+
+  if (navigator.onLine && window.supabaseClient) {
+    const { data, error } = await supabaseClient
+      .from("clientes")
+      .select("id,nombre,telefono,fecha_registro")
+      .gte("fecha_registro", rango.fechaDesde)
+      .lte("fecha_registro", rango.fechaHasta)
+      .order("fecha_registro", { ascending: true });
+
+    if (!error) {
+      remotoDisponible = true;
+      lista = (data || []).map(c => ({
+        id: c.id,
+        nombre: String(c?.nombre || "").trim() || "Cliente",
+        telefono: String(c?.telefono || "0"),
+        fechaRegistro: String(c?.fecha_registro || "")
+      }));
+    } else {
+      console.warn("[CORTE] Error leyendo clientes remotos:", error.message || error);
+    }
+  }
+
+  if (!remotoDisponible) {
+    lista = safeGet("clientes")
+      .map(c => ({
+        id: c.id,
+        nombre: String(c?.nombre || "").trim() || "Cliente",
+        telefono: String(c?.telefono || "0"),
+        fechaRegistro: String(c?.fechaRegistro || c?.fecha_registro || "")
+      }))
+      .filter(c =>
+        c.fechaRegistro &&
+        c.fechaRegistro >= rango.fechaDesde &&
+        c.fechaRegistro <= rango.fechaHasta
+      )
+      .sort((a, b) => {
+        if (a.fechaRegistro !== b.fechaRegistro) {
+          return a.fechaRegistro.localeCompare(b.fechaRegistro);
+        }
+        return a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" });
+      });
+  }
+
+  return lista;
+}
+
+async function cargarVentas(rango) {
+  let remotas = [];
+
+  if (navigator.onLine && window.supabaseClient) {
+    const { data, error } = await supabaseClient
+      .from("historial_ventas")
+      .select("*")
+      .order("ts", { ascending: true });
+
+    if (!error) {
+      remotas = data || [];
+    } else {
+      console.warn("[CORTE] Error leyendo ventas remotas:", error.message || error);
+    }
+  }
+
+  const locales = safeGet("historial_ventas_local");
+  const map = new Map();
+
+  [...locales, ...remotas].forEach(v => {
+    if (!v) return;
+    const key = String(v?.id || "").trim() ||
+      `${String(v?.fecha || "")}|${String(v?.hora || "")}|${String(v?.folio || "")}|${String(v?.total || "")}`;
+    map.set(key, v);
+  });
+
+  const ventas = Array.from(map.values())
+    .map(v => {
+      const ts = tsVenta(v);
+      const fecha = tsValido(ts) ? fechaDesdeTS(ts) : String(v?.fecha || "");
+      const hora = tsValido(ts) ? horaDesdeTS(ts) : String(v?.hora || "");
+      const items = itemsVenta(v);
+      const unidades = items.reduce((acc, it) => acc + aNumero(it?.cantidad), 0);
+
+      return {
+        ts,
+        fecha,
+        hora,
+        folio: folioVenta(v),
+        referencia: referenciaVenta(v),
+        total: Number(totalVenta(v).toFixed(2)),
+        unidades,
+        items
+      };
+    })
+    .filter(v => {
+      if (enRangoTs(v.ts, rango)) return true;
+      if (!v.fecha) return false;
+      return v.fecha >= rango.fechaDesde && v.fecha <= rango.fechaHasta;
+    })
+    .sort((a, b) => a.ts - b.ts);
+
+  return ventas;
+}
+
+function construirResumenProductos(ventas) {
+  const map = new Map();
+  let totalUnidades = 0;
+
+  ventas.forEach(v => {
+    v.items.forEach(it => {
+      const nombre = String(it?.nombre || "Producto").trim() || "Producto";
+      const cantidad = aNumero(it?.cantidad);
+      const precio = aNumero(it?.precio_unitario);
+      const subtotal = aNumero(it?.subtotal || (precio * cantidad));
+      totalUnidades += cantidad;
+
+      if (!map.has(nombre)) {
+        map.set(nombre, { nombre, cantidad: 0, importe: 0 });
+      }
+
+      const actual = map.get(nombre);
+      actual.cantidad += cantidad;
+      actual.importe += subtotal;
+    });
+  });
+
+  const productos = Array.from(map.values())
+    .map(p => ({
+      ...p,
+      cantidad: Number(p.cantidad.toFixed(2)),
+      importe: Number(p.importe.toFixed(2))
+    }))
+    .sort((a, b) => {
+      if (b.cantidad !== a.cantidad) return b.cantidad - a.cantidad;
+      return a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" });
+    });
+
+  return {
+    totalUnidades: Number(totalUnidades.toFixed(2)),
+    productos
+  };
+}
+
+function renderEntradasSalidas(eventos) {
+  const tbody = document.getElementById("tbodyEntradasSalidas");
+  tbody.innerHTML = "";
+
+  let entradas = 0;
+  let salidas = 0;
+
+  if (!eventos.length) {
+    tbody.innerHTML = "<tr><td colspan='5'>No hay registros en el rango seleccionado</td></tr>";
+  } else {
+    eventos.forEach((ev, i) => {
+      const tipo = ev.movimiento === "salida" ? "salida" : "entrada";
+      if (tipo === "entrada") entradas += 1;
+      if (tipo === "salida") salidas += 1;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${escapeHTML(ev.fecha || "-")}</td>
+        <td>${escapeHTML(ev.hora || "-")}</td>
+        <td>${escapeHTML(ev.cliente || "Cliente")}</td>
+        <td><span class="tag tag-${tipo}">${tipo === "entrada" ? "Entrada" : "Salida"}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById("metaEntradasSalidas").textContent =
+    `Registros: ${eventos.length} | Entradas: ${entradas} | Salidas: ${salidas}`;
+}
+
+function renderClientesNuevos(clientes) {
+  const tbody = document.getElementById("tbodyClientesNuevos");
+  tbody.innerHTML = "";
+
+  if (!clientes.length) {
+    tbody.innerHTML = "<tr><td colspan='4'>No hay clientes nuevos en el rango seleccionado</td></tr>";
+  } else {
+    clientes.forEach((c, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${escapeHTML(c.fechaRegistro || "-")}</td>
+        <td>${escapeHTML(c.nombre || "Cliente")}</td>
+        <td>${escapeHTML(c.telefono || "0")}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById("metaClientesNuevos").textContent =
+    `Clientes nuevos: ${clientes.length}`;
+}
+
+function renderVentas(ventas, resumenProductos) {
+  const tbodyVentas = document.getElementById("tbodyVentas");
+  tbodyVentas.innerHTML = "";
+
+  let totalVentas = 0;
+  let totalProductosVendidos = 0;
+
+  if (!ventas.length) {
+    tbodyVentas.innerHTML = "<tr><td colspan='6'>No hay ventas en el rango seleccionado</td></tr>";
+  } else {
+    ventas.forEach((v, i) => {
+      totalVentas += aNumero(v.total);
+      totalProductosVendidos += aNumero(v.unidades);
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${escapeHTML(v.fecha || "-")}</td>
+        <td>${escapeHTML(v.hora || "-")}</td>
+        <td title="${escapeHTML(v.referencia)}">${escapeHTML(v.folio)}</td>
+        <td class="num">${aNumero(v.unidades)}</td>
+        <td class="num">${fmtMoney(v.total)}</td>
+      `;
+      tbodyVentas.appendChild(tr);
+    });
+  }
+
+  const tbodyProductos = document.getElementById("tbodyProductosVendidos");
+  tbodyProductos.innerHTML = "";
+
+  if (!resumenProductos.productos.length) {
+    tbodyProductos.innerHTML = "<tr><td colspan='4'>No hay productos vendidos en el rango seleccionado</td></tr>";
+  } else {
+    resumenProductos.productos.forEach((p, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${escapeHTML(p.nombre)}</td>
+        <td class="num">${p.cantidad}</td>
+        <td class="num">${fmtMoney(p.importe)}</td>
+      `;
+      tbodyProductos.appendChild(tr);
+    });
+  }
+
+  document.getElementById("metaVentas").textContent =
+    `Ventas: ${ventas.length} | Productos vendidos: ${totalProductosVendidos}`;
+  document.getElementById("metaProductosVendidos").textContent =
+    `Productos distintos: ${resumenProductos.productos.length} | Cantidad vendida: ${resumenProductos.totalUnidades}`;
+
+  document.getElementById("totalVentasFinal").innerHTML =
+    `Total de dinero de las ventas:<strong>${fmtMoney(totalVentas)}</strong>`;
+}
+
+function marcarCargando(loading) {
+  const txt = loading ? "Cargando..." : "Sin datos";
+  document.getElementById("metaEntradasSalidas").textContent = txt;
+  document.getElementById("metaClientesNuevos").textContent = txt;
+  document.getElementById("metaVentas").textContent = txt;
+  document.getElementById("metaProductosVendidos").textContent = txt;
+}
+
+async function cargarCorte() {
+  const rango = crearRango();
+  if (!rango) return;
+
+  const btn = document.getElementById("btnActualizar");
+  btn.disabled = true;
+  marcarCargando(true);
+
+  try {
+    const [eventos, clientesNuevos, ventas] = await Promise.all([
+      cargarEntradasSalidas(rango),
+      cargarClientesNuevos(rango),
+      cargarVentas(rango)
+    ]);
+
+    const resumenProductos = construirResumenProductos(ventas);
+
+    renderEntradasSalidas(eventos);
+    renderClientesNuevos(clientesNuevos);
+    renderVentas(ventas, resumenProductos);
+  } catch (error) {
+    console.error("[CORTE] Error cargando corte:", error);
+    alert("No se pudo cargar el corte. Revisa la consola para mas detalle.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function initCorte() {
+  const fechaActual = hoy();
+
+  const fechaDesde = document.getElementById("fechaDesde");
+  const fechaHasta = document.getElementById("fechaHasta");
+  const btnActualizar = document.getElementById("btnActualizar");
+
+  fechaDesde.value = fechaActual;
+  fechaHasta.value = fechaActual;
+
+  fechaDesde.addEventListener("change", cargarCorte);
+  fechaHasta.addEventListener("change", cargarCorte);
+  btnActualizar.addEventListener("click", cargarCorte);
+
+  cargarCorte();
+}
+</script>
+
+</body>
+</html>
