@@ -13,16 +13,10 @@
 <header class="header-brand">
   <div class="brand">
     <img src="img/logo.png">
-    <h2>Asistencias del día</h2>
+    <h2>Asistencias del dia</h2>
   </div>
 
   <div class="estado-sistema">
-
-    <!-- BOTÓN FULLSCREEN INTEGRADO -->
-    <button id="btnFullscreen" class="btn-fullscreen" title="Pantalla completa">
-      ⛶
-    </button>
-
     <span id="contadorAforo" class="contador">
       Dentro: <strong>0</strong>
     </span>
@@ -37,7 +31,7 @@
   <button class="destacado" onclick="location.href='registro.html'">Registro</button>
   <button onclick="location.href='pos.html'">Ventas</button>
   <button onclick="location.href='stock.html'">Stock</button>
-  <button onclick="location.href='membresias.html'">Membresías</button>
+  <button onclick="location.href='membresias.html'">Membresias</button>
   <button onclick="location.href='clientes.html'">Clientes</button>
   <button onclick="location.href='historial.html'">Historial</button>
 </div>
@@ -70,27 +64,17 @@
 
 <script>
 
-/* ================= FULLSCREEN ================= */
-const btnFullscreen = document.getElementById("btnFullscreen");
-const panelAcciones = document.querySelector(".panel-acciones");
+let ultimoUIDLeido = null;
+let ultimoTSLeido = 0;
+const COOLDOWN_LECTURA_MS = 3000;
+const DIAS_GRACIA_MEMBRESIA = 2;
+const PERMITIR_ENTRADA_EN_GRACIA = true;
+const HEARTBEAT_STALE_MS = 20000;
 
-btnFullscreen.addEventListener("click", () => {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen();
-  } else {
-    document.exitFullscreen();
-  }
-});
-
-document.addEventListener("fullscreenchange", () => {
-  if (document.fullscreenElement) {
-    panelAcciones.style.display = "none";
-    btnFullscreen.style.display = "none";
-  } else {
-    panelAcciones.style.display = "";
-    btnFullscreen.style.display = "";
-  }
-});
+let estadoCanalNFC = "INIT";
+let ultimoHeartbeatLector = 0;
+let monitorHeartbeatId = null;
+const clientesEnProceso = new Set();
 
 /* ================= INIT ================= */
 window.addEventListener("load", () => {
@@ -99,14 +83,17 @@ window.addEventListener("load", () => {
   const estadoConexion = document.getElementById("estadoConexion");
 
   actualizarEstadoConexion(estadoConexion);
+  window.addEventListener("online", () => actualizarEstadoConexion(estadoConexion));
+  window.addEventListener("offline", () => actualizarEstadoConexion(estadoConexion));
 
   cargarAsistencias();
   actualizarContador();
 
   iniciarLecturaNFCIndex(estadoLector);
+  iniciarMonitorHeartbeat(estadoLector);
 });
 
-/* ================= CONEXIÓN ================= */
+/* ================= CONEXION ================= */
 function actualizarEstadoConexion(el) {
   if (!el) return;
 
@@ -117,6 +104,55 @@ function actualizarEstadoConexion(el) {
     el.textContent = "Offline";
     el.className = "lector off";
   }
+}
+
+function setEstadoLector(el, modo, texto) {
+  if (!el) return;
+  el.className = `lector ${modo}`;
+  el.textContent = texto;
+}
+
+function actualizarEstadoCanal(estadoLector, status) {
+  const s = String(status || "").toUpperCase();
+  estadoCanalNFC = s;
+
+  if (s === "SUBSCRIBED") {
+    ultimoHeartbeatLector = Date.now();
+    setEstadoLector(estadoLector, "on", "Lector activo");
+    return;
+  }
+
+  if (s === "RECONNECTING") {
+    setEstadoLector(estadoLector, "warn", "Reconectando lector");
+    return;
+  }
+
+  if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED", "ERROR_NO_SUPABASE"].includes(s)) {
+    setEstadoLector(estadoLector, "off", "Lector sin senal");
+    return;
+  }
+}
+
+function marcarHeartbeatLector(estadoLector, detalle = "") {
+  ultimoHeartbeatLector = Date.now();
+
+  if (estadoCanalNFC === "SUBSCRIBED") {
+    const sufijo = detalle ? ` (${detalle})` : "";
+    setEstadoLector(estadoLector, "on", `Lector activo${sufijo}`);
+  }
+}
+
+function iniciarMonitorHeartbeat(estadoLector) {
+  if (monitorHeartbeatId) clearInterval(monitorHeartbeatId);
+
+  monitorHeartbeatId = setInterval(() => {
+    if (!estadoLector || estadoCanalNFC !== "SUBSCRIBED") return;
+
+    const delta = Date.now() - ultimoHeartbeatLector;
+    if (!ultimoHeartbeatLector || delta > HEARTBEAT_STALE_MS) {
+      setEstadoLector(estadoLector, "warn", "Activo sin lecturas recientes");
+    }
+  }, 3000);
 }
 
 /* ================= CONFIRMACION ================= */
@@ -139,65 +175,292 @@ function iniciarLecturaNFCIndex(estadoLector) {
 
   if (!estadoLector) return;
 
-  estadoLector.className = "lector on";
-  estadoLector.textContent = "Lector activo";
+  setEstadoLector(estadoLector, "warn", "Conectando lector...");
 
   if (typeof iniciarNFCControlado === "function") {
     iniciarNFCControlado({
-      onUID: procesarTarjeta,
-      onTimeout: () => iniciarLecturaNFCIndex(estadoLector),
-      onError: () => setTimeout(() => iniciarLecturaNFCIndex(estadoLector), 2000)
+      onUID: uid => {
+        marcarHeartbeatLector(estadoLector, "lectura recibida");
+        procesarTarjeta(uid);
+      },
+      onHeartbeat: evento => {
+        marcarHeartbeatLector(
+          estadoLector,
+          `ultima ${horaDesdeTS(evento?.ts || Date.now())}`
+        );
+      },
+      onStatus: status => {
+        actualizarEstadoCanal(estadoLector, status);
+      },
+      onTimeout: () => {
+        if (estadoCanalNFC === "SUBSCRIBED") {
+          setEstadoLector(estadoLector, "warn", "Esperando tarjeta...");
+        }
+      },
+      onError: () => {
+        setEstadoLector(estadoLector, "off", "Lector con error");
+        if (typeof detenerNFC === "function") detenerNFC();
+        setTimeout(() => iniciarLecturaNFCIndex(estadoLector), 1800);
+      }
     });
   }
+}
+
+function parseFechaLocal(ymd) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ""));
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(y, mo - 1, d, 0, 0, 0, 0);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+function evaluarMembresia(membresiaExpira) {
+  const fechaExp = parseFechaLocal(membresiaExpira);
+  if (!fechaExp) {
+    return {
+      estado: "vencida",
+      diasRestantes: null,
+      mensaje: "Membresia no configurada"
+    };
+  }
+
+  const hoyLocal = new Date();
+  hoyLocal.setHours(0, 0, 0, 0);
+  const msDia = 24 * 60 * 60 * 1000;
+  const diasRestantes = Math.floor((fechaExp.getTime() - hoyLocal.getTime()) / msDia);
+
+  if (diasRestantes >= 0) {
+    const msg = diasRestantes === 0
+      ? "Membresia vigente (vence hoy)"
+      : `Membresia vigente (${diasRestantes} dia(s) restantes)`;
+    return { estado: "vigente", diasRestantes, mensaje: msg };
+  }
+
+  if (diasRestantes >= -DIAS_GRACIA_MEMBRESIA) {
+    const diasGracia = Math.abs(diasRestantes);
+    return {
+      estado: "gracia",
+      diasRestantes,
+      mensaje: `Periodo de gracia (${diasGracia} dia(s) vencido)`
+    };
+  }
+
+  return {
+    estado: "vencida",
+    diasRestantes,
+    mensaje: `Membresia vencida hace ${Math.abs(diasRestantes)} dia(s)`
+  };
+}
+
+function clienteDentroLocal(clienteId) {
+  const asistencias = obtenerAsistencias();
+  if (!Array.isArray(asistencias)) return false;
+
+  return asistencias.some(a =>
+    a &&
+    a.fecha === hoy() &&
+    String(a.cliente_id || "") === String(clienteId) &&
+    a.entrada_ts &&
+    !a.salida_ts
+  );
+}
+
+async function resolverAccionEsperada(clienteId) {
+  const estadoLocal = clienteDentroLocal(clienteId) ? "dentro" : "fuera";
+
+  if (!window.supabaseClient || !navigator.onLine) {
+    return {
+      accionEsperada: estadoLocal === "dentro" ? "salida" : "entrada",
+      estadoActual: estadoLocal,
+      fuente: "local"
+    };
+  }
+
+  const { inicioISO, finISO } = rangoHoyISO();
+  const { data, error } = await window.supabaseClient
+    .from("attendance")
+    .select("type,created_at")
+    .eq("cliente_id", clienteId)
+    .gte("created_at", inicioISO)
+    .lt("created_at", finISO)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.warn("[INDEX] No se pudo validar estado remoto de asistencia:", error.message || error);
+    return {
+      accionEsperada: estadoLocal === "dentro" ? "salida" : "entrada",
+      estadoActual: estadoLocal,
+      fuente: "local"
+    };
+  }
+
+  const ultimoTipo = data?.[0]?.type;
+  if (!ultimoTipo) {
+    return {
+      accionEsperada: estadoLocal === "dentro" ? "salida" : "entrada",
+      estadoActual: estadoLocal,
+      ultimoTipo: null,
+      fuente: "local"
+    };
+  }
+
+  const estadoRemoto = ultimoTipo === "entrada" ? "dentro" : "fuera";
+
+  return {
+    accionEsperada: estadoRemoto === "dentro" ? "salida" : "entrada",
+    estadoActual: estadoRemoto,
+    ultimoTipo: ultimoTipo || null,
+    fuente: "remoto"
+  };
+}
+
+async function registrarAsistenciaConControl({ clienteId, uid, accion }) {
+  const payload = {
+    id: crypto.randomUUID(),
+    cliente_id: clienteId,
+    uid,
+    created_at: new Date().toISOString(),
+    type: accion,
+    source: "wifi",
+    device_id: "pc_principal"
+  };
+
+  const { error } = await window.supabaseClient
+    .from("attendance")
+    .insert(payload);
+
+  if (!error) {
+    return { accion };
+  }
+
+  console.warn("[INDEX] Insert directo attendance fallo, usando RPC fallback:", error.message || error);
+
+  const rpc = await window.supabaseClient.rpc("registrar_asistencia", {
+    p_id: payload.id,
+    p_cliente_id: payload.cliente_id,
+    p_uid: payload.uid,
+    p_created_at: payload.created_at,
+    p_source: payload.source,
+    p_device_id: payload.device_id
+  });
+
+  if (rpc.error) {
+    throw rpc.error;
+  }
+
+  const resultadoRpc = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+  return { accion: resultadoRpc?.accion || accion };
 }
 
 /* ================= PROCESAR TARJETA ================= */
 async function procesarTarjeta(uid) {
 
   if (!window.supabaseClient) return;
+  uid = normalizarUID(uid);
+  const ahoraMs = Date.now();
+
+  if (uid === ultimoUIDLeido && (ahoraMs - ultimoTSLeido) < COOLDOWN_LECTURA_MS) {
+    console.info(`[INDEX] UID ignorado por cooldown uid=${uid}`);
+    return;
+  }
+
+  ultimoUIDLeido = uid;
+  ultimoTSLeido = ahoraMs;
+  let clienteIdProcesado = null;
 
   try {
 
-    const { data: cliente, error: errorCliente } = await window.supabaseClient
+    let { data: cliente, error: errorCliente } = await window.supabaseClient
       .from("clientes")
-      .select("id, nombre")
+      .select("id, nombre, membresia_expira")
       .eq("tarjeta_uid", uid)
-      .single();
+      .maybeSingle();
+
+    if (!cliente) {
+      const alt = await window.supabaseClient
+        .from("clientes")
+        .select("id, nombre, membresia_expira")
+        .ilike("tarjeta_uid", uid)
+        .maybeSingle();
+
+      cliente = alt.data;
+      errorCliente = alt.error;
+    }
 
     if (errorCliente || !cliente) {
-      mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepción");
+      mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepcion");
       return;
     }
 
-    const id = crypto.randomUUID();
-    const ahoraISO = new Date().toISOString();
-    const source = "wifi";
-    const deviceId = "pc_principal";
+    if (clientesEnProceso.has(cliente.id)) {
+      console.info(`[INDEX] Cliente en proceso, lectura ignorada cliente=${cliente.id}`);
+      return;
+    }
 
-    const { data, error } = await window.supabaseClient.rpc("registrar_asistencia", {
-      p_id: id,
-      p_cliente_id: cliente.id,
-      p_uid: uid,
-      p_created_at: ahoraISO,
-      p_source: source,
-      p_device_id: deviceId
+    clienteIdProcesado = cliente.id;
+    clientesEnProceso.add(cliente.id);
+
+    const control = await resolverAccionEsperada(cliente.id);
+    const accionEsperada = control.accionEsperada;
+
+    const estadoMembresia = evaluarMembresia(cliente.membresia_expira);
+    if (accionEsperada === "entrada") {
+      if (estadoMembresia.estado === "vencida") {
+        mostrarConfirmacion("error", "Acceso bloqueado", `${cliente.nombre} - ${estadoMembresia.mensaje}`);
+        return;
+      }
+
+      if (estadoMembresia.estado === "gracia" && !PERMITIR_ENTRADA_EN_GRACIA) {
+        mostrarConfirmacion("error", "Acceso bloqueado", `${cliente.nombre} - Fuera de vigencia`);
+        return;
+      }
+    }
+
+    const resultado = await registrarAsistenciaConControl({
+      clienteId: cliente.id,
+      uid,
+      accion: accionEsperada
     });
 
-    if (error) {
-      console.error(error);
+    if (resultado?.accion !== accionEsperada) {
+      mostrarConfirmacion(
+        "error",
+        "Secuencia invalida",
+        "Anti-passback activo: el sistema detecto una accion fuera de orden"
+      );
+      console.warn("[ANTI-PASSBACK] Accion inesperada", {
+        clienteId: cliente.id,
+        esperado: accionEsperada,
+        recibido: resultado?.accion,
+        fuente: control.fuente
+      });
       return;
     }
 
-    const resultado = Array.isArray(data) ? data[0] : data;
-
-    if (resultado?.accion === "entrada") {
-      mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
-    } else if (resultado?.accion === "salida") {
+    if (resultado.accion === "entrada") {
+      if (estadoMembresia.estado === "gracia") {
+        mostrarConfirmacion("gracia", "Acceso en gracia", `${cliente.nombre} - ${estadoMembresia.mensaje}`);
+      } else {
+        mostrarConfirmacion("entrada", "Bienvenido", cliente.nombre);
+      }
+    } else if (resultado.accion === "salida") {
       mostrarConfirmacion("salida", "Hasta luego", cliente.nombre);
     }
 
+    if (typeof reconstruirAsistenciasHoy === "function") {
+      await reconstruirAsistenciasHoy();
+    }
+
   } catch (err) {
-    console.error("❌ Error procesando tarjeta:", err);
+    console.error("[INDEX] Error procesando tarjeta:", err);
+    mostrarConfirmacion("error", "Error de lectura", "Consulte recepcion");
+  } finally {
+    if (clienteIdProcesado) {
+      clientesEnProceso.delete(clienteIdProcesado);
+    }
   }
 }
 
@@ -205,3 +468,5 @@ async function procesarTarjeta(uid) {
 
 </body>
 </html>
+
+
