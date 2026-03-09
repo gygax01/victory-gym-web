@@ -10,7 +10,7 @@
 <!-- SUPABASE (ESTA ES LA BUENA) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+<!-- ===== ADAPTACION SOLO TAMANO MOVIL ===== -->
 <style>
 @media (max-width:768px){
 
@@ -105,6 +105,28 @@
   }
 
 }
+
+.auditoria-box{
+  display:grid;
+  gap:8px;
+  margin-top: 18px;
+}
+
+.auditoria-box label{
+  font-size: 13px;
+  opacity:.88;
+  text-align:left;
+}
+
+.auditoria-box input{
+  margin:0;
+}
+
+.folio-previo{
+  text-align:left;
+  opacity:.7;
+  font-size:12px;
+}
 </style>
 </head>
 
@@ -117,16 +139,12 @@
   </div>
 
   <div style="display:flex; gap:10px;">
-
-    <!-- ✅ BOTÓN AGREGADO -->
-    <button onclick="activarEdicion()">
-      ✏️ Editar Stock
-    </button>
-
     <button onclick="abrirModalHistorial()" style="opacity:.85">
       Historial de Cambios
     </button>
-
+    <button onclick="abrirModalHistorialVentas()" style="opacity:.85">
+      Historial de Ventas
+    </button>
     <button onclick="location.href='index.html'">← Inicio</button>
   </div>
 </header>
@@ -145,7 +163,7 @@
   </div>
 </div>
 
-<!-- ================= NUEVO PRODUCTO (SOLO EDICIÓN) ================= -->
+<!-- ================= NUEVO PRODUCTO (SOLO EDICION) ================= -->
 <div
   class="card stock-nuevo"
   data-permission="products_create"
@@ -169,26 +187,39 @@
 <!-- ================= LISTA ================= -->
 <div class="stock-grid" id="listaStock"></div>
 
-<!-- ================= PANEL EDICIÓN ================= -->
+<!-- ================= AUDITORIA ================= -->
+<div class="stock-footer auditoria-box" id="panelAuditoria" style="display:none">
+  <label for="inputReferenciaCambio">Referencia (ticket/nota) *</label>
+  <input
+    id="inputReferenciaCambio"
+    maxlength="120"
+    placeholder="Ej: Ajuste inventario turno noche #T-2041"
+  >
+  <div class="folio-previo" id="previewFolio">
+    El folio se genera al guardar.
+  </div>
+</div>
+
+<!-- ================= PANEL EDICION ================= -->
 <div class="stock-footer" id="panelEdicion"></div>
 
 <!-- CORE -->
+<script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
-
 /* ================= STATE ================= */
 let productos = [];
 let productosFiltrados = [];
 let modoEdicion = false;
 let accionMaster = null;
+let folioPendiente = "";
 
-/* ================= FUNCIÓN AGREGADA ================= */
-function activarEdicion() {
-  modoEdicion = true;
-  renderStock();
-}
+const MAX_PRECIO = 1000000;
+const MAX_STOCK = 1000000;
+const DELTA_STOCK_EXTREMO = 500;
+const CAMBIO_PRECIO_EXTREMO_PCT = 0.5;
 
 /* ================= DOM ================= */
 const inputNombre   = document.getElementById("inputNombre");
@@ -198,10 +229,12 @@ const buscadorStock = document.getElementById("buscadorStock");
 const listaStock    = document.getElementById("listaStock");
 const panelEdicion  = document.getElementById("panelEdicion");
 const panelNuevoProducto = document.getElementById("panelNuevoProducto");
+const panelAuditoria = document.getElementById("panelAuditoria");
+const inputReferenciaCambio = document.getElementById("inputReferenciaCambio");
+const previewFolio = document.getElementById("previewFolio");
 
 /* ================= INIT ================= */
 function initStock() {
-  if (!verificarSesion()) return;
 
   buscadorStock.oninput = filtrarStock;
 
@@ -235,7 +268,6 @@ function renderStock() {
 
   if (!productosFiltrados.length) {
     listaStock.innerHTML = "<p style='opacity:.6'>No hay productos</p>";
-    renderPanel(); // ✅ agregado para que funcione aun vacío
     return;
   }
 
@@ -271,22 +303,28 @@ function renderStock() {
   renderPanel();
 }
 
-/* ================= PANEL EDICIÓN ================= */
+/* ================= PANEL EDICION ================= */
 function renderPanel() {
   panelEdicion.innerHTML = "";
 
   if (!modoEdicion) {
     panelNuevoProducto.style.display = "none";
+    panelAuditoria.style.display = "none";
+    folioPendiente = "";
 
     const btn = document.createElement("button");
     btn.textContent = "✏️ Editar stock";
     btn.onclick = () => {
       modoEdicion = true;
+      folioPendiente = generarFolioStockLocal();
       renderStock();
     };
     panelEdicion.appendChild(btn);
   } else {
     panelNuevoProducto.style.display = "block";
+    panelAuditoria.style.display = "grid";
+    if (!folioPendiente) folioPendiente = generarFolioStockLocal();
+    previewFolio.textContent = `Folio actual: ${folioPendiente}`;
 
     const guardar = document.createElement("button");
     guardar.className = "btn-guardar";
@@ -300,6 +338,8 @@ function renderPanel() {
     cancelar.textContent = "❌ Cancelar";
     cancelar.onclick = () => {
       modoEdicion = false;
+      inputReferenciaCambio.value = "";
+      folioPendiente = "";
       cargarStock();
     };
 
@@ -311,6 +351,11 @@ function renderPanel() {
 /* ================= MODAL ================= */
 function abrirModalHistorial() {
   accionMaster = "historial";
+  abrirModalMaster();
+}
+
+function abrirModalHistorialVentas() {
+  accionMaster = "historial_ventas";
   abrirModalMaster();
 }
 
@@ -345,74 +390,250 @@ function confirmarMaster() {
     return;
   }
 
+  if (accionMaster === "historial_ventas") {
+    location.href = "historialventas.html?v=20260302";
+    return;
+  }
+
   if (accionMaster === "guardar") guardarCambiosStock();
   if (accionMaster === "nuevo") confirmarNuevoProducto();
 }
 
+function generarFolioStockLocal() {
+  const baseFecha = hoy().replace(/-/g, "");
+  const sufijo = Date.now().toString(36).toUpperCase().slice(-4);
+  return `STK-${baseFecha}-${sufijo}`;
+}
+
+function esEnteroNoNegativo(n) {
+  return Number.isInteger(n) && n >= 0;
+}
+
+function referenciaValida() {
+  const ref = String(inputReferenciaCambio.value || "").trim();
+  if (ref.length < 3) {
+    alert("La referencia es obligatoria (mínimo 3 caracteres).");
+    return null;
+  }
+  return ref.slice(0, 120);
+}
+
+function resumenCambioExtremo(op) {
+  const partes = [];
+  const deltaStock = Math.abs(op.despues.stock - op.antes.stock);
+  const deltaMin = Math.abs(op.despues.stock_minimo - op.antes.stock_minimo);
+
+  let cambioPrecio = 0;
+  if (op.antes.precio === 0 && op.despues.precio > 0) cambioPrecio = 1;
+  if (op.antes.precio > 0) {
+    cambioPrecio = Math.abs((op.despues.precio - op.antes.precio) / op.antes.precio);
+  }
+
+  if (deltaStock >= DELTA_STOCK_EXTREMO) {
+    partes.push(`stock ${op.antes.stock} -> ${op.despues.stock}`);
+  }
+  if (deltaMin >= DELTA_STOCK_EXTREMO) {
+    partes.push(`stock mínimo ${op.antes.stock_minimo} -> ${op.despues.stock_minimo}`);
+  }
+  if (cambioPrecio >= CAMBIO_PRECIO_EXTREMO_PCT) {
+    partes.push(`precio ${op.antes.precio} -> ${op.despues.precio}`);
+  }
+
+  if (!partes.length) return "";
+  return `${op.nombre}: ${partes.join(", ")}`;
+}
+
 /* ================= GUARDAR CAMBIOS ================= */
 async function guardarCambiosStock() {
+  const referencia = referenciaValida();
+  if (!referencia) return;
+
   const cards = document.querySelectorAll(".stock-card");
+  const operaciones = [];
 
   for (let i = 0; i < cards.length; i++) {
     const inputs = cards[i].querySelectorAll("input");
     if (!inputs.length) continue;
 
-    const nombre = inputs[0].value.trim();
+    const nombreInput = inputs[0].value.trim();
     const precio = Number(inputs[1].value);
     const stockEdit = Number(inputs[2].value);
     const stockMin = Number(inputs[3].value);
-    const exacto = inputs[4].value;
+    const exacto = inputs[4].value.trim();
     const nuevoStock = exacto !== "" ? Number(exacto) : stockEdit;
 
     const prod = productosFiltrados[i];
-    const antes = { stock: prod.stock, precio: prod.precio };
+    if (!prod) continue;
+    const nombre = nombreInput || (prod.nombre ?? "");
 
-    prod.nombre = nombre;
-    prod.precio = precio;
-    prod.stock = nuevoStock;
-    prod.stock_minimo = stockMin;
+    if (!nombre) {
+      alert(`Producto inválido en fila ${i + 1}: el nombre es obligatorio.`);
+      return;
+    }
+    if (!Number.isFinite(precio) || precio < 0 || precio > MAX_PRECIO) {
+      alert(`Precio inválido en "${nombre}". Debe ser un número entre 0 y ${MAX_PRECIO}.`);
+      return;
+    }
+    if (!esEnteroNoNegativo(nuevoStock) || nuevoStock > MAX_STOCK) {
+      alert(`Stock inválido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`);
+      return;
+    }
+    if (!esEnteroNoNegativo(stockMin) || stockMin > MAX_STOCK) {
+      alert(`Stock mínimo inválido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`);
+      return;
+    }
 
-    await supabaseClient
-      .from("productos")
-      .update({ nombre, precio, stock: nuevoStock, stock_minimo: stockMin })
-      .eq("id", prod.id);
-
-    await pushHistorialStock([{
-      producto_id: prod.id,
+    const antes = {
+      nombre: prod.nombre ?? "",
+      stock: Number(prod.stock) || 0,
+      precio: Number(prod.precio) || 0,
+      stock_minimo: Number(prod.stock_minimo || 0)
+    };
+    const despues = {
       nombre,
-      antes,
-      despues: { stock: nuevoStock, precio }
-    }]);
+      stock: Number.isFinite(nuevoStock) ? nuevoStock : antes.stock,
+      precio: Number.isFinite(precio) ? precio : antes.precio,
+      stock_minimo: Number.isFinite(stockMin) ? stockMin : antes.stock_minimo
+    };
+
+    const huboCambios =
+      antes.nombre !== despues.nombre ||
+      antes.stock !== despues.stock ||
+      antes.precio !== despues.precio ||
+      antes.stock_minimo !== despues.stock_minimo;
+
+    if (!huboCambios) continue;
+
+    operaciones.push({ prod, nombre, antes, despues });
+  }
+
+  if (!operaciones.length) {
+    alert("No hubo cambios para guardar.");
+    return;
+  }
+
+  const extremos = operaciones
+    .map(resumenCambioExtremo)
+    .filter(Boolean);
+
+  if (extremos.length) {
+    const preview = extremos.slice(0, 5).join("\n");
+    const extra = extremos.length > 5
+      ? `\n...y ${extremos.length - 5} cambios extremos más.`
+      : "";
+    const continuar = confirm(
+      `Se detectaron cambios extremos:\n${preview}${extra}\n\n¿Deseas continuar?`
+    );
+    if (!continuar) return;
+  }
+
+  for (const op of operaciones) {
+    const { error } = await supabaseClient
+      .from("productos")
+      .update({
+        nombre: op.nombre,
+        precio: op.despues.precio,
+        stock: op.despues.stock,
+        stock_minimo: op.despues.stock_minimo
+      })
+      .eq("id", op.prod.id);
+
+    if (error) {
+      console.error("[STOCK] Error actualizando producto:", op.prod.id, error);
+      alert(`No se pudo guardar "${op.nombre}".`);
+      return;
+    }
+
+    op.prod.nombre = op.nombre;
+    op.prod.precio = op.despues.precio;
+    op.prod.stock = op.despues.stock;
+    op.prod.stock_minimo = op.despues.stock_minimo;
+  }
+
+  const folio = folioPendiente || generarFolioStockLocal();
+  await pushHistorialStock(
+    operaciones.map(op => ({
+      producto_id: op.prod.id,
+      nombre: op.nombre,
+      antes: op.antes,
+      despues: op.despues
+    })),
+    {
+      folio,
+      referencia,
+      tipo: "edicion_manual"
+    }
+  );
+
+  if (typeof bc !== "undefined") {
+    bc.postMessage("productos");
+  } else {
+    new BroadcastChannel("victory-data").postMessage("productos");
   }
 
   localStorage.setItem("productos", JSON.stringify(productos));
+  inputReferenciaCambio.value = "";
+  folioPendiente = "";
   location.reload();
 }
 
 /* ================= NUEVO PRODUCTO ================= */
 async function confirmarNuevoProducto() {
-  if (!inputNombre.value || !inputPrecio.value) return;
+  const referencia = referenciaValida();
+  if (!referencia) return;
+
+  const nombre = inputNombre.value.trim();
+  const precio = Number(inputPrecio.value);
+  const stockInicial = Number(inputStock.value || 0);
+
+  if (!nombre) {
+    alert("El nombre del producto es obligatorio.");
+    return;
+  }
+  if (!Number.isFinite(precio) || precio < 0 || precio > MAX_PRECIO) {
+    alert(`Precio inválido. Debe ser un número entre 0 y ${MAX_PRECIO}.`);
+    return;
+  }
+  if (!esEnteroNoNegativo(stockInicial) || stockInicial > MAX_STOCK) {
+    alert(`Stock inicial inválido. Debe ser entero entre 0 y ${MAX_STOCK}.`);
+    return;
+  }
 
   const prod = {
     id: crypto.randomUUID(),
-    nombre: inputNombre.value.trim(),
-    precio: Number(inputPrecio.value),
-    stock: Number(inputStock.value) || 0,
+    nombre,
+    precio,
+    stock: stockInicial,
     stock_minimo: 0
   };
 
   await insertarProductoSupabase(prod);
 
-  await pushHistorialStock([{
-    producto_id: prod.id,
-    nombre: prod.nombre,
-    antes: null,
-    despues: { stock: prod.stock, precio: prod.precio }
-  }]);
+  const folio = folioPendiente || generarFolioStockLocal();
+  await pushHistorialStock(
+    [{
+      producto_id: prod.id,
+      nombre: prod.nombre,
+      antes: null,
+      despues: {
+        nombre: prod.nombre,
+        stock: prod.stock,
+        precio: prod.precio,
+        stock_minimo: prod.stock_minimo
+      }
+    }],
+    {
+      folio,
+      referencia,
+      tipo: "alta_producto"
+    }
+  );
 
   inputNombre.value = "";
   inputPrecio.value = "";
   inputStock.value = "";
+  inputReferenciaCambio.value = "";
+  folioPendiente = "";
 
   location.reload();
 }
@@ -425,8 +646,11 @@ function filtrarStock() {
   );
   renderStock();
 }
-
 </script>
 
 </body>
 </html>
+
+
+
+
