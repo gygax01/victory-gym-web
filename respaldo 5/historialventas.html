@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Historial de Ventas</title>
+<link rel="stylesheet" href="css/styles.css">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+
+<style>
+.filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.filtros-grid input,
+.filtros-grid select {
+  width: 100%;
+  margin: 0;
+  background: #3a3a3a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+}
+
+.export-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.export-actions button {
+  margin: 0;
+}
+
+.meta-extra {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.venta-resumen {
+  margin-top: 12px;
+  border-top: 1px solid rgba(243,114,44,.22);
+  padding-top: 10px;
+  font-size: 13px;
+  text-align: right;
+}
+
+@media (max-width: 768px){
+
+  .header-brand{
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    text-align:center;
+  }
+
+  .brand{
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .brand img{
+    height: 70px;
+  }
+
+  .brand h2{
+    font-size: 20px;
+  }
+
+  header button{
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .search-bar{
+    width: 92%;
+  }
+
+  .search-bar input{
+    height: 46px;
+    font-size: 15px;
+  }
+
+  .historial-container{
+    width: 94%;
+  }
+
+  .cliente{
+    padding: 16px;
+  }
+
+  .cliente h3{
+    font-size: 18px;
+  }
+
+  .racha{
+    font-size: 13px;
+  }
+
+  .flecha{
+    font-size: 20px;
+  }
+
+  .historial{
+    overflow-x: auto;
+  }
+
+  .historial table{
+    font-size: 13px;
+  }
+
+  .historial th,
+  .historial td{
+    padding: 8px 6px;
+  }
+
+  .filtros-grid{
+    grid-template-columns: 1fr;
+  }
+
+  .export-actions{
+    flex-direction: column;
+  }
+}
+</style>
+</head>
+
+<body onload="initHistorialVentas()">
+
+<header class="header-brand">
+  <div class="brand">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
+    <h2>Historial de Ventas</h2>
+  </div>
+
+  <button onclick="location.href='stock.html'">← Volver</button>
+</header>
+
+<div class="search-bar">
+  <input
+    id="buscadorVentas"
+    placeholder="Buscar por folio, referencia, usuario o producto..."
+  >
+</div>
+
+<div class="search-bar">
+  <div class="filtros-grid">
+    <input id="filtroFechaDesde" type="date" title="Fecha desde">
+    <input id="filtroFechaHasta" type="date" title="Fecha hasta">
+    <select id="filtroUsuario">
+      <option value="">Todos los usuarios</option>
+    </select>
+  </div>
+</div>
+
+<div class="search-bar export-actions">
+  <button id="btnExportExcel" type="button">Exportar Excel</button>
+  <button id="btnExportPDF" type="button">Exportar PDF</button>
+</div>
+
+<div id="popupDiasExport" class="flow-popup" aria-hidden="true">
+  <div class="flow-popup-card" role="dialog" aria-modal="true" aria-labelledby="tituloPopupDias">
+    <h3 id="tituloPopupDias">Exportar historial</h3>
+    <p id="subtituloPopupDias">Selecciona cuántos días deseas exportar.</p>
+
+    <div class="flow-popup-grid">
+      <button type="button" class="btn-dia-export" data-days="1">1 día</button>
+      <button type="button" class="btn-dia-export" data-days="7">7 días</button>
+      <button type="button" class="btn-dia-export" data-days="15">15 días</button>
+      <button type="button" class="btn-dia-export" data-days="30">30 días</button>
+    </div>
+
+    <label class="flow-popup-label" for="inputDiasPersonalizados">
+      Días personalizados (1 a 30)
+    </label>
+    <input
+      id="inputDiasPersonalizados"
+      class="flow-popup-input"
+      type="number"
+      min="1"
+      max="30"
+      placeholder="Ej: 10"
+    >
+
+    <div id="msgPopupDias" class="flow-popup-msg"></div>
+
+    <div class="flow-popup-actions">
+      <button id="btnCancelarPopupDias" type="button">Cancelar</button>
+      <button id="btnAceptarPopupDias" type="button" class="flow-primary">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<div class="historial-container" id="contenedorVentas"></div>
+
+<script src="js/auth.js?v=20260302"></script>
+<script src="js/storage.js?v=20260302"></script>
+<script src="js/realtime.js?v=20260302"></script>
+
+<script>
+let ventas = [];
+let ventasFiltradas = [];
+let resolverPopupDias = null;
+let formatoPopupDias = "";
+
+async function initHistorialVentas() {
+  document.getElementById("buscadorVentas").addEventListener("input", aplicarFiltros);
+  document.getElementById("filtroFechaDesde").addEventListener("change", aplicarFiltros);
+  document.getElementById("filtroFechaHasta").addEventListener("change", aplicarFiltros);
+  document.getElementById("filtroUsuario").addEventListener("change", aplicarFiltros);
+  document.getElementById("btnExportExcel").addEventListener("click", exportarExcel);
+  document.getElementById("btnExportPDF").addEventListener("click", exportarPDF);
+  inicializarPopupDias();
+
+  await cargarVentas();
+}
+
+function inicializarPopupDias() {
+  const modal = document.getElementById("popupDiasExport");
+  const inputCustom = document.getElementById("inputDiasPersonalizados");
+  const msg = document.getElementById("msgPopupDias");
+  const btnCancelar = document.getElementById("btnCancelarPopupDias");
+  const btnAceptar = document.getElementById("btnAceptarPopupDias");
+  const btnsRapidos = document.querySelectorAll(".btn-dia-export");
+
+  function limpiarSeleccionRapida() {
+    btnsRapidos.forEach(b => b.classList.remove("flow-selected"));
+  }
+
+  function cerrarPopupDias(valor = null) {
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+    msg.textContent = "";
+    inputCustom.value = "";
+    limpiarSeleccionRapida();
+
+    if (resolverPopupDias) {
+      const resolve = resolverPopupDias;
+      resolverPopupDias = null;
+      resolve(valor);
+    }
+  }
+
+  btnsRapidos.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const dias = Number(btn.dataset.days);
+      if (!Number.isInteger(dias) || dias < 1 || dias > 30) return;
+      cerrarPopupDias(dias);
+    });
+  });
+
+  btnCancelar.addEventListener("click", () => cerrarPopupDias(null));
+
+  btnAceptar.addEventListener("click", () => {
+    const dias = Number(String(inputCustom.value || "").trim());
+    if (!Number.isInteger(dias) || dias < 1 || dias > 30) {
+      msg.textContent = "Ingresa un número válido entre 1 y 30.";
+      return;
+    }
+    cerrarPopupDias(dias);
+  });
+
+  inputCustom.addEventListener("input", () => {
+    inputCustom.value = inputCustom.value.replace(/[^0-9]/g, "");
+    msg.textContent = "";
+    limpiarSeleccionRapida();
+  });
+
+  modal.addEventListener("click", e => {
+    if (e.target === modal) cerrarPopupDias(null);
+  });
+
+  window.addEventListener("keydown", e => {
+    if (e.key === "Escape" && resolverPopupDias) {
+      cerrarPopupDias(null);
+    }
+  });
+
+  window.abrirPopupDias = formato => {
+    formatoPopupDias = formato;
+    document.getElementById("tituloPopupDias").textContent = `Exportar ${formato}`;
+    document.getElementById("subtituloPopupDias").textContent =
+      `Selecciona cuántos días deseas exportar (${formato}). Máximo 30 días.`;
+    msg.textContent = "";
+    inputCustom.value = "";
+    limpiarSeleccionRapida();
+
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+    setTimeout(() => inputCustom.focus(), 40);
+
+    return new Promise(resolve => {
+      resolverPopupDias = resolve;
+    });
+  };
+}
+
+function normalizarTexto(t) {
+  return String(t ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function escapeHTML(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function aNumero(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function fmtMoney(v) {
+  return `$${aNumero(v).toFixed(2)}`;
+}
+
+function eventoTs(v) {
+  const ts = Number(v?.ts || 0);
+  if (Number.isFinite(ts) && ts > 0) return ts;
+
+  const fecha = String(v?.fecha || "");
+  const hora = String(v?.hora || "00:00:00");
+  const parsed = new Date(`${fecha}T${hora}`).getTime();
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return 0;
+}
+
+function fechaVenta(v) {
+  return v?.ts ? fechaDesdeTS(v.ts) : String(v?.fecha || "");
+}
+
+function horaVenta(v) {
+  return v?.ts ? horaDesdeTS(v.ts) : String(v?.hora || "");
+}
+
+function usuarioVenta(v) {
+  const raw = String(v?.usuario || "").trim();
+  if (!raw) return "Admin";
+  const n = normalizarTexto(raw);
+  if (n === "admin" || n === "sistema") return "Admin";
+  return raw;
+}
+
+function folioVenta(v) {
+  const directo = String(v?.folio || "").trim();
+  if (directo) return directo.toUpperCase();
+  const fallback = String(v?.id || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8);
+  return fallback ? `VTA-${fallback}` : "VTA-SIN-FOLIO";
+}
+
+function referenciaVenta(v) {
+  return String(v?.referencia || "").trim() || "Sin referencia";
+}
+
+function itemsVenta(v) {
+  return Array.isArray(v?.items) ? v.items : [];
+}
+
+function totalVenta(v) {
+  const total = aNumero(v?.total);
+  if (total > 0) return total;
+  return itemsVenta(v).reduce((acc, it) => {
+    const subtotal = aNumero(it?.subtotal);
+    if (subtotal > 0) return acc + subtotal;
+    return acc + (aNumero(it?.precio_unitario) * aNumero(it?.cantidad));
+  }, 0);
+}
+
+function guardarVentasLocales(lista) {
+  const key = "historial_ventas_local";
+  const actuales = safeGet(key);
+  const map = new Map();
+  [...actuales, ...lista].forEach(v => {
+    if (v?.id) map.set(v.id, v);
+  });
+  safeSet(key, Array.from(map.values()));
+}
+
+function construirFolioMigradoStock(h, cambios) {
+  const folioStock = String(cambios?.[0]?._folio || "").trim().toUpperCase();
+  if (folioStock.startsWith("VTA-")) return folioStock;
+  if (folioStock.startsWith("STK-")) return `VTA-MIG-${folioStock.slice(4)}`;
+
+  const baseFecha = String(h?.fecha || (h?.ts ? fechaDesdeTS(h.ts) : hoy()) || "")
+    .replace(/-/g, "");
+  const sufijo = String(h?.id || "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase()
+    .slice(-4) || "0000";
+  return `VTA-MIG-${baseFecha}-${sufijo}`;
+}
+
+function itemDesdeCambioStock(c) {
+  const tipo = normalizarTexto(c?._tipo_evento || "");
+  if (tipo === "edicion_manual" || tipo === "alta_producto") return null;
+
+  const antes = c?.antes || {};
+  const despues = c?.despues || {};
+  const stockAntes = Number(antes.stock);
+  const stockDespues = Number(despues.stock);
+  if (!Number.isFinite(stockAntes) || !Number.isFinite(stockDespues)) return null;
+
+  const cantidad = stockAntes - stockDespues;
+  if (!Number.isFinite(cantidad) || cantidad <= 0) return null;
+
+  const precio = Number.isFinite(Number(despues.precio))
+    ? Number(despues.precio)
+    : Number.isFinite(Number(antes.precio))
+      ? Number(antes.precio)
+      : 0;
+
+  const nombre = String(despues.nombre || antes.nombre || c?.nombre || "Producto").trim();
+  return {
+    producto_id: c?.producto_id || null,
+    nombre,
+    cantidad,
+    precio_unitario: Number(precio.toFixed(2)),
+    subtotal: Number((precio * cantidad).toFixed(2))
+  };
+}
+
+function ventaDesdeEventoStock(h) {
+  const cambios = Array.isArray(h?.cambios) ? h.cambios : [];
+  const items = cambios.map(itemDesdeCambioStock).filter(Boolean);
+  if (!items.length) return null;
+
+  const total = Number(items.reduce((acc, it) => acc + aNumero(it.subtotal), 0).toFixed(2));
+  const fecha = String(h?.fecha || (h?.ts ? fechaDesdeTS(h.ts) : hoy()) || "");
+  const hora = String(h?.hora || (h?.ts ? horaDesdeTS(h.ts) : horaActual()) || "");
+  const referenciaBase = String(h?.cambios?.[0]?._referencia || "").trim();
+
+  return {
+    id: h.id, // id estable para no duplicar en futuras migraciones
+    fecha,
+    hora,
+    usuario: "Admin",
+    rol: "admin",
+    folio: construirFolioMigradoStock(h, cambios),
+    referencia: referenciaBase || "Migrado desde historial de stock",
+    total,
+    pago: total,
+    cambio: 0,
+    items,
+    ts: Number(h?.ts || new Date(`${fecha}T${hora}`).getTime() || Date.now())
+  };
+}
+
+async function migrarVentasDesdeStock(ventasExistentes = []) {
+  if (!navigator.onLine || !window.supabaseClient) return [];
+
+  const idsExistentes = new Set(
+    ventasExistentes
+      .map(v => String(v?.id || ""))
+      .filter(Boolean)
+  );
+
+  const { data, error } = await supabaseClient
+    .from("historial_stock")
+    .select("*")
+    .order("ts", { ascending: false });
+
+  if (error) {
+    console.warn("[VENTAS] No se pudo leer historial_stock para migración:", error.message || error);
+    return [];
+  }
+
+  const migradas = (data || [])
+    .map(ventaDesdeEventoStock)
+    .filter(v => v && !idsExistentes.has(String(v.id)));
+
+  if (!migradas.length) return [];
+
+  const { error: upsertError } = await supabaseClient
+    .from("historial_ventas")
+    .upsert(migradas, { onConflict: "id", ignoreDuplicates: true });
+
+  if (upsertError) {
+    console.warn("[VENTAS] Migración remota parcial/no disponible:", upsertError.message || upsertError);
+  }
+
+  guardarVentasLocales(migradas.map(v => ({ ...v, synced: !upsertError })));
+  return migradas;
+}
+
+function cargarUsuariosFiltro() {
+  const select = document.getElementById("filtroUsuario");
+  const actual = select.value;
+  const usuarios = [...new Set(ventas.map(usuarioVenta))]
+    .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+
+  select.innerHTML = `<option value="">Todos los usuarios</option>`;
+  usuarios.forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = u;
+    opt.textContent = u;
+    select.appendChild(opt);
+  });
+
+  if (usuarios.includes(actual)) {
+    select.value = actual;
+  }
+}
+
+async function cargarVentas() {
+  let remotas = [];
+  if (navigator.onLine && window.supabaseClient) {
+    const { data, error } = await supabaseClient
+      .from("historial_ventas")
+      .select("*")
+      .order("ts", { ascending: false });
+
+    if (error) {
+      console.warn("[VENTAS] Historial remoto no disponible:", error.message || error);
+    } else {
+      remotas = data || [];
+    }
+  }
+
+  const locales = safeGet("historial_ventas_local");
+  const migradas = await migrarVentasDesdeStock([...remotas, ...locales]);
+  const map = new Map();
+  [...locales, ...remotas, ...migradas].forEach(v => {
+    if (v?.id) map.set(v.id, v);
+  });
+
+  ventas = Array.from(map.values())
+    .sort((a, b) => eventoTs(b) - eventoTs(a));
+
+  cargarUsuariosFiltro();
+  aplicarFiltros();
+}
+
+function aplicarFiltros() {
+  const q = normalizarTexto(document.getElementById("buscadorVentas").value);
+  const fechaDesde = document.getElementById("filtroFechaDesde").value;
+  const fechaHasta = document.getElementById("filtroFechaHasta").value;
+  const usuarioQ = document.getElementById("filtroUsuario").value;
+
+  ventasFiltradas = ventas.filter(v => {
+    const fecha = fechaVenta(v);
+    const hora = horaVenta(v);
+    const usuario = usuarioVenta(v);
+    const folio = folioVenta(v);
+    const referencia = referenciaVenta(v);
+    const productos = itemsVenta(v).map(it => String(it?.nombre || "")).join(" ");
+
+    if (fechaDesde && fecha && fecha < fechaDesde) return false;
+    if (fechaHasta && fecha && fecha > fechaHasta) return false;
+    if (usuarioQ && usuario !== usuarioQ) return false;
+
+    if (q) {
+      const texto = normalizarTexto([
+        fecha,
+        hora,
+        usuario,
+        folio,
+        referencia,
+        productos,
+        fmtMoney(totalVenta(v))
+      ].join(" "));
+      if (!texto.includes(q)) return false;
+    }
+
+    return true;
+  });
+
+  renderVentas();
+}
+
+function renderTablaItems(items = []) {
+  if (!items.length) return "<p>Sin productos registrados</p>";
+
+  let rows = "";
+  items.forEach(it => {
+    const nombre = escapeHTML(it?.nombre || "Producto");
+    const cantidad = aNumero(it?.cantidad);
+    const precio = aNumero(it?.precio_unitario);
+    const subtotal = aNumero(it?.subtotal || (precio * cantidad));
+
+    rows += `
+      <tr>
+        <td><b>${nombre}</b></td>
+        <td>${cantidad}</td>
+        <td>${fmtMoney(precio)}</td>
+        <td>${fmtMoney(subtotal)}</td>
+      </tr>
+    `;
+  });
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Cantidad</th>
+          <th>Precio</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderVentas() {
+  const cont = document.getElementById("contenedorVentas");
+  cont.innerHTML = "";
+
+  if (!ventasFiltradas.length) {
+    cont.innerHTML = "<p style='text-align:center'>No hay ventas registradas</p>";
+    return;
+  }
+
+  ventasFiltradas.forEach(v => {
+    const fecha = fechaVenta(v) || "-";
+    const hora = horaVenta(v) || "-";
+    const usuario = usuarioVenta(v);
+    const folio = folioVenta(v);
+    const referencia = referenciaVenta(v);
+    const total = totalVenta(v);
+    const pago = aNumero(v?.pago);
+    const cambio = aNumero(v?.cambio);
+
+    const card = document.createElement("div");
+    card.className = "cliente";
+    card.innerHTML = `
+      <div class="cliente-header" aria-expanded="false">
+        <div class="info-wrapper">
+          <div class="info-bloque">
+            <h3>${escapeHTML(fecha)}</h3>
+            <div class="racha">${escapeHTML(hora)} · ${escapeHTML(usuario)}</div>
+            <div class="meta meta-extra">
+              Folio: ${escapeHTML(folio)} · Ref: ${escapeHTML(referencia)} · Total: ${fmtMoney(total)}
+            </div>
+          </div>
+        </div>
+        <div class="flecha">▾</div>
+      </div>
+
+      <div class="historial">
+        ${renderTablaItems(itemsVenta(v))}
+        <div class="venta-resumen">
+          Pago: ${fmtMoney(pago)} · Cambio: ${fmtMoney(cambio)}
+        </div>
+      </div>
+    `;
+
+    const header = card.querySelector(".cliente-header");
+    const body = card.querySelector(".historial");
+
+    header.onclick = () => {
+      const abrirActual = !card.classList.contains("abierto");
+
+      document
+        .querySelectorAll("#contenedorVentas .cliente.abierto")
+        .forEach(abierto => {
+          if (abierto !== card) {
+            abierto.classList.remove("abierto");
+            abierto.querySelector(".historial")?.classList.remove("abierto");
+            abierto.querySelector(".cliente-header")?.setAttribute("aria-expanded", "false");
+          }
+        });
+
+      card.classList.toggle("abierto", abrirActual);
+      body.classList.toggle("abierto", abrirActual);
+      header.setAttribute("aria-expanded", abrirActual ? "true" : "false");
+    };
+
+    cont.appendChild(card);
+  });
+}
+
+async function solicitarDiasExportacion(formato) {
+  if (typeof window.abrirPopupDias !== "function") return null;
+  const dias = await window.abrirPopupDias(formato);
+  if (!dias) return null;
+  return dias;
+}
+
+function filtrarPorDias(data, dias) {
+  const inicio = new Date();
+  inicio.setHours(0, 0, 0, 0);
+  inicio.setDate(inicio.getDate() - (dias - 1));
+  const limite = inicio.getTime();
+  return data.filter(v => eventoTs(v) >= limite);
+}
+
+function filasExportacion(data) {
+  const filas = [];
+  data.forEach(v => {
+    const base = {
+      folio: folioVenta(v),
+      fecha: fechaVenta(v),
+      hora: horaVenta(v),
+      usuario: usuarioVenta(v),
+      referencia: referenciaVenta(v),
+      total_venta: totalVenta(v).toFixed(2),
+      pago: aNumero(v?.pago).toFixed(2),
+      cambio: aNumero(v?.cambio).toFixed(2)
+    };
+
+    itemsVenta(v).forEach(it => {
+      const cantidad = aNumero(it?.cantidad);
+      const precio = aNumero(it?.precio_unitario);
+      const subtotal = aNumero(it?.subtotal || (precio * cantidad));
+      filas.push({
+        ...base,
+        producto: String(it?.nombre || "Producto"),
+        cantidad,
+        precio_unitario: precio.toFixed(2),
+        subtotal: subtotal.toFixed(2)
+      });
+    });
+  });
+  return filas;
+}
+
+function csvEscape(v) {
+  const s = String(v ?? "");
+  if (/[",\n]/.test(s)) {
+    return `"${s.replace(/"/g, "\"\"")}"`;
+  }
+  return s;
+}
+
+async function exportarConExcelXLSX(filas, dias) {
+  if (!window.ExcelJS || typeof window.ExcelJS.Workbook !== "function") {
+    return false;
+  }
+
+  const wb = new window.ExcelJS.Workbook();
+  wb.creator = "Victory Pro Fitness";
+  wb.created = new Date();
+  const ws = wb.addWorksheet("Historial Ventas", {
+    views: [{ state: "frozen", ySplit: 4 }]
+  });
+
+  const cols = [
+    { header: "Folio", key: "folio", width: 22 },
+    { header: "Fecha", key: "fecha_hora", width: 20 },
+    { header: "Usuario", key: "usuario", width: 16 },
+    { header: "Referencia", key: "referencia", width: 34 },
+    { header: "Producto", key: "producto", width: 24 },
+    { header: "Cantidad", key: "cantidad", width: 10 },
+    { header: "Precio", key: "precio_unitario", width: 14 },
+    { header: "Subtotal", key: "subtotal", width: 14 },
+    { header: "Total Venta", key: "total_venta", width: 14 },
+    { header: "Pago", key: "pago", width: 14 },
+    { header: "Cambio", key: "cambio", width: 14 }
+  ];
+  ws.columns = cols;
+
+  ws.mergeCells("A1:K1");
+  ws.getCell("A1").value = "Historial de Ventas";
+  ws.getCell("A1").font = { name: "Calibri", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+  ws.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF202020" } };
+  ws.getCell("A1").alignment = { horizontal: "left", vertical: "middle" };
+  ws.getRow(1).height = 24;
+
+  ws.mergeCells("A2:K2");
+  ws.getCell("A2").value = `Rango exportado: ultimos ${dias} dia(s) | Generado: ${hoy()} ${horaActual()}`;
+  ws.getCell("A2").font = { name: "Calibri", size: 10, color: { argb: "FF666666" } };
+  ws.getCell("A2").alignment = { horizontal: "left", vertical: "middle" };
+  ws.getRow(2).height = 18;
+
+  cols.forEach((col, idx) => {
+    const c = ws.getCell(4, idx + 1);
+    c.value = col.header;
+    c.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3722C" } };
+    c.alignment = { horizontal: "center", vertical: "middle" };
+    c.border = {
+      top: { style: "thin", color: { argb: "FFD8D8D8" } },
+      left: { style: "thin", color: { argb: "FFD8D8D8" } },
+      bottom: { style: "thin", color: { argb: "FFD8D8D8" } },
+      right: { style: "thin", color: { argb: "FFD8D8D8" } }
+    };
+  });
+  ws.getRow(4).height = 20;
+  ws.autoFilter = "A4:K4";
+
+  filas.forEach((f, i) => {
+    const rowIndex = i + 5;
+    ws.addRow({
+      folio: String(f.folio ?? ""),
+      fecha_hora: `${String(f.fecha ?? "")} ${String(f.hora ?? "")}`.trim(),
+      usuario: String(f.usuario ?? ""),
+      referencia: String(f.referencia ?? ""),
+      producto: String(f.producto ?? ""),
+      cantidad: aNumero(f.cantidad),
+      precio_unitario: aNumero(f.precio_unitario),
+      subtotal: aNumero(f.subtotal),
+      total_venta: aNumero(f.total_venta),
+      pago: aNumero(f.pago),
+      cambio: aNumero(f.cambio)
+    });
+
+    const zebra = i % 2 === 0 ? "FFF8F8F8" : "FFFFFFFF";
+    for (let col = 1; col <= 11; col += 1) {
+      const cell = ws.getCell(rowIndex, col);
+      cell.font = { name: "Calibri", size: 10, color: { argb: "FF202020" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: zebra } };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFE6E6E6" } },
+        left: { style: "thin", color: { argb: "FFE6E6E6" } },
+        bottom: { style: "thin", color: { argb: "FFE6E6E6" } },
+        right: { style: "thin", color: { argb: "FFE6E6E6" } }
+      };
+      if (col === 6) {
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      } else if (col >= 7) {
+        cell.alignment = { horizontal: "right", vertical: "middle" };
+      } else {
+        cell.alignment = { horizontal: "left", vertical: "middle" };
+      }
+    }
+
+    ws.getCell(rowIndex, 7).numFmt = '"$"#,##0.00';
+    ws.getCell(rowIndex, 8).numFmt = '"$"#,##0.00';
+    ws.getCell(rowIndex, 9).numFmt = '"$"#,##0.00';
+    ws.getCell(rowIndex, 10).numFmt = '"$"#,##0.00';
+    ws.getCell(rowIndex, 11).numFmt = '"$"#,##0.00';
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob(
+    [buf],
+    { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+  );
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `historial_ventas_${dias}dias_${hoy()}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return true;
+}
+
+async function exportarExcel() {
+  const dias = await solicitarDiasExportacion("Excel");
+  if (!dias) return;
+
+  const data = filtrarPorDias(ventasFiltradas, dias);
+  const filas = filasExportacion(data);
+  if (!filas.length) {
+    alert("No hay ventas para exportar en ese rango.");
+    return;
+  }
+
+  if (await exportarConExcelXLSX(filas, dias)) {
+    return;
+  }
+
+  const headers = [
+    "folio",
+    "fecha",
+    "hora",
+    "usuario",
+    "referencia",
+    "producto",
+    "cantidad",
+    "precio_unitario",
+    "subtotal",
+    "total_venta",
+    "pago",
+    "cambio"
+  ];
+
+  const lines = [headers.join(",")];
+  filas.forEach(f => {
+    lines.push(headers.map(k => csvEscape(f[k])).join(","));
+  });
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `historial_ventas_${dias}dias_${hoy()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function imprimirHTMLComoPDF(html) {
+  const frame = document.createElement("iframe");
+  frame.style.position = "fixed";
+  frame.style.right = "0";
+  frame.style.bottom = "0";
+  frame.style.width = "0";
+  frame.style.height = "0";
+  frame.style.border = "0";
+  frame.style.visibility = "hidden";
+  frame.setAttribute("aria-hidden", "true");
+  document.body.appendChild(frame);
+
+  const limpiar = () => {
+    setTimeout(() => {
+      try { frame.remove(); } catch {}
+    }, 1200);
+  };
+
+  frame.onload = () => {
+    try {
+      const w = frame.contentWindow;
+      if (!w) {
+        limpiar();
+        return;
+      }
+
+      w.onafterprint = limpiar;
+      w.focus();
+      w.print();
+
+      // fallback si afterprint no dispara
+      setTimeout(limpiar, 2500);
+    } catch (e) {
+      console.error("[VENTAS] Error imprimiendo PDF:", e);
+      limpiar();
+    }
+  };
+
+  frame.srcdoc = html;
+}
+
+function exportarConJsPDF(filas, dias) {
+  const jsPdfApi = window.jspdf;
+  if (!jsPdfApi || typeof jsPdfApi.jsPDF !== "function") {
+    return false;
+  }
+
+  const doc = new jsPdfApi.jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4"
+  });
+
+  const colorNaranja = [243, 114, 44];
+  const colorTexto = [32, 32, 32];
+
+  doc.setTextColor(...colorTexto);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Historial de Ventas", 10, 12);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Rango: ultimos ${dias} dia(s)`, 10, 18);
+  doc.text(`Generado: ${hoy()} ${horaActual()}`, 10, 23);
+
+  const head = [[
+    "Folio",
+    "Fecha/Hora",
+    "Usuario",
+    "Referencia",
+    "Producto",
+    "Cant.",
+    "Precio",
+    "Subtotal",
+    "Total",
+    "Pago",
+    "Cambio"
+  ]];
+
+  const body = filas.map(f => [
+    String(f.folio ?? ""),
+    `${String(f.fecha ?? "")} ${String(f.hora ?? "")}`.trim(),
+    String(f.usuario ?? ""),
+    String(f.referencia ?? ""),
+    String(f.producto ?? ""),
+    String(f.cantidad ?? ""),
+    fmtMoney(f.precio_unitario),
+    fmtMoney(f.subtotal),
+    fmtMoney(f.total_venta),
+    fmtMoney(f.pago),
+    fmtMoney(f.cambio)
+  ]);
+
+  if (typeof doc.autoTable === "function") {
+    doc.autoTable({
+      startY: 27,
+      head,
+      body,
+      styles: {
+        font: "helvetica",
+        fontSize: 8,
+        textColor: colorTexto,
+        lineColor: [220, 220, 220],
+        lineWidth: 0.1,
+        cellPadding: 1.6,
+        overflow: "linebreak"
+      },
+      headStyles: {
+        fillColor: colorNaranja,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        halign: "center"
+      },
+      alternateRowStyles: {
+        fillColor: [248, 248, 248]
+      },
+      margin: { left: 8, right: 8, top: 6, bottom: 8 },
+      columnStyles: {
+        0: { cellWidth: 34 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 34 },
+        4: { cellWidth: 32 },
+        5: { cellWidth: 10, halign: "center" },
+        6: { cellWidth: 16, halign: "right" },
+        7: { cellWidth: 16, halign: "right" },
+        8: { cellWidth: 16, halign: "right" },
+        9: { cellWidth: 16, halign: "right" },
+        10: { cellWidth: 16, halign: "right" }
+      }
+    });
+  } else {
+    let y = 30;
+    doc.setFontSize(8);
+    body.forEach(row => {
+      const linea = row.join(" | ");
+      doc.text(linea.slice(0, 240), 10, y);
+      y += 5;
+      if (y > 190) {
+        doc.addPage();
+        y = 15;
+      }
+    });
+  }
+
+  doc.save(`historial_ventas_${dias}dias_${hoy()}.pdf`);
+  return true;
+}
+
+async function exportarPDF() {
+  const dias = await solicitarDiasExportacion("PDF");
+  if (!dias) return;
+
+  const data = filtrarPorDias(ventasFiltradas, dias);
+  const filas = filasExportacion(data);
+  if (!filas.length) {
+    alert("No hay ventas para exportar en ese rango.");
+    return;
+  }
+
+  if (exportarConJsPDF(filas, dias)) {
+    return;
+  }
+
+  const filasHTML = filas.map(f => [
+    "<tr>",
+    `<td>${escapeHTML(f.folio)}</td>`,
+    `<td>${escapeHTML(f.fecha)} ${escapeHTML(f.hora)}</td>`,
+    `<td>${escapeHTML(f.usuario)}</td>`,
+    `<td>${escapeHTML(f.referencia)}</td>`,
+    `<td>${escapeHTML(f.producto)}</td>`,
+    `<td>${escapeHTML(f.cantidad)}</td>`,
+    `<td>${escapeHTML(fmtMoney(f.precio_unitario))}</td>`,
+    `<td>${escapeHTML(fmtMoney(f.subtotal))}</td>`,
+    `<td>${escapeHTML(fmtMoney(f.total_venta))}</td>`,
+    "</tr>"
+  ].join("")).join("");
+
+  const html = [
+    "<!DOCTYPE html>",
+    "<html lang='es'>",
+    "<head>",
+    "<meta charset='UTF-8'>",
+    "<title>Historial de Ventas</title>",
+    "<style>",
+    "@page { size: A4 landscape; margin: 10mm; }",
+    "body { font-family: Arial, sans-serif; margin: 20px; color: #111; }",
+    "h1 { margin: 0 0 10px 0; font-size: 22px; }",
+    "p { margin: 0 0 16px 0; color: #555; }",
+    "table { width: 100%; border-collapse: collapse; font-size: 11px; }",
+    "th, td { border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }",
+    "th { background: #f0f0f0; }",
+    "</style>",
+    "</head>",
+    "<body>",
+    "<h1>Historial de Ventas</h1>",
+    `<p>Rango exportado: últimos ${dias} día(s). Generado: ${escapeHTML(hoy())} ${escapeHTML(horaActual())}</p>`,
+    "<table>",
+    "<thead>",
+    "<tr>",
+    "<th>Folio</th>",
+    "<th>Fecha/Hora</th>",
+    "<th>Usuario</th>",
+    "<th>Referencia</th>",
+    "<th>Producto</th>",
+    "<th>Cantidad</th>",
+    "<th>Precio</th>",
+    "<th>Subtotal</th>",
+    "<th>Total Venta</th>",
+    "</tr>",
+    "</thead>",
+    `<tbody>${filasHTML}</tbody>`,
+    "</table>",
+    "</" + "body>",
+    "</" + "html>"
+  ].join("");
+
+  imprimirHTMLComoPDF(html);
+}
+</script>
+
+</body>
+</html>
