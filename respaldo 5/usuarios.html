@@ -15,7 +15,7 @@
   <script src="js/nfc.js"></script>
   <script src="js/realtime.js"></script>
 
-  <!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+  <!-- ===== ADAPTACION SOLO TAMANO MOVIL ===== -->
   <style>
   @media (max-width:768px){
 
@@ -94,21 +94,6 @@
       padding:30px 20px;
     }
 
-    .header-brand{flex-direction:column;gap:14px;padding:18px;text-align:center;}
-    .brand{flex-direction:column;gap:8px;}
-    .brand img{height:70px;}
-    .brand h2{font-size:20px;}
-    header button{width:100%;margin-left:0;}
-    .card.usuarios-pc{grid-template-columns:1fr !important;padding:28px 20px;gap:20px;}
-    .usuarios-col input,.usuarios-col select{height:46px;font-size:15px;}
-    .usuarios-col button{width:100%;margin-top:10px;height:46px;font-size:15px;}
-    #buscador{width:92%;}
-    #buscador input{height:46px;font-size:15px;}
-    .historial-container{width:92%;}
-    .cliente{padding:16px;}
-    .cliente h3{font-size:18px;}
-    .confirmacion .box{width:92%;padding:40px 20px;}
-    .popup{width:92%;padding:30px 20px;}
   }
   </style>
 </head>
@@ -180,20 +165,10 @@
 
 <script>
 /* ================= CONFIG ================= */
-const CLAVE_MAESTRA = "victory(profitness)";
 let tarjetaUID = null;
 
 /* ================= INIT ================= */
 function initUsuarios() {
-  if (!verificarSesion()) return;
-
-  const s = obtenerSesion();
-  const s = getSession(); // 🔥 CORREGIDO
-  if (!["admin","superadmin"].includes(s.rol)) {
-    location.href = "index.html";
-    return;
-  }
-
   iniciarSyncUsuarios();
   renderUsuarios();
 }
@@ -219,18 +194,20 @@ function iniciarSyncUsuarios() {
 /* ================= VOLVER ================= */
 function volver() {
   location.href = "index.html";
+}
+
 /* ================= NFC ================= */
 async function uidYaRegistrada(uid) {
+  uid = normalizarUID(uid);
 
   const empleados = obtenerEmpleados();
-  if (empleados.some(e => e.tarjetaUID === uid)) return true;
+  if (empleados.some(e => normalizarUID(e.tarjetaUID) === uid)) return true;
 
   if (navigator.onLine && window.supabaseClient) {
-
     const { data } = await supabaseClient
       .from("empleados")
       .select("id")
-      .eq("tarjeta_uid", uid)
+      .ilike("tarjeta_uid", uid)
       .maybeSingle();
 
     if (data) return true;
@@ -239,21 +216,18 @@ async function uidYaRegistrada(uid) {
   return false;
 }
 
-/* ================= NFC ================= */
 function asignarTarjeta() {
   tarjetaUID = null;
   btnRegistrar.disabled = true;
 
   overlay.style.display = "flex";
   estado.className = "estado amarillo";
-  estado.textContent = "Esperando tarjeta…";
+  estado.textContent = "Esperando tarjeta...";
   uidTexto.textContent = "";
 
   iniciarNFCControlado({
-    onUID: uid => {
-      if (uidYaRegistrada(uid)) {
     onUID: async uid => {
-
+      uid = normalizarUID(uid);
       if (await uidYaRegistrada(uid)) {
         estado.className = "estado rojo";
         estado.textContent = "Tarjeta ya registrada";
@@ -282,24 +256,10 @@ function cerrarPopup() {
 /* ================= REGISTRO ================= */
 function pedirClaveRegistro() {
   if (!tarjetaUID) return alert("Asigne una tarjeta primero");
-
-  mostrarConfirm(
-    "Acceso administrativo",
-    "Ingrese la contraseña maestra",
-    `
-      <input id="claveInput" type="password">
-      <button onclick="confirmarRegistro()">Confirmar</button>
-      <button onclick="cerrarConfirm()">Cancelar</button>
-    `
-  );
+  registrarUsuario();
 }
 
 function confirmarRegistro() {
-  if (claveInput.value !== CLAVE_MAESTRA) {
-    alert("Contraseña incorrecta");
-    return;
-  }
-  cerrarConfirm();
   registrarUsuario();
 }
 
@@ -328,7 +288,7 @@ function registrarUsuario() {
     accion: "add",
     data: nuevo
   });
-  // 🔥 AHORA TAMBIÉN GUARDA EN SUPABASE
+  // Ahora tambien guarda en Supabase
   if (typeof insertarEmpleadoSupabase === "function") {
     insertarEmpleadoSupabase(nuevo);
   }
@@ -382,10 +342,9 @@ function cerrarConfirm() {
   confirmacion.style.display = "none";
 }
 
-function volver() {
-  location.href = "index.html";
-}
 </script>
 
 </body>
 </html>
+
+
