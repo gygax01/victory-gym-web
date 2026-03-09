@@ -145,6 +145,9 @@
     <button onclick="abrirModalHistorialVentas()" style="opacity:.85">
       Historial de Ventas
     </button>
+    <button onclick="abrirModalCorte()" style="opacity:.85">
+      Corte
+    </button>
     <button onclick="location.href='index.html'">← Inicio</button>
   </div>
 </header>
@@ -359,6 +362,11 @@ function abrirModalHistorialVentas() {
   abrirModalMaster();
 }
 
+function abrirModalCorte() {
+  accionMaster = "corte";
+  abrirModalMaster();
+}
+
 function solicitarAltaProducto() {
   accionMaster = "nuevo";
   abrirModalMaster();
@@ -392,6 +400,11 @@ function confirmarMaster() {
 
   if (accionMaster === "historial_ventas") {
     location.href = "historialventas.html?v=20260302";
+    return;
+  }
+
+  if (accionMaster === "corte") {
+    location.href = "corte.html";
     return;
   }
 
