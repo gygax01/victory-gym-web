@@ -6,49 +6,105 @@
 <title>Membresías</title>
 <link rel="stylesheet" href="css/styles.css">
 
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-@media (max-width: 768px){
-  .header-brand{
+@media (max-width: 768px) {
+  .header-brand {
     flex-direction: column;
     gap: 14px;
     padding: 18px;
-    text-align:center;
+    text-align: center;
   }
-  .brand{
+
+  .brand {
     flex-direction: column;
     gap: 8px;
   }
-  .brand img{
+
+  .brand img {
     height: 70px;
   }
-  .brand h2{
+
+  .brand h2 {
     font-size: 20px;
   }
-  header button{
+
+  header button {
     width: 100%;
     margin-left: 0;
   }
-  .historial-container{
-    width: 94%;
+
+  .search-bar {
+    width: 92%;
   }
-  .cliente{
-    padding: 16px;
-  }
-  .cliente h3{
-    font-size: 20px;
-  }
-  .cliente p{
-    font-size: 14px;
-  }
-  .cliente button{
-    width: 100%;
-    margin-top: 10px;
-    padding: 14px;
+
+  .search-bar input {
+    height: 46px;
     font-size: 15px;
   }
+
+  .historial-container {
+    width: 94%;
+  }
+
+  .cliente {
+    padding: 16px;
+  }
+
+  .cliente h3 {
+    font-size: 20px;
+  }
+
+  .meta {
+    font-size: 13px;
+  }
+
+  .flecha {
+    font-size: 20px;
+  }
+}
+
+.membresia-panel {
+  padding-top: 12px;
+}
+
+.membresia-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(243, 114, 44, 0.25);
+}
+
+.membresia-btn {
+  margin: 0;
+  background: #3f4147;
+}
+
+.membresia-btn:hover {
+  background: #4a4d55;
+}
+
+.dias-custom {
+  width: 100%;
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #3f4147;
+  color: #fff;
+  text-align: center;
+}
+
+.dias-custom:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(243, 114, 44, 0.45);
+}
+
+.dias-custom,
+.btn-custom {
+  grid-column: 1 / -1;
 }
 </style>
 </head>
@@ -57,58 +113,43 @@
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
     <h2>Membresías</h2>
   </div>
   <button onclick="location.href='index.html'">← Inicio</button>
 </header>
 
+<div class="search-bar">
+  <input id="busqueda" placeholder="Buscar cliente...">
+</div>
+
 <div class="historial-container" id="listaMembresias"></div>
 
-<!-- JS BASE (NO TOCAR) -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
-
-/* =====================================================
-   ================= VARIABLES DOM ======================
-===================================================== */
 const listaMembresias = document.getElementById("listaMembresias");
+const busqueda = document.getElementById("busqueda");
 
-/* =====================================================
-   ================= INIT PRINCIPAL =====================
-   Se ejecuta cuando carga la página
-===================================================== */
+let clientesBase = [];
+
 window.addEventListener("load", initMembresias);
 
 async function initMembresias() {
+  busqueda.addEventListener("input", filtrarClientes);
 
-  // 🔐 Validar sesión
-  if (!verificarSesion()) return;
-
-  // 🔥 Siempre intentar traer datos reales primero
   await sincronizarDesdeSupabase();
-
-  // 🎨 Pintar tarjetas
-  renderMembresias();
-
-  // 🔄 Activar sincronización entre pestañas
+  cargarMembresias();
   activarSyncLocal();
 
-  // 🔴 Activar realtime si existe
   if (navigator.onLine && typeof iniciarRealtime === "function") {
     iniciarRealtime();
   }
 }
 
-/* =====================================================
-   =========== SINCRONIZAR DESDE SUPABASE ==============
-   Trae clientes reales y actualiza cache local
-===================================================== */
 async function sincronizarDesdeSupabase() {
-
   if (!navigator.onLine || !window.supabaseClient) return;
 
   const { data, error } = await supabaseClient
@@ -121,58 +162,166 @@ async function sincronizarDesdeSupabase() {
     return;
   }
 
-  // Guardamos copia local para cache
-  safeSet("clientes", data || []);
+  const clientesNormalizados = (data || []).map(c => ({
+    id: c.id,
+    nombre: c.nombre ?? "",
+    tarjetaUID: normalizarUidLocal(c.tarjeta_uid ?? c.tarjetaUID ?? ""),
+    fechaRegistro: c.fecha_registro ?? c.fechaRegistro ?? "",
+    membresiaExpira: c.membresia_expira ?? c.membresiaExpira ?? "",
+    telefono: c.telefono ?? "0",
+    peso: c.peso ?? 0,
+    altura: c.altura ?? 0
+  }));
+
+  safeSet("clientes", clientesNormalizados);
 }
 
-/* =====================================================
-   ================== RENDER UI =========================
-===================================================== */
-function renderMembresias() {
+function normalizarUidLocal(uid) {
+  if (typeof normalizarUID === "function") {
+    return normalizarUID(uid);
+  }
+  return String(uid ?? "").trim().toUpperCase();
+}
 
-  const clientes = (safeGet("clientes") || [])
-    .filter(c => c && typeof c.nombre === "string");
+function normalizarTexto(texto) {
+  return String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
 
+function escapeHTML(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function normalizarClienteMembresia(c) {
+  return {
+    id: c.id ?? null,
+    nombre: c.nombre ?? "",
+    membresiaExpira: c.membresiaExpira ?? c.membresia_expira ?? "—"
+  };
+}
+
+function cargarMembresias() {
+  clientesBase = (safeGet("clientes") || [])
+    .filter(c => c && typeof c.nombre === "string")
+    .map(normalizarClienteMembresia)
+    .sort((a, b) =>
+      a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" })
+    );
+
+  filtrarClientes();
+}
+
+function filtrarClientes() {
+  const q = normalizarTexto(busqueda.value);
+  const filtrados = clientesBase.filter(c =>
+    normalizarTexto(c.nombre).includes(q)
+  );
+  renderMembresias(filtrados);
+}
+
+function renderMembresias(lista) {
   listaMembresias.innerHTML = "";
 
-  if (!clientes.length) {
+  if (!lista.length) {
     listaMembresias.textContent = "No hay clientes registrados";
     return;
   }
 
-  clientes.forEach(cliente => {
+  lista.forEach(cliente => {
+    const nombre = escapeHTML(cliente.nombre);
+    const expira = escapeHTML(cliente.membresiaExpira || "—");
 
     const card = document.createElement("div");
     card.className = "cliente";
 
     card.innerHTML = `
-      <h3>${cliente.nombre}</h3>
-      <p>Expira: ${cliente.membresia_expira ?? "—"}</p>
-      <button>+7 días</button>
-      <button>+30 días</button>
+      <div class="cliente-header" aria-expanded="false">
+        <div class="info-wrapper">
+          <div class="info-bloque">
+            <h3>${nombre}</h3>
+            <div class="meta">
+              <span class="racha actual">Expira: ${expira}</span>
+            </div>
+          </div>
+        </div>
+        <div class="flecha">▾</div>
+      </div>
+
+      <div class="historial membresia-panel">
+        <div class="membresia-grid">
+          <button type="button" class="membresia-btn btn-plus7">+7 días</button>
+          <button type="button" class="membresia-btn btn-plus30">+30 días</button>
+          <input
+            class="dias-custom"
+            type="number"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            placeholder="Días personalizados"
+          >
+          <button type="button" class="membresia-btn btn-custom">Aplicar días</button>
+        </div>
+      </div>
     `;
 
-    const botones = card.querySelectorAll("button");
+    const header = card.querySelector(".cliente-header");
+    const panel = card.querySelector(".historial");
+    const inputDias = card.querySelector(".dias-custom");
+    const btnPlus7 = card.querySelector(".btn-plus7");
+    const btnPlus30 = card.querySelector(".btn-plus30");
+    const btnCustom = card.querySelector(".btn-custom");
 
-    botones[0].onclick = () => extenderMembresia(cliente.id, 7);
-    botones[1].onclick = () => extenderMembresia(cliente.id, 30);
+    header.addEventListener("click", () => {
+      document.querySelectorAll(".cliente.abierto").forEach(actual => {
+        if (actual !== card) {
+          actual.classList.remove("abierto");
+          actual.querySelector(".historial")?.classList.remove("abierto");
+          actual.querySelector(".cliente-header")?.setAttribute("aria-expanded", "false");
+        }
+      });
+
+      const abierto = card.classList.toggle("abierto");
+      panel.classList.toggle("abierto");
+      header.setAttribute("aria-expanded", abierto ? "true" : "false");
+    });
+
+    inputDias.addEventListener("input", () => {
+      inputDias.value = inputDias.value.replace(/[^0-9]/g, "");
+    });
+
+    btnPlus7.addEventListener("click", () => extenderMembresia(cliente.id, 7));
+    btnPlus30.addEventListener("click", () => extenderMembresia(cliente.id, 30));
+    btnCustom.addEventListener("click", () => {
+      const dias = Number(inputDias.value);
+      if (!Number.isInteger(dias) || dias <= 0) {
+        alert("Ingrese solo números mayores a 0");
+        return;
+      }
+      extenderMembresia(cliente.id, dias);
+    });
 
     listaMembresias.appendChild(card);
   });
 }
 
-/* =====================================================
-   ============ EXTENDER MEMBRESÍA ======================
-   Supabase-first real
-===================================================== */
 async function extenderMembresia(idCliente, dias) {
+  if (!idCliente) {
+    alert("Cliente sin ID válido");
+    return;
+  }
 
-  if (!navigator.onLine) {
+  if (!navigator.onLine || !window.supabaseClient) {
     alert("Sin conexión a internet");
     return;
   }
 
-  // 🔎 Obtener fecha actual real desde Supabase
   const { data, error: fetchError } = await supabaseClient
     .from("clientes")
     .select("membresia_expira")
@@ -184,13 +333,20 @@ async function extenderMembresia(idCliente, dias) {
     return;
   }
 
-  // 📅 Calcular nueva fecha
-  const base = new Date(data.membresia_expira || new Date());
+  const hoyLocal = new Date();
+  hoyLocal.setHours(0, 0, 0, 0);
+
+  const base = data.membresia_expira
+    ? new Date(data.membresia_expira + "T00:00:00")
+    : new Date(hoyLocal);
+
+  if (base < hoyLocal) {
+    base.setTime(hoyLocal.getTime());
+  }
   base.setDate(base.getDate() + dias);
 
-  const nuevaFecha = base.toISOString().split("T")[0];
+  const nuevaFecha = fechaDesdeTS(base.getTime());
 
-  // 🔥 Actualizar en Supabase
   const { error } = await supabaseClient
     .from("clientes")
     .update({ membresia_expira: nuevaFecha })
@@ -201,36 +357,33 @@ async function extenderMembresia(idCliente, dias) {
     return;
   }
 
-  // 🔄 Volver a sincronizar
   await sincronizarDesdeSupabase();
-
-  // 🔄 Refrescar UI
-  renderMembresias();
-
-  // 🔄 Avisar a otras pestañas
+  cargarMembresias();
   new BroadcastChannel("victory-data").postMessage("clientes");
 }
 
-/* =====================================================
-   ============== SINCRONIZACIÓN LOCAL ==================
-===================================================== */
 function activarSyncLocal() {
-
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = async e => {
     if (e.data === "clientes") {
       await sincronizarDesdeSupabase();
-      renderMembresias();
+      cargarMembresias();
     }
   };
 
+  window.addEventListener("storage", async e => {
+    if (e.key === "clientes") {
+      await sincronizarDesdeSupabase();
+      cargarMembresias();
+    }
+  });
+
   window.addEventListener("online", async () => {
     await sincronizarDesdeSupabase();
-    renderMembresias();
+    cargarMembresias();
   });
 }
-
 </script>
 
 </body>
