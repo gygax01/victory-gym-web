@@ -6,7 +6,7 @@
 <title>Historial</title>
 <link rel="stylesheet" href="css/styles.css">
 
-<!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
+<!-- ===== ADAPTACION SOLO TAMANO MOVIL ===== -->
 <style>
 @media (max-width: 768px){
 
@@ -101,14 +101,14 @@
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 
-<!-- ✅ SUPABASE (ESTO FALTABA) -->
+<!-- SUPABASE -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <!-- CREA window.supabaseClient -->
 <script src="js/realtime.js"></script>
 
 <script>
-/* ================= ALIAS CRÍTICOS ================= */
+/* ================= ALIAS CRITICOS ================= */
 function obtenerClientes() {
   return safeGet("clientes");
 }
@@ -129,7 +129,6 @@ let asistencias = [];
 window.addEventListener("load", initHistorial);
 
 async function initHistorial() {
-  if (!verificarSesion()) return;
 
   busqueda.addEventListener("input", filtrar);
 
@@ -139,9 +138,9 @@ async function initHistorial() {
     cargado = await cargarAsistenciasDesdeSupabase();
   }
 
-  // 🔥 Si Supabase falló, usar cache local
+  // Si Supabase falla, usar cache local
   if (!cargado) {
-    console.warn("⚠️ Usando datos locales");
+    console.warn("Usando datos locales");
   }
 
   cargarHistorial();
@@ -149,7 +148,7 @@ async function initHistorial() {
 }
 
 
-/* ================= SUPABASE → ASISTENCIAS ================= */
+/* ================= SUPABASE -> ASISTENCIAS ================= */
 async function cargarAsistenciasDesdeSupabase() {
   const { data, error } = await supabaseClient
     .from("attendance")
@@ -157,7 +156,7 @@ async function cargarAsistenciasDesdeSupabase() {
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("❌ Error cargando asistencias:", error);
+    console.error("Error cargando asistencias:", error);
     return false;
   }
 
@@ -167,30 +166,35 @@ async function cargarAsistenciasDesdeSupabase() {
   const abiertas = {};
 
   data.forEach(row => {
-    const uid = row.uid;
+    const key = row.cliente_id || row.uid;
+
+    const ts = new Date(row.created_at).getTime();
+    if (!ts) return;
 
     if (row.type === "entrada") {
-      abiertas[uid] = {
+      abiertas[key] = {
         id: row.id,
-        tarjetaUID: uid,
-        fecha: new Date(row.created_at).toISOString().split("T")[0],
-        entrada_ts: new Date(row.created_at).getTime(),
+        cliente_id: row.cliente_id ?? null,
+        tarjetaUID: normalizarUID(row.uid),
+        fecha: fechaDesdeTS(ts),
+        entrada_ts: ts,
         salida_ts: null
       };
     }
 
-    if (row.type === "salida" && abiertas[uid]) {
-      abiertas[uid].salida_ts = new Date(row.created_at).getTime();
-      sesiones.push(abiertas[uid]);
-      delete abiertas[uid];
+    if (row.type === "salida" && abiertas[key]) {
+      abiertas[key].salida_ts = ts;
+      sesiones.push(abiertas[key]);
+      delete abiertas[key];
     }
   });
+  Object.values(abiertas).forEach(s => sesiones.push(s));
   sesiones.sort((a, b) => b.entrada_ts - a.entrada_ts);
   safeSet("asistencias", sesiones);
   return true;
 }
 
-/* ================= SINCRONIZACIÓN ================= */
+/* ================= SINCRONIZACION ================= */
 function iniciarSyncHistorial() {
   const bc = new BroadcastChannel("victory-data");
 
@@ -211,17 +215,32 @@ function diasEntre(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
 }
 
-function ultimaVisita(uid) {
-  return asistencias
-    .filter(a => a.tarjetaUID === uid)
+function normalizarClienteHistorial(c) {
+  return {
+    ...c,
+    id: c.id,
+    nombre: c.nombre,
+    tarjetaUID: c.tarjetaUID ?? c.tarjeta_uid ?? ""
+  };
+}
+
+function registrosCliente(c) {
+  return asistencias.filter(a =>
+    (c.id && a.cliente_id && a.cliente_id === c.id) ||
+    (!a.cliente_id && c.tarjetaUID && a.tarjetaUID === c.tarjetaUID)
+  );
+}
+
+function ultimaVisita(cliente) {
+  return registrosCliente(cliente)
     .map(a => a.fecha)
     .sort()
     .reverse()[0] ?? "—";
 }
 
-function calcularRachas(uid) {
+function calcularRachas(cliente) {
   const fechas = [...new Set(
-    asistencias.filter(a => a.tarjetaUID === uid).map(a => a.fecha)
+    registrosCliente(cliente).map(a => a.fecha)
   )].sort();
 
   let max = 0, actual = 0, temp = fechas.length ? 1 : 0;
@@ -243,21 +262,19 @@ function calcularRachas(uid) {
 
 function horaLocalDesdeTS(ts) {
   if (!ts) return "-";
-  return new Date(ts).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  });
+  return horaDesdeTS(ts) || "-";
 }
 
 /* ================= CARGA ================= */
 function cargarHistorial() {
-  clientes = obtenerClientes().filter(c => c && typeof c.nombre === "string");
+  clientes = obtenerClientes()
+    .map(normalizarClienteHistorial)
+    .filter(c => c && typeof c.nombre === "string");
   asistencias = obtenerAsistencias();
 
   clientes.sort((a, b) =>
-    ultimaVisita(b.tarjetaUID)
-      .localeCompare(ultimaVisita(a.tarjetaUID))
+    ultimaVisita(b)
+      .localeCompare(ultimaVisita(a))
   );
 
   render(clientes);
@@ -273,11 +290,10 @@ function render(lista) {
   }
 
   lista.forEach(c => {
-    const registros = asistencias
-      .filter(a => a.tarjetaUID === c.tarjetaUID)
+    const registros = registrosCliente(c)
       .sort((a, b) => b.fecha.localeCompare(a.fecha));
 
-    const { actual, max } = calcularRachas(c.tarjetaUID);
+    const { actual, max } = calcularRachas(c);
 
     const card = document.createElement("div");
     card.className = "cliente";
@@ -352,6 +368,7 @@ function filtrar() {
 
 </body>
 </html>
+
 
 
 
