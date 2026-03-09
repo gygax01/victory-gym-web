@@ -237,12 +237,13 @@ btnNFC.onclick = () => {
 
   iniciarNFCControlado({
     onUID: async uid => {
+      uid = normalizarUID(uid);
 
       clearTimeout(timeoutNFC);
 
       const empleados = obtenerEmpleados();
 
-      const emp = empleados.find(e => e.tarjetaUID === uid);
+      const emp = empleados.find(e => normalizarUID(e.tarjetaUID) === uid);
 
       if (!emp) {
         estadoNFC.className = "estado rojo";
