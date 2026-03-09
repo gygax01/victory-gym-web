@@ -52,24 +52,8 @@ function formatearHoraTS(ts) {
 
   if (!ts) return "-";
 
-  let fecha;
-
-  if (typeof ts === "number") {
-    fecha = new Date(ts);
-  } else if (typeof ts === "string") {
-    fecha = new Date(ts);
-  } else {
-    return "-";
-  }
-
-  if (isNaN(fecha.getTime())) return "-";
-
-  return fecha.toLocaleTimeString("es-MX", {
-    timeZone: "America/Mexico_City",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  });
+  const h = horaDesdeTS(ts);
+  return h || "-";
 }
 
 /* ======================================================
