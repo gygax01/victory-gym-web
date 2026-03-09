@@ -6,11 +6,42 @@
 <title>Historial de Stock</title>
 <link rel="stylesheet" href="css/styles.css">
 
-<!-- SUPABASE (ESTA ES LA BUENA) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
 <style>
+.filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.filtros-grid input,
+.filtros-grid select {
+  width: 100%;
+  margin: 0;
+  background: #3a3a3a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+}
+
+.export-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.export-actions button {
+  margin: 0;
+}
+
+.meta-extra {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
 @media (max-width: 768px){
 
   .header-brand{
@@ -80,6 +111,13 @@
     padding: 8px 6px;
   }
 
+  .filtros-grid{
+    grid-template-columns: 1fr;
+  }
+
+  .export-actions{
+    flex-direction: column;
+  }
 }
 </style>
 
@@ -98,38 +136,67 @@
   </button>
 </header>
 
-<!-- ===== BUSCADOR ===== -->
 <div class="search-bar">
   <input
     id="buscadorHistorial"
-    placeholder="Buscar por fecha, usuario o producto..."
+    placeholder="Buscar por folio, referencia, usuario o producto..."
   >
 </div>
 
-<!-- ===== HISTORIAL ===== -->
+<div class="search-bar">
+  <div class="filtros-grid">
+    <input id="filtroFechaDesde" type="date" title="Fecha desde">
+    <input id="filtroFechaHasta" type="date" title="Fecha hasta">
+    <input id="filtroProducto" placeholder="Producto...">
+    <select id="filtroUsuario">
+      <option value="">Todos los usuarios</option>
+    </select>
+    <select id="filtroTipo">
+      <option value="">Todos los tipos</option>
+      <option value="alta">Alta de producto</option>
+      <option value="nombre">Cambio de nombre</option>
+      <option value="stock">Cambio de stock</option>
+      <option value="stock_minimo">Cambio de stock mínimo</option>
+      <option value="precio">Cambio de precio</option>
+    </select>
+  </div>
+</div>
+
+<div class="search-bar export-actions">
+  <button id="btnExportCSV" type="button">Exportar CSV</button>
+  <button id="btnExportPDF" type="button">Exportar PDF</button>
+</div>
+
 <div class="historial-container" id="contenedorHistorial"></div>
 
-<!-- CORE -->
 <script src="js/auth.js"></script>
+<script src="js/storage.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
-/* ================= STATE ================= */
 let historial = [];
 let historialFiltrado = [];
 
-/* ================= INIT ================= */
-async function initHistorialStock() {
-  if (!verificarSesion()) return;
+const ETIQUETAS_CAMPO = {
+  nombre: "Nombre",
+  stock: "Stock",
+  stock_minimo: "Stock mínimo",
+  precio: "Precio"
+};
 
-  document
-    .getElementById("buscadorHistorial")
-    .addEventListener("input", filtrarHistorial);
+async function initHistorialStock() {
+  document.getElementById("buscadorHistorial").addEventListener("input", aplicarFiltros);
+  document.getElementById("filtroFechaDesde").addEventListener("change", aplicarFiltros);
+  document.getElementById("filtroFechaHasta").addEventListener("change", aplicarFiltros);
+  document.getElementById("filtroProducto").addEventListener("input", aplicarFiltros);
+  document.getElementById("filtroUsuario").addEventListener("change", aplicarFiltros);
+  document.getElementById("filtroTipo").addEventListener("change", aplicarFiltros);
+  document.getElementById("btnExportCSV").addEventListener("click", exportarCSV);
+  document.getElementById("btnExportPDF").addEventListener("click", exportarPDF);
 
   await cargarHistorial();
 }
 
-/* ================= DATA ================= */
 async function cargarHistorial() {
   const { data, error } = await supabaseClient
     .from("historial_stock")
@@ -142,88 +209,256 @@ async function cargarHistorial() {
   }
 
   historial = data || [];
-  historialFiltrado = [...historial];
+  cargarUsuariosFiltro();
+  aplicarFiltros();
+}
+
+function normalizarTexto(t) {
+  return String(t ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function escapeHTML(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function aNumero(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function fmtMoney(v) {
+  const n = aNumero(v);
+  return n === null ? "-" : `$${n.toFixed(2)}`;
+}
+
+function fmtEntero(v) {
+  const n = aNumero(v);
+  return n === null ? "-" : String(n);
+}
+
+function diffNumerico(antes, despues, decimales = 0) {
+  if (antes === null || despues === null) return "";
+  const d = despues - antes;
+  if (d === 0) return "";
+  const color = d > 0 ? "#4caf50" : "#f44336";
+  const valor = decimales > 0 ? d.toFixed(decimales) : String(d);
+  const prefijo = d > 0 ? "+" : "";
+  return ` <span style="color:${color}">(${prefijo}${valor})</span>`;
+}
+
+function fechaEvento(h) {
+  return h.ts ? fechaDesdeTS(h.ts) : String(h.fecha || "");
+}
+
+function horaEvento(h) {
+  return h.ts ? horaDesdeTS(h.ts) : String(h.hora || "");
+}
+
+function usuarioEvento(h) {
+  const raw = String(h.usuario || "").trim();
+  if (!raw) return "Admin";
+  if (normalizarTexto(raw) === "sistema") return "Admin";
+  if (normalizarTexto(raw) === "admin") return "Admin";
+  return raw;
+}
+
+function folioEvento(h) {
+  const directo = String(h.folio || "").trim();
+  if (directo) return directo.toUpperCase();
+  const desdeCambios = String(h.cambios?.[0]?._folio || "").trim();
+  if (desdeCambios) return desdeCambios.toUpperCase();
+  const fallback = String(h.id || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8);
+  return fallback ? `STK-${fallback}` : "STK-SIN-FOLIO";
+}
+
+function referenciaEvento(h) {
+  const directo = String(h.referencia || "").trim();
+  if (directo) return directo;
+  const desdeCambios = String(h.cambios?.[0]?._referencia || "").trim();
+  return desdeCambios || "Sin referencia";
+}
+
+function esAlta(cambio) {
+  const antes = cambio?.antes;
+  const despues = cambio?.despues;
+  const sinAntes = !antes || Object.keys(antes).length === 0;
+  const conDespues = !!despues && Object.keys(despues).length > 0;
+  return sinAntes && conDespues;
+}
+
+function camposCambiados(cambio) {
+  const antes = cambio?.antes || {};
+  const despues = cambio?.despues || {};
+  const campos = [];
+
+  if ((antes.nombre ?? "") !== (despues.nombre ?? "")) campos.push("nombre");
+  if (aNumero(antes.stock) !== aNumero(despues.stock)) campos.push("stock");
+  if (aNumero(antes.stock_minimo) !== aNumero(despues.stock_minimo)) campos.push("stock_minimo");
+  if (aNumero(antes.precio) !== aNumero(despues.precio)) campos.push("precio");
+
+  return campos;
+}
+
+function tiposEvento(h) {
+  const tipos = new Set();
+  (h.cambios || []).forEach(c => {
+    if (esAlta(c)) tipos.add("alta");
+    camposCambiados(c).forEach(x => tipos.add(x));
+  });
+  return tipos;
+}
+
+function productosEvento(h) {
+  const lista = (h.cambios || []).map(c =>
+    String(c?.despues?.nombre || c?.antes?.nombre || c?.nombre || "").trim()
+  ).filter(Boolean);
+  return [...new Set(lista)];
+}
+
+function cargarUsuariosFiltro() {
+  const select = document.getElementById("filtroUsuario");
+  const actual = select.value;
+  const usuarios = [...new Set(historial.map(usuarioEvento))]
+    .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+
+  select.innerHTML = `<option value="">Todos los usuarios</option>`;
+  usuarios.forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = u;
+    opt.textContent = u;
+    select.appendChild(opt);
+  });
+
+  if (usuarios.includes(actual)) {
+    select.value = actual;
+  }
+}
+
+function aplicarFiltros() {
+  const q = normalizarTexto(document.getElementById("buscadorHistorial").value);
+  const fechaDesde = document.getElementById("filtroFechaDesde").value;
+  const fechaHasta = document.getElementById("filtroFechaHasta").value;
+  const productoQ = normalizarTexto(document.getElementById("filtroProducto").value);
+  const usuarioQ = document.getElementById("filtroUsuario").value;
+  const tipoQ = document.getElementById("filtroTipo").value;
+
+  historialFiltrado = historial.filter(h => {
+    const fecha = fechaEvento(h);
+    const hora = horaEvento(h);
+    const usuario = usuarioEvento(h);
+    const folio = folioEvento(h);
+    const referencia = referenciaEvento(h);
+    const productos = productosEvento(h);
+    const tipos = tiposEvento(h);
+
+    if (fechaDesde && fecha && fecha < fechaDesde) return false;
+    if (fechaHasta && fecha && fecha > fechaHasta) return false;
+
+    if (productoQ) {
+      const okProducto = productos.some(p => normalizarTexto(p).includes(productoQ));
+      if (!okProducto) return false;
+    }
+
+    if (usuarioQ && usuario !== usuarioQ) return false;
+    if (tipoQ && !tipos.has(tipoQ)) return false;
+
+    if (q) {
+      const texto = normalizarTexto([
+        fecha,
+        hora,
+        usuario,
+        folio,
+        referencia,
+        productos.join(" "),
+        [...tipos].join(" "),
+        JSON.stringify(h.cambios || [])
+      ].join(" "));
+
+      if (!texto.includes(q)) return false;
+    }
+
+    return true;
+  });
+
   renderHistorial();
 }
 
-/* ================= RENDER ================= */
-function renderHistorial() {
-  const cont = document.getElementById("contenedorHistorial");
-  cont.innerHTML = "";
-
-  if (!historialFiltrado.length) {
-    cont.innerHTML = "<p style='text-align:center'>No hay registros</p>";
-    return;
-  }
-
-  historialFiltrado.forEach(h => {
-    const card = document.createElement("div");
-    card.className = "cliente";
-
-    card.innerHTML = `
-      <div class="cliente-header">
-        <div class="info-wrapper">
-          <div class="info-bloque">
-            <h3>${h.fecha}</h3>
-            <div class="racha">
-              ${h.hora} · ${h.usuario} (${h.rol})
-            </div>
-          </div>
-        </div>
-        <div class="flecha">▾</div>
-      </div>
-
-      <div class="historial">
-        ${renderTablaCambios(h.cambios)}
-      </div>
-    `;
-
-    const header = card.querySelector(".cliente-header");
-    const body = card.querySelector(".historial");
-
-    header.onclick = () => {
-      card.classList.toggle("abierto");
-      body.classList.toggle("abierto");
-    };
-
-    cont.appendChild(card);
-  });
+function valorCampo(obj, campo) {
+  const src = obj || {};
+  if (campo === "nombre") return String(src.nombre ?? "-");
+  if (campo === "stock") return fmtEntero(src.stock);
+  if (campo === "stock_minimo") return fmtEntero(src.stock_minimo);
+  if (campo === "precio") return fmtMoney(src.precio);
+  return "-";
 }
 
-/* ================= TABLA ================= */
+function detalleCampoDespues(cambio, campo) {
+  const antes = cambio?.antes || {};
+  const despues = cambio?.despues || {};
+  const base = escapeHTML(valorCampo(despues, campo));
+
+  if (campo === "stock") {
+    return `${base}${diffNumerico(aNumero(antes.stock), aNumero(despues.stock))}`;
+  }
+  if (campo === "stock_minimo") {
+    return `${base}${diffNumerico(aNumero(antes.stock_minimo), aNumero(despues.stock_minimo))}`;
+  }
+  if (campo === "precio") {
+    return `${base}${diffNumerico(aNumero(antes.precio), aNumero(despues.precio), 2)}`;
+  }
+  return base;
+}
+
+function renderDetalleAntes(cambio, campos) {
+  if (esAlta(cambio)) return "Sin registro previo";
+  if (!campos.length) return "Sin cambios";
+  return campos
+    .map(campo => `${ETIQUETAS_CAMPO[campo]}: ${escapeHTML(valorCampo(cambio?.antes, campo))}`)
+    .join("<br>");
+}
+
+function renderDetalleDespues(cambio, campos) {
+  if (esAlta(cambio)) {
+    const camposAlta = ["nombre", "stock", "stock_minimo", "precio"];
+    return camposAlta
+      .map(campo => `${ETIQUETAS_CAMPO[campo]}: ${escapeHTML(valorCampo(cambio?.despues, campo))}`)
+      .join("<br>");
+  }
+  if (!campos.length) return "Sin cambios";
+  return campos
+    .map(campo => `${ETIQUETAS_CAMPO[campo]}: ${detalleCampoDespues(cambio, campo)}`)
+    .join("<br>");
+}
+
 function renderTablaCambios(cambios = []) {
   if (!cambios.length) return "<p>Sin cambios</p>";
 
   let rows = "";
 
   cambios.forEach(c => {
-    const antes = c.antes || {};
-    const despues = c.despues || {};
-
-    const stockAntes = antes.stock ?? "-";
-    const stockDespues = despues.stock ?? "-";
-
-    let diff = "";
-    if (typeof stockAntes === "number" && typeof stockDespues === "number") {
-      const d = stockDespues - stockAntes;
-      if (d !== 0) {
-        diff = d > 0
-          ? `<span style="color:#4caf50"> (+${d})</span>`
-          : `<span style="color:#f44336"> (${d})</span>`;
-      }
-    }
+    const campos = camposCambiados(c);
+    const titulo = String(c?.despues?.nombre || c?.antes?.nombre || c?.nombre || "-");
+    const tipoTexto = esAlta(c)
+      ? "Alta"
+      : (campos.map(x => ETIQUETAS_CAMPO[x]).join(", ") || "Sin cambios");
 
     rows += `
       <tr>
-        <td><b>${c.nombre}</b></td>
         <td>
-          Stock: ${stockAntes}<br>
-          Precio: $${antes.precio?.toFixed(2) ?? "-"}
+          <b>${escapeHTML(titulo)}</b>
+          <div class="small">Tipo: ${escapeHTML(tipoTexto)}</div>
         </td>
-        <td>
-          Stock: ${stockDespues}${diff}<br>
-          Precio: $${despues.precio?.toFixed(2) ?? "-"}
-        </td>
+        <td>${renderDetalleAntes(c, campos)}</td>
+        <td>${renderDetalleDespues(c, campos)}</td>
       </tr>
     `;
   });
@@ -242,17 +477,251 @@ function renderTablaCambios(cambios = []) {
   `;
 }
 
-/* ================= FILTRO ================= */
-function filtrarHistorial(e) {
-  const q = e.target.value.toLowerCase();
+function renderHistorial() {
+  const cont = document.getElementById("contenedorHistorial");
+  cont.innerHTML = "";
 
-  historialFiltrado = historial.filter(h =>
-    h.fecha.toLowerCase().includes(q) ||
-    h.usuario.toLowerCase().includes(q) ||
-    JSON.stringify(h.cambios).toLowerCase().includes(q)
-  );
+  if (!historialFiltrado.length) {
+    cont.innerHTML = "<p style='text-align:center'>No hay registros</p>";
+    return;
+  }
 
-  renderHistorial();
+  historialFiltrado.forEach(h => {
+    const fechaMostrar = fechaEvento(h) || "-";
+    const horaMostrar = horaEvento(h) || "-";
+    const usuarioMostrar = usuarioEvento(h);
+    const folio = folioEvento(h);
+    const referencia = referenciaEvento(h);
+
+    const card = document.createElement("div");
+    card.className = "cliente";
+    card.innerHTML = `
+      <div class="cliente-header" aria-expanded="false">
+        <div class="info-wrapper">
+          <div class="info-bloque">
+            <h3>${escapeHTML(fechaMostrar)}</h3>
+            <div class="racha">${escapeHTML(horaMostrar)} · ${escapeHTML(usuarioMostrar)}</div>
+            <div class="meta meta-extra">Folio: ${escapeHTML(folio)} · Ref: ${escapeHTML(referencia)}</div>
+          </div>
+        </div>
+        <div class="flecha">▾</div>
+      </div>
+
+      <div class="historial">
+        ${renderTablaCambios(h.cambios)}
+      </div>
+    `;
+
+    const header = card.querySelector(".cliente-header");
+    const body = card.querySelector(".historial");
+
+    header.onclick = () => {
+      const abrirActual = !card.classList.contains("abierto");
+
+      document
+        .querySelectorAll("#contenedorHistorial .cliente.abierto")
+        .forEach(abierto => {
+          if (abierto !== card) {
+            abierto.classList.remove("abierto");
+            abierto.querySelector(".historial")?.classList.remove("abierto");
+            abierto.querySelector(".cliente-header")?.setAttribute("aria-expanded", "false");
+          }
+        });
+
+      card.classList.toggle("abierto", abrirActual);
+      body.classList.toggle("abierto", abrirActual);
+      header.setAttribute("aria-expanded", abrirActual ? "true" : "false");
+    };
+
+    cont.appendChild(card);
+  });
+}
+
+function filasExportacion(data) {
+  const filas = [];
+
+  data.forEach(h => {
+    const fecha = fechaEvento(h) || "";
+    const hora = horaEvento(h) || "";
+    const usuario = usuarioEvento(h);
+    const folio = folioEvento(h);
+    const referencia = referenciaEvento(h);
+
+    (h.cambios || []).forEach(c => {
+      const nombre = String(c?.despues?.nombre || c?.antes?.nombre || c?.nombre || "-");
+      const campos = camposCambiados(c);
+
+      if (esAlta(c)) {
+        ["nombre", "stock", "stock_minimo", "precio"].forEach(campo => {
+          filas.push({
+            folio,
+            fecha,
+            hora,
+            usuario,
+            referencia,
+            producto: nombre,
+            tipo: "alta",
+            campo: ETIQUETAS_CAMPO[campo],
+            antes: "-",
+            despues: valorCampo(c.despues, campo),
+            diferencia: "-"
+          });
+        });
+        return;
+      }
+
+      campos.forEach(campo => {
+        const antesVal = valorCampo(c.antes, campo);
+        const despuesVal = valorCampo(c.despues, campo);
+        let diferencia = "-";
+
+        if (campo === "stock") {
+          const d = aNumero(c?.despues?.stock) - aNumero(c?.antes?.stock);
+          diferencia = Number.isFinite(d) ? String(d) : "-";
+        } else if (campo === "stock_minimo") {
+          const d = aNumero(c?.despues?.stock_minimo) - aNumero(c?.antes?.stock_minimo);
+          diferencia = Number.isFinite(d) ? String(d) : "-";
+        } else if (campo === "precio") {
+          const d = aNumero(c?.despues?.precio) - aNumero(c?.antes?.precio);
+          diferencia = Number.isFinite(d) ? d.toFixed(2) : "-";
+        }
+
+        filas.push({
+          folio,
+          fecha,
+          hora,
+          usuario,
+          referencia,
+          producto: nombre,
+          tipo: campo,
+          campo: ETIQUETAS_CAMPO[campo],
+          antes: antesVal,
+          despues: despuesVal,
+          diferencia
+        });
+      });
+    });
+  });
+
+  return filas;
+}
+
+function csvEscape(v) {
+  const s = String(v ?? "");
+  if (/[",\n]/.test(s)) {
+    return `"${s.replace(/"/g, "\"\"")}"`;
+  }
+  return s;
+}
+
+function exportarCSV() {
+  const filas = filasExportacion(historialFiltrado);
+  if (!filas.length) {
+    alert("No hay datos para exportar.");
+    return;
+  }
+
+  const headers = [
+    "folio",
+    "fecha",
+    "hora",
+    "usuario",
+    "referencia",
+    "producto",
+    "tipo",
+    "campo",
+    "antes",
+    "despues",
+    "diferencia"
+  ];
+
+  const lines = [headers.join(",")];
+  filas.forEach(f => {
+    lines.push(headers.map(k => csvEscape(f[k])).join(","));
+  });
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `historial_stock_${hoy()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportarPDF() {
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("El navegador bloqueó la ventana. Habilita popups para exportar PDF.");
+    return;
+  }
+
+  const filas = filasExportacion(historialFiltrado);
+  if (!filas.length) {
+    alert("No hay datos para exportar.");
+    win.close();
+    return;
+  }
+
+  const filasHTML = filas.map(f => [
+    "<tr>",
+    `<td>${escapeHTML(f.folio)}</td>`,
+    `<td>${escapeHTML(f.fecha)} ${escapeHTML(f.hora)}</td>`,
+    `<td>${escapeHTML(f.usuario)}</td>`,
+    `<td>${escapeHTML(f.referencia)}</td>`,
+    `<td>${escapeHTML(f.producto)}</td>`,
+    `<td>${escapeHTML(f.campo)}</td>`,
+    `<td>${escapeHTML(String(f.antes))}</td>`,
+    `<td>${escapeHTML(String(f.despues))}</td>`,
+    `<td>${escapeHTML(String(f.diferencia))}</td>`,
+    "</tr>"
+  ].join("")).join("");
+
+  const html = [
+    "<!DOCTYPE html>",
+    "<html lang='es'>",
+    "<head>",
+    "<meta charset='UTF-8'>",
+    "<title>Historial de Stock</title>",
+    "<style>",
+    "body { font-family: Arial, sans-serif; margin: 20px; color: #111; }",
+    "h1 { margin: 0 0 10px 0; font-size: 22px; }",
+    "p { margin: 0 0 16px 0; color: #555; }",
+    "table { width: 100%; border-collapse: collapse; font-size: 12px; }",
+    "th, td { border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }",
+    "th { background: #f0f0f0; }",
+    "</style>",
+    "</head>",
+    "<body>",
+    "<h1>Historial de Stock</h1>",
+    `<p>Generado: ${escapeHTML(hoy())} ${escapeHTML(horaActual())}</p>`,
+    "<table>",
+    "<thead>",
+    "<tr>",
+    "<th>Folio</th>",
+    "<th>Fecha/Hora</th>",
+    "<th>Usuario</th>",
+    "<th>Referencia</th>",
+    "<th>Producto</th>",
+    "<th>Campo</th>",
+    "<th>Antes</th>",
+    "<th>Después</th>",
+    "<th>Diferencia</th>",
+    "</tr>",
+    "</thead>",
+    `<tbody>${filasHTML}</tbody>`,
+    "</table>",
+    "</" + "body>",
+    "</" + "html>"
+  ].join("");
+
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
 }
 </script>
 
