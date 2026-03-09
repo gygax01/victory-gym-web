@@ -69,7 +69,7 @@
   text-align:center;
 }
 
-/* ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== */
+/* ===== ADAPTACION SOLO TAMANO MOVIL ===== */
 @media(max-width:768px){
 
   header{
@@ -187,7 +187,6 @@ function registrarVenta(){}
 
 /* ================= INIT ================= */
 function initPOS(){
-  if (!verificarSesion()) return;
   cargarProductos();
   iniciarSyncPOS();
 }
@@ -253,12 +252,23 @@ function cancelar(){
 }
 
 /* ================= COBRAR ================= */
-function cobrar(){
+async function cobrar(){
   if (!carrito.length) return alert("Carrito vacío");
 
   const totalVenta = Number(total.innerText);
   const paga = Number(pago.value);
   if (paga < totalVenta) return alert("Pago insuficiente");
+
+  const referenciaRaw = prompt(
+    "Referencia de venta (ticket/nota). Ej: Mostrador #A-120"
+  );
+  if (referenciaRaw === null) return;
+
+  const referencia = String(referenciaRaw).trim();
+  if (referencia.length < 3) {
+    alert("La referencia es obligatoria (mínimo 3 caracteres).");
+    return;
+  }
 
   cobrando = true;
 
@@ -266,10 +276,21 @@ function cobrar(){
 
   const conteo = {};
   carrito.forEach(id => conteo[id] = (conteo[id] || 0) + 1);
+  const itemsVenta = [];
 
   Object.keys(conteo).forEach(id => {
     const p = stock.find(x => x.id === id);
     if (!p) return;
+
+    const cantidad = conteo[id];
+    const precioUnitario = Number(p.precio) || 0;
+    itemsVenta.push({
+      producto_id: p.id,
+      nombre: p.nombre,
+      cantidad,
+      precio_unitario: precioUnitario,
+      subtotal: Number((precioUnitario * cantidad).toFixed(2))
+    });
 
     p.stock -= conteo[id];
 
@@ -283,8 +304,23 @@ function cobrar(){
   safeSet("productos", stock);
   new BroadcastChannel("victory-data").postMessage("productos");
 
-  cambio.innerText = (paga - totalVenta).toFixed(2);
+  const cambioVenta = Number((paga - totalVenta).toFixed(2));
+  cambio.innerText = cambioVenta.toFixed(2);
   overlay.style.display = "flex";
+
+  if (typeof pushHistorialVenta === "function") {
+    await pushHistorialVenta(
+      {
+        total: Number(totalVenta.toFixed(2)),
+        pago: Number(paga.toFixed(2)),
+        cambio: cambioVenta,
+        items: itemsVenta
+      },
+      {
+        referencia
+      }
+    );
+  }
 
   setTimeout(() => {
     cobrando = false;
@@ -295,3 +331,4 @@ function cobrar(){
 
 </body>
 </html>
+
