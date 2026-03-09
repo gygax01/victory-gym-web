@@ -16,6 +16,10 @@ window.supabaseClient = supabaseClient;
 
 const bc = new BroadcastChannel("victory-data");
 let realtimeChannel = null;
+const AUTO_CIERRE_LAST_OK_KEY = "auto_cierre_last_ok_date";
+const AUTO_CIERRE_SEGUNDO = 2;
+let autoCierreTimer = null;
+let autoCierreEnProceso = false;
 
 async function logEstadoSupabase() {
   if (!navigator.onLine) {
@@ -292,8 +296,55 @@ function cierreDiaISODesdeTS(ts) {
   return cierreLocal.toISOString();
 }
 
+function yaSeEjecutoAutoCierreHoy() {
+  return localStorage.getItem(AUTO_CIERRE_LAST_OK_KEY) === hoy();
+}
+
+function marcarAutoCierreHoy() {
+  localStorage.setItem(AUTO_CIERRE_LAST_OK_KEY, hoy());
+}
+
+function msHastaProximoAutoCierre() {
+  const ahora = new Date();
+  const proximo = new Date(
+    ahora.getFullYear(),
+    ahora.getMonth(),
+    ahora.getDate() + 1,
+    0, 0, AUTO_CIERRE_SEGUNDO, 0
+  );
+  return Math.max(1000, proximo.getTime() - ahora.getTime());
+}
+
+function programarAutoCierreDiario() {
+  if (autoCierreTimer) clearTimeout(autoCierreTimer);
+
+  const esperaMs = msHastaProximoAutoCierre();
+  autoCierreTimer = setTimeout(async () => {
+    await ejecutarAutoCierreConControl({ force: true, motivo: "scheduler_00_00" });
+    programarAutoCierreDiario();
+  }, esperaMs);
+}
+
+async function ejecutarAutoCierreConControl({ force = false, motivo = "manual" } = {}) {
+  if (autoCierreEnProceso) return false;
+  if (!force && yaSeEjecutoAutoCierreHoy()) return true;
+
+  autoCierreEnProceso = true;
+  try {
+    const ok = await autocerrarAsistenciasPendientes();
+    if (ok) {
+      marcarAutoCierreHoy();
+      console.info(`[AUTO-CIERRE] Ejecutado (${motivo})`);
+      await reconstruirAsistenciasHoy();
+    }
+    return ok;
+  } finally {
+    autoCierreEnProceso = false;
+  }
+}
+
 async function autocerrarAsistenciasPendientes() {
-  if (!navigator.onLine || !window.supabaseClient) return;
+  if (!navigator.onLine || !window.supabaseClient) return false;
 
   const { inicioISO } = rangoHoyISO();
 
@@ -305,7 +356,7 @@ async function autocerrarAsistenciasPendientes() {
 
   if (error) {
     console.error("[AUTO-CIERRE] Error leyendo attendance:", error);
-    return;
+    return false;
   }
 
   const abiertas = {};
@@ -339,7 +390,7 @@ async function autocerrarAsistenciasPendientes() {
 
   if (!cierres.length) {
     console.info("[AUTO-CIERRE] Sin asistencias pendientes por cerrar");
-    return;
+    return true;
   }
 
   const { error: insertError } = await supabaseClient
@@ -348,10 +399,11 @@ async function autocerrarAsistenciasPendientes() {
 
   if (insertError) {
     console.error("[AUTO-CIERRE] Error insertando cierres:", insertError);
-    return;
+    return false;
   }
 
   console.info(`[AUTO-CIERRE] Cierres automaticos generados: ${cierres.length}`);
+  return true;
 }
 
 /* ======================================================
@@ -360,6 +412,7 @@ async function autocerrarAsistenciasPendientes() {
 
 window.addEventListener("load", () => {
   logEstadoSupabase();
+  programarAutoCierreDiario();
 
   if (navigator.onLine) {
     cargarProductosIniciales();
@@ -368,16 +421,14 @@ window.addEventListener("load", () => {
     iniciarRealtimeClientes();
 
     iniciarRealtimeAttendance();
-    autocerrarAsistenciasPendientes().then(() => {
-      reconstruirAsistenciasHoy();
-    });
+    ejecutarAutoCierreConControl({ force: false, motivo: "load" });
   }
 });
 
 window.addEventListener("online", () => {
   console.info("[APP] Conexion restablecida");
   logEstadoSupabase();
-  autocerrarAsistenciasPendientes();
+  ejecutarAutoCierreConControl({ force: false, motivo: "online" });
 });
 
 window.addEventListener("offline", () => {
