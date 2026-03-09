@@ -17,6 +17,28 @@ window.supabaseClient = supabaseClient;
 const bc = new BroadcastChannel("victory-data");
 let realtimeChannel = null;
 
+async function logEstadoSupabase() {
+  if (!navigator.onLine) {
+    console.warn("[SUPABASE] Offline: no se puede validar conexion");
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from("productos")
+      .select("id", { count: "exact", head: true });
+
+    if (error) {
+      console.error("[SUPABASE] Conexion con error:", error.message || error);
+      return;
+    }
+
+    console.info("[SUPABASE] Conexion OK");
+  } catch (err) {
+    console.error("[SUPABASE] Error de red/SDK:", err);
+  }
+}
+
 /* ======================================================
    ===== PRODUCTOS (NO TOCAR) ===========================
 ====================================================== */
@@ -27,13 +49,13 @@ async function cargarProductosIniciales() {
     .select("*");
 
   if (error) {
-    console.error("❌ Error carga inicial:", error);
+    console.error("[PRODUCTOS] Error carga inicial:", error);
     return;
   }
 
   localStorage.setItem("productos", JSON.stringify(data || []));
   bc.postMessage("productos");
-  console.log("✅ Productos iniciales:", data.length);
+  console.log("[PRODUCTOS] Productos iniciales:", data.length);
 }
 
 async function actualizarStockSupabase(id, nuevoStock) {
@@ -43,7 +65,7 @@ async function actualizarStockSupabase(id, nuevoStock) {
     .eq("id", id);
 
   if (error) {
-    console.error("❌ Error update stock:", error);
+    console.error("[PRODUCTOS] Error update stock:", error);
     return false;
   }
   return true;
@@ -54,7 +76,7 @@ async function insertarProductoSupabase(prod) {
     .from("productos")
     .insert(prod);
 
-  if (error) console.error("❌ Error insert:", error);
+  if (error) console.error("[PRODUCTOS] Error insert:", error);
 }
 
 async function borrarProductoSupabase(id) {
@@ -63,7 +85,7 @@ async function borrarProductoSupabase(id) {
     .delete()
     .eq("id", id);
 
-  if (error) console.error("❌ Error delete:", error);
+  if (error) console.error("[PRODUCTOS] Error delete:", error);
 }
 
 function iniciarRealtime() {
@@ -92,7 +114,7 @@ function iniciarRealtime() {
       }
     )
     .subscribe(() => {
-      console.log("✅ Realtime productos activo");
+      console.log("[PRODUCTOS] Realtime activo");
     });
 }
 
@@ -106,22 +128,25 @@ async function cargarClientesIniciales() {
     .select("*");
 
   if (error) {
-    console.error("❌ Error carga clientes:", error);
+    console.error("[CLIENTES] Error carga inicial:", error);
     return;
   }
 
   const clientesNormalizados = (data || []).map(c => ({
     id: c.id,
     nombre: c.nombre,
-    tarjetaUID: c.tarjeta_uid,
+    tarjetaUID: normalizarUID(c.tarjeta_uid),
     fechaRegistro: c.fecha_registro,
-    membresiaExpira: c.membresia_expira
+    membresiaExpira: c.membresia_expira,
+    telefono: c.telefono ?? "0",
+    peso: c.peso ?? 0,
+    altura: c.altura ?? 0
   }));
 
   localStorage.setItem("clientes", JSON.stringify(clientesNormalizados));
   bc.postMessage("clientes");
 
-  console.log("✅ Clientes cargados:", clientesNormalizados.length);
+  console.log("[CLIENTES] Clientes cargados:", clientesNormalizados.length);
 }
 
 function iniciarRealtimeClientes() {
@@ -137,9 +162,12 @@ function iniciarRealtimeClientes() {
           const nuevo = {
             id: payload.new.id,
             nombre: payload.new.nombre,
-            tarjetaUID: payload.new.tarjeta_uid,
+            tarjetaUID: normalizarUID(payload.new.tarjeta_uid),
             fechaRegistro: payload.new.fecha_registro,
-            membresiaExpira: payload.new.membresia_expira
+            membresiaExpira: payload.new.membresia_expira,
+            telefono: payload.new.telefono ?? "0",
+            peso: payload.new.peso ?? 0,
+            altura: payload.new.altura ?? 0
           };
 
           const i = clientes.findIndex(c => c.id === nuevo.id);
@@ -156,7 +184,7 @@ function iniciarRealtimeClientes() {
       }
     )
     .subscribe(() => {
-      console.log("📡 Realtime clientes activo");
+      console.log("[CLIENTES] Realtime activo");
     });
 }
 
@@ -165,16 +193,17 @@ function iniciarRealtimeClientes() {
 ====================================================== */
 async function reconstruirAsistenciasHoy() {
 
-  const hoyFecha = new Date().toISOString().slice(0, 10);
+  const { fechaLocal, inicioISO, finISO } = rangoHoyISO();
 
   const { data, error } = await supabaseClient
     .from("attendance")
     .select("*")
-    .gte("created_at", hoyFecha + "T00:00:00")
+    .gte("created_at", inicioISO)
+    .lt("created_at", finISO)
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("❌ Error cargar attendance:", error);
+    console.error("[ATTENDANCE] Error cargar attendance:", error);
     return;
   }
 
@@ -185,7 +214,7 @@ async function reconstruirAsistenciasHoy() {
 
   for (const e of data) {
 
-    const key = e.cliente_id; // 🔥 CAMBIO CLAVE
+    const key = e.cliente_id; // clave por cliente_id
 
     if (!sesiones[key]) {
       sesiones[key] = [];
@@ -209,7 +238,7 @@ async function reconstruirAsistenciasHoy() {
           id: ev.id,
           cliente_id: clienteId,
           nombre: cliente?.nombre || "Cliente",
-          fecha: hoyFecha,
+          fecha: fechaLocal,
           entrada_ts: new Date(ev.created_at).getTime(),
           salida_ts: null
         };
@@ -245,8 +274,84 @@ function iniciarRealtimeAttendance() {
       }
     )
     .subscribe(() => {
-      console.log("📡 Realtime attendance activo");
+      console.log("[ATTENDANCE] Realtime activo");
     });
+}
+
+function cierreDiaISODesdeTS(ts) {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return null;
+
+  const cierreLocal = new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    23, 59, 59, 999
+  );
+
+  return cierreLocal.toISOString();
+}
+
+async function autocerrarAsistenciasPendientes() {
+  if (!navigator.onLine || !window.supabaseClient) return;
+
+  const { inicioISO } = rangoHoyISO();
+
+  const { data, error } = await supabaseClient
+    .from("attendance")
+    .select("id, uid, created_at, type, cliente_id")
+    .lt("created_at", inicioISO)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[AUTO-CIERRE] Error leyendo attendance:", error);
+    return;
+  }
+
+  const abiertas = {};
+
+  for (const ev of data || []) {
+    const key = ev.cliente_id || ev.uid;
+    if (!abiertas[key]) abiertas[key] = [];
+
+    if (ev.type === "entrada") {
+      abiertas[key].push(ev);
+      continue;
+    }
+
+    if (ev.type === "salida") {
+      if (abiertas[key].length > 0) {
+        abiertas[key].pop();
+      }
+    }
+  }
+
+  const pendientes = Object.values(abiertas).flat();
+  const cierres = pendientes.map(entrada => ({
+    id: crypto.randomUUID(),
+    uid: entrada.uid,
+    created_at: cierreDiaISODesdeTS(new Date(entrada.created_at).getTime()),
+    type: "salida",
+    source: "auto_cierre",
+    device_id: "sistema_nocturno",
+    cliente_id: entrada.cliente_id
+  })).filter(x => !!x.created_at);
+
+  if (!cierres.length) {
+    console.info("[AUTO-CIERRE] Sin asistencias pendientes por cerrar");
+    return;
+  }
+
+  const { error: insertError } = await supabaseClient
+    .from("attendance")
+    .insert(cierres);
+
+  if (insertError) {
+    console.error("[AUTO-CIERRE] Error insertando cierres:", insertError);
+    return;
+  }
+
+  console.info(`[AUTO-CIERRE] Cierres automaticos generados: ${cierres.length}`);
 }
 
 /* ======================================================
@@ -254,6 +359,8 @@ function iniciarRealtimeAttendance() {
 ====================================================== */
 
 window.addEventListener("load", () => {
+  logEstadoSupabase();
+
   if (navigator.onLine) {
     cargarProductosIniciales();
     cargarClientesIniciales();
@@ -261,30 +368,56 @@ window.addEventListener("load", () => {
     iniciarRealtimeClientes();
 
     iniciarRealtimeAttendance();
-    reconstruirAsistenciasHoy();
+    autocerrarAsistenciasPendientes().then(() => {
+      reconstruirAsistenciasHoy();
+    });
   }
+});
+
+window.addEventListener("online", () => {
+  console.info("[APP] Conexion restablecida");
+  logEstadoSupabase();
+  autocerrarAsistenciasPendientes();
+});
+
+window.addEventListener("offline", () => {
+  console.warn("[APP] Sin conexion a internet");
 });
 
 /* ======================================================
    ===== HISTORIAL STOCK (NO TOCAR) =====================
 ====================================================== */
-async function pushHistorialStock(cambios) {
+function generarFolioStock() {
+  const baseFecha = hoy().replace(/-/g, "");
+  const sufijo = Date.now().toString(36).toUpperCase().slice(-4);
+  return `STK-${baseFecha}-${sufijo}`;
+}
+
+function generarFolioVenta() {
+  const baseFecha = hoy().replace(/-/g, "");
+  const sufijo = Date.now().toString(36).toUpperCase().slice(-4);
+  return `VTA-${baseFecha}-${sufijo}`;
+}
+
+async function pushHistorialStock(cambios, meta = {}) {
   try {
-
-    const session = JSON.parse(localStorage.getItem("session")) || {
-      nombre: "admin",
-      rol: "admin"
-    };
-
-    const now = new Date();
+    const folio = String(meta.folio || generarFolioStock()).trim().toUpperCase();
+    const referencia = String(meta.referencia || "").trim().slice(0, 120);
+    const tipoEvento = String(meta.tipo || "edicion_manual").trim();
+    const cambiosConMeta = (Array.isArray(cambios) ? cambios : []).map(c => ({
+      ...c,
+      _folio: folio,
+      _referencia: referencia,
+      _tipo_evento: tipoEvento
+    }));
 
     const payload = {
       id: crypto.randomUUID(),
-      fecha: now.toISOString().slice(0, 10),
-      hora: now.toTimeString().slice(0, 8),
-      usuario: session.nombre,
-      rol: session.rol,
-      cambios: cambios,
+      fecha: hoy(),
+      hora: horaActual(),
+      usuario: "Admin",
+      rol: "admin",
+      cambios: cambiosConMeta,
       ts: Date.now()
     };
 
@@ -293,53 +426,163 @@ async function pushHistorialStock(cambios) {
       .insert(payload);
 
     if (error) {
-      console.error("❌ Error historial stock:", error);
+      console.error("[STOCK] Error historial stock:", error);
     } else {
-      console.log("📝 Historial stock guardado");
+      console.log("[STOCK] Historial stock guardado");
     }
 
   } catch (e) {
-    console.error("❌ Error pushHistorialStock:", e);
+    console.error("[STOCK] Error pushHistorialStock:", e);
   }
+}
+
+function guardarVentaLocal(payload) {
+  try {
+    const key = "historial_ventas_local";
+    const actual = safeGet(key);
+    const idx = actual.findIndex(v => v.id === payload.id);
+    if (idx >= 0) actual[idx] = { ...actual[idx], ...payload };
+    else actual.push(payload);
+    safeSet(key, actual);
+  } catch (e) {
+    console.error("[VENTAS] Error guardando historial local:", e);
+  }
+}
+
+async function pushHistorialVenta(venta, meta = {}) {
+  try {
+    const folio = String(meta.folio || generarFolioVenta()).trim().toUpperCase();
+    const referencia = String(meta.referencia || "").trim().slice(0, 120);
+
+    const payload = {
+      id: crypto.randomUUID(),
+      fecha: hoy(),
+      hora: horaActual(),
+      usuario: "Admin",
+      rol: "admin",
+      folio,
+      referencia,
+      total: Number(venta?.total) || 0,
+      pago: Number(venta?.pago) || 0,
+      cambio: Number(venta?.cambio) || 0,
+      items: Array.isArray(venta?.items) ? venta.items : [],
+      ts: Date.now()
+    };
+
+    // Offline-first real: siempre persiste local antes de remoto.
+    guardarVentaLocal({ ...payload, synced: false });
+
+    const { error } = await supabaseClient
+      .from("historial_ventas")
+      .insert(payload);
+
+    if (error) {
+      console.error("[VENTAS] Error historial ventas remoto:", error);
+      return false;
+    }
+
+    guardarVentaLocal({ ...payload, synced: true });
+    return true;
+  } catch (e) {
+    console.error("[VENTAS] Error pushHistorialVenta:", e);
+    return false;
+  }
+}
+
+function payloadClienteBaseInsert(cliente) {
+  return {
+    id: cliente.id,
+    nombre: cliente.nombre,
+    tarjeta_uid: normalizarUID(cliente.tarjetaUID),
+    fecha_registro: cliente.fechaRegistro ?? hoy(),
+    membresia_expira: cliente.membresiaExpira ?? null
+  };
+}
+
+function payloadClienteBaseUpdate(cliente) {
+  return {
+    nombre: cliente.nombre,
+    tarjeta_uid: normalizarUID(cliente.tarjetaUID),
+    fecha_registro: cliente.fechaRegistro ?? hoy(),
+    membresia_expira: cliente.membresiaExpira ?? null
+  };
+}
+
+function payloadClienteExtendidoInsert(cliente) {
+  return {
+    ...payloadClienteBaseInsert(cliente),
+    telefono: cliente.telefono ?? null,
+    peso: cliente.peso === "" ? null : (cliente.peso ?? null),
+    altura: cliente.altura === "" ? null : (cliente.altura ?? null)
+  };
+}
+
+function payloadClienteExtendidoUpdate(cliente) {
+  return {
+    ...payloadClienteBaseUpdate(cliente),
+    telefono: cliente.telefono ?? null,
+    peso: cliente.peso === "" ? null : (cliente.peso ?? null),
+    altura: cliente.altura === "" ? null : (cliente.altura ?? null)
+  };
+}
+
+function esErrorCamposOpcionalesCliente(error) {
+  const raw = [
+    error?.message || "",
+    error?.details || "",
+    error?.hint || "",
+    error?.code || ""
+  ].join(" ").toLowerCase();
+
+  return /(telefono|peso|altura)/.test(raw) &&
+    /(column|schema cache|could not find|does not exist|pgrst)/.test(raw);
 }
 
 async function insertarClienteSupabase(cliente) {
   if (!navigator.onLine || !window.supabaseClient) return;
 
-  const payload = {
-    id: cliente.id,
-    nombre: cliente.nombre,
-    tarjeta_uid: cliente.tarjetaUID,
-    fecha_registro: cliente.fechaRegistro ?? hoy(),
-    membresia_expira: cliente.membresiaExpira ?? null
-  };
-
-  const { error } = await supabaseClient
+  let { error } = await supabaseClient
     .from("clientes")
-    .insert(payload);
+    .insert(payloadClienteExtendidoInsert(cliente));
+
+  if (error && esErrorCamposOpcionalesCliente(error)) {
+    console.warn("[CLIENTES] Columnas opcionales no disponibles, insertando en modo compatible");
+
+    const retry = await supabaseClient
+      .from("clientes")
+      .insert(payloadClienteBaseInsert(cliente));
+
+    error = retry.error;
+  }
 
   if (error) {
-    console.error("❌ Error insertar cliente:", error);
+    console.error("[CLIENTES] Error insertar cliente:", error);
   } else {
-    console.log("☁️ Cliente insertado en Supabase");
+    console.log("[CLIENTES] Cliente insertado en Supabase");
   }
 }
 
 async function actualizarClienteSupabase(cliente) {
   if (!navigator.onLine || !window.supabaseClient) return;
 
-  const { error } = await supabaseClient
+  let { error } = await supabaseClient
     .from("clientes")
-    .update({
-      nombre: cliente.nombre,
-      tarjeta_uid: cliente.tarjetaUID,
-      fecha_registro: cliente.fechaRegistro,
-      membresia_expira: cliente.membresiaExpira
-    })
+    .update(payloadClienteExtendidoUpdate(cliente))
     .eq("id", cliente.id);
 
+  if (error && esErrorCamposOpcionalesCliente(error)) {
+    console.warn("[CLIENTES] Columnas opcionales no disponibles, actualizando en modo compatible");
+
+    const retry = await supabaseClient
+      .from("clientes")
+      .update(payloadClienteBaseUpdate(cliente))
+      .eq("id", cliente.id);
+
+    error = retry.error;
+  }
+
   if (error) {
-    console.error("❌ Error actualizar cliente:", error);
+    console.error("[CLIENTES] Error actualizar cliente:", error);
   }
 }
 async function borrarClienteSupabase(id) {
@@ -348,11 +591,29 @@ async function borrarClienteSupabase(id) {
   const { error } = await supabaseClient
     .from("clientes")
     .delete()
-    .eq("id", id);   // 🔥 BORRAR POR ID REAL
+    .eq("id", id);   // borrar por id real
 
   if (error) {
-    console.error("❌ Error borrando en Supabase:", error);
+    console.error("[CLIENTES] Error borrando en Supabase:", error);
   } else {
-    console.log("🗑 Cliente borrado en Supabase");
+    console.log("[CLIENTES] Cliente borrado en Supabase");
   }
 }
+
+async function migrarUIDEnAttendance(uidAnterior, uidNuevo) {
+  if (!navigator.onLine || !window.supabaseClient) return;
+  if (!uidAnterior || !uidNuevo || uidAnterior === uidNuevo) return;
+
+  const { error } = await supabaseClient
+    .from("attendance")
+    .update({ uid: uidNuevo })
+    .eq("uid", uidAnterior);
+
+  if (error) {
+    console.error("[ATTENDANCE] Error migrando UID:", error);
+  } else {
+    console.info(`[ATTENDANCE] UID migrado ${uidAnterior} -> ${uidNuevo}`);
+  }
+}
+
+
