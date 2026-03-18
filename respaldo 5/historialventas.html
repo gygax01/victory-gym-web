@@ -773,7 +773,7 @@ async function exportarConExcelXLSX(filas, dias) {
   ws.getRow(1).height = 24;
 
   ws.mergeCells("A2:K2");
-  ws.getCell("A2").value = `Rango exportado: ultimos ${dias} dia(s) | Generado: ${hoy()} ${horaActual()}`;
+  ws.getCell("A2").value = `Rango exportado: últimos ${dias} día(s) | Generado: ${hoy()} ${horaActual()}`;
   ws.getCell("A2").font = { name: "Calibri", size: 10, color: { argb: "FF666666" } };
   ws.getCell("A2").alignment = { horizontal: "left", vertical: "middle" };
   ws.getRow(2).height = 18;
@@ -962,7 +962,7 @@ function exportarConJsPDF(filas, dias) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(`Rango: ultimos ${dias} dia(s)`, 10, 18);
+  doc.text(`Rango: últimos ${dias} día(s)`, 10, 18);
   doc.text(`Generado: ${hoy()} ${horaActual()}`, 10, 23);
 
   const head = [[
