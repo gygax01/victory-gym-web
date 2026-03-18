@@ -132,7 +132,7 @@
   </div>
 
   <button onclick="location.href='stock.html'">
-    â† Volver
+    &larr; Volver
   </button>
 </header>
 
@@ -156,7 +156,7 @@
       <option value="alta">Alta de producto</option>
       <option value="nombre">Cambio de nombre</option>
       <option value="stock">Cambio de stock</option>
-      <option value="stock_minimo">Cambio de stock mÃ­nimo</option>
+      <option value="stock_minimo">Cambio de stock m&iacute;nimo</option>
       <option value="precio">Cambio de precio</option>
     </select>
   </div>
@@ -182,7 +182,7 @@ let historialFiltrado = [];
 const ETIQUETAS_CAMPO = {
   nombre: "Nombre",
   stock: "Stock",
-  stock_minimo: "Stock mÃ­nimo",
+  stock_minimo: "Stock m\u00ednimo",
   precio: "Precio"
 };
 
@@ -471,7 +471,7 @@ function renderTablaCambios(cambios = []) {
         <tr>
           <th>Producto</th>
           <th>Antes</th>
-          <th>DespuÃ©s</th>
+          <th>Despu\u00e9s</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -502,11 +502,11 @@ function renderHistorial() {
         <div class="info-wrapper">
           <div class="info-bloque">
             <h3>${escapeHTML(fechaMostrar)}</h3>
-            <div class="racha">${escapeHTML(horaMostrar)} Â· ${escapeHTML(usuarioMostrar)}</div>
-            <div class="meta meta-extra">Folio: ${escapeHTML(folio)} Â· Ref: ${escapeHTML(referencia)}</div>
+            <div class="racha">${escapeHTML(horaMostrar)} \u00b7 ${escapeHTML(usuarioMostrar)}</div>
+            <div class="meta meta-extra">Folio: ${escapeHTML(folio)} \u00b7 Ref: ${escapeHTML(referencia)}</div>
           </div>
         </div>
-        <div class="flecha">â–¾</div>
+        <div class="flecha">\u25BE</div>
       </div>
 
       <div class="historial">
@@ -709,7 +709,7 @@ async function exportarPDF() {
     "<th>Producto</th>",
     "<th>Campo</th>",
     "<th>Antes</th>",
-    "<th>DespuÃ©s</th>",
+    "<th>Despu\u00e9s</th>",
     "<th>Diferencia</th>",
     "</tr>",
     "</thead>",
