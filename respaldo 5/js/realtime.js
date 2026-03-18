@@ -23,7 +23,7 @@ let autoCierreEnProceso = false;
 
 async function logEstadoSupabase() {
   if (!navigator.onLine) {
-    console.warn("[SUPABASE] Offline: no se puede validar conexion");
+    console.warn("[SUPABASE] Offline: no se puede validar conexión");
     return;
   }
 
@@ -33,11 +33,11 @@ async function logEstadoSupabase() {
       .select("id", { count: "exact", head: true });
 
     if (error) {
-      console.error("[SUPABASE] Conexion con error:", error.message || error);
+      console.error("[SUPABASE] Conexión con error:", error.message || error);
       return;
     }
 
-    console.info("[SUPABASE] Conexion OK");
+    console.info("[SUPABASE] Conexión OK");
   } catch (err) {
     console.error("[SUPABASE] Error de red/SDK:", err);
   }
@@ -421,18 +421,24 @@ window.addEventListener("load", () => {
     iniciarRealtimeClientes();
 
     iniciarRealtimeAttendance();
+    reconstruirAsistenciasHoy().catch(error => {
+      console.error("[ATTENDANCE] Error reconstruyendo al iniciar:", error);
+    });
     ejecutarAutoCierreConControl({ force: false, motivo: "load" });
   }
 });
 
 window.addEventListener("online", () => {
-  console.info("[APP] Conexion restablecida");
+  console.info("[APP] Conexión restablecida");
   logEstadoSupabase();
+  reconstruirAsistenciasHoy().catch(error => {
+    console.error("[ATTENDANCE] Error reconstruyendo en online:", error);
+  });
   ejecutarAutoCierreConControl({ force: false, motivo: "online" });
 });
 
 window.addEventListener("offline", () => {
-  console.warn("[APP] Sin conexion a internet");
+  console.warn("[APP] Sin conexión a internet");
 });
 
 /* ======================================================
@@ -666,5 +672,3 @@ async function migrarUIDEnAttendance(uidAnterior, uidNuevo) {
     console.info(`[ATTENDANCE] UID migrado ${uidAnterior} -> ${uidNuevo}`);
   }
 }
-
-
