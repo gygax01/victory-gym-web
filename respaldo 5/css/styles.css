@@ -504,6 +504,8 @@ tbody tr:hover {
 .estado-sistema {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 18px;
 }
 
@@ -514,6 +516,17 @@ tbody tr:hover {
 
 .estado-sistema .contador strong {
   color: #f3722c;
+}
+
+.estado-sistema .total-ventas {
+  background: #333;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.estado-sistema .total-ventas strong {
+  color: #2ecc71;
 }
 
 .estado-sistema .lector {
@@ -533,6 +546,23 @@ tbody tr:hover {
 
 .estado-sistema .lector.warn {
   color: #f39c12;
+}
+
+.estado-sistema .btn-visita {
+  width: auto;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f3722c;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(243,114,44,.35);
+}
+
+.estado-sistema .btn-visita:hover {
+  background: #ff8a3d;
+  transform: translateY(-1px);
 }
 /* ===== PANEL PRINCIPAL INDEX ===== */
 
