@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Membresías</title>
+<title>Membresias</title>
 <link rel="stylesheet" href="css/styles.css">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -63,6 +63,14 @@
   .flecha {
     font-size: 20px;
   }
+
+  .membresia-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pago-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .membresia-panel {
@@ -71,7 +79,7 @@
 
 .membresia-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   padding-top: 14px;
   border-top: 1px solid rgba(243, 114, 44, 0.25);
@@ -86,25 +94,73 @@
   background: #4a4d55;
 }
 
-.dias-custom {
-  width: 100%;
-  margin: 0;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: #3f4147;
+.membresia-btn.activo {
+  background: #f3722c;
   color: #fff;
+  box-shadow: 0 0 0 2px rgba(243, 114, 44, .4);
+}
+
+.monto-resumen {
+  margin-top: 10px;
+  border: 1px solid rgba(46, 204, 113, .32);
+  background: rgba(46, 204, 113, .12);
+  border-radius: 10px;
+  padding: 10px 12px;
   text-align: center;
+  color: #d8ffe7;
+  font-weight: 600;
 }
 
-.dias-custom:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(243, 114, 44, 0.45);
+.monto-resumen .total-valor {
+  color: #2ecc71;
+  font-size: 23px;
+  margin-left: 6px;
 }
 
-.dias-custom,
-.btn-custom {
-  grid-column: 1 / -1;
+.pago-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.pago-row input {
+  margin: 0;
+  height: 44px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.cambio-valor {
+  margin: 0;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 10px;
+  background: #2f3238;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #d5d9df;
+}
+
+.btn-confirmar {
+  margin-top: 10px;
+  width: 100%;
+  background: #2ecc71;
+  font-weight: 700;
+}
+
+.btn-confirmar:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-confirmar:disabled:hover {
+  background: #2ecc71;
+  transform: none;
+  box-shadow: none;
 }
 </style>
 </head>
@@ -114,7 +170,7 @@
 <header class="header-brand">
   <div class="brand">
     <img src="img/logo.png" alt="Victory Pro Fitness">
-    <h2>Membresías</h2>
+    <h2>Membresias</h2>
   </div>
   <button onclick="location.href='index.html'">← Inicio</button>
 </header>
@@ -127,11 +183,18 @@
 
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/ingresos.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
 const listaMembresias = document.getElementById("listaMembresias");
 const busqueda = document.getElementById("busqueda");
+
+const PRECIO_MENSUALIDAD =
+  typeof getPrecioMembresiaMensual === "function" ? getPrecioMembresiaMensual() : 399;
+const DIAS_POR_MES = window.APP_CONFIG?.membresias?.diasPorMes || 30;
 
 let clientesBase = [];
 
@@ -199,11 +262,15 @@ function escapeHTML(valor) {
     .replace(/'/g, "&#39;");
 }
 
+function fmtMoney(n) {
+  return `$${(Number(n) || 0).toFixed(2)}`;
+}
+
 function normalizarClienteMembresia(c) {
   return {
     id: c.id ?? null,
     nombre: c.nombre ?? "",
-    membresiaExpira: c.membresiaExpira ?? c.membresia_expira ?? "—"
+    membresiaExpira: c.membresiaExpira ?? c.membresia_expira ?? "-"
   };
 }
 
@@ -236,7 +303,7 @@ function renderMembresias(lista) {
 
   lista.forEach(cliente => {
     const nombre = escapeHTML(cliente.nombre);
-    const expira = escapeHTML(cliente.membresiaExpira || "—");
+    const expira = escapeHTML(cliente.membresiaExpira || "-");
 
     const card = document.createElement("div");
     card.className = "cliente";
@@ -256,27 +323,45 @@ function renderMembresias(lista) {
 
       <div class="historial membresia-panel">
         <div class="membresia-grid">
-          <button type="button" class="membresia-btn btn-plus7">+7 días</button>
-          <button type="button" class="membresia-btn btn-plus30">+30 días</button>
-          <input
-            class="dias-custom"
-            type="number"
-            min="1"
-            step="1"
-            inputmode="numeric"
-            placeholder="Días personalizados"
-          >
-          <button type="button" class="membresia-btn btn-custom">Aplicar días</button>
+          <button type="button" class="membresia-btn btn-plan" data-meses="1">1 mes</button>
+          <button type="button" class="membresia-btn btn-plan" data-meses="2">2 meses</button>
+          <button type="button" class="membresia-btn btn-plan" data-meses="3">3 meses</button>
         </div>
+
+        <div class="monto-resumen">
+          Total a pagar: <span class="total-valor">$0.00</span>
+        </div>
+
+        <div class="pago-row">
+          <input
+            type="number"
+            class="pago-con"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="Pago con"
+          >
+          <div class="cambio-valor">Cambio: $0.00</div>
+        </div>
+
+        <button type="button" class="membresia-btn btn-confirmar" disabled>
+          Confirmar pago
+        </button>
       </div>
     `;
 
     const header = card.querySelector(".cliente-header");
     const panel = card.querySelector(".historial");
-    const inputDias = card.querySelector(".dias-custom");
-    const btnPlus7 = card.querySelector(".btn-plus7");
-    const btnPlus30 = card.querySelector(".btn-plus30");
-    const btnCustom = card.querySelector(".btn-custom");
+    const botonesPlan = Array.from(card.querySelectorAll(".btn-plan"));
+    const totalValor = card.querySelector(".total-valor");
+    const inputPago = card.querySelector(".pago-con");
+    const cambioValor = card.querySelector(".cambio-valor");
+    const btnConfirmar = card.querySelector(".btn-confirmar");
+
+    let mesesSeleccionados = 0;
+    let totalSeleccionado = 0;
+    let pagoSeleccionado = 0;
+    let cambioSeleccionado = 0;
 
     header.addEventListener("click", () => {
       document.querySelectorAll(".cliente.abierto").forEach(actual => {
@@ -292,45 +377,124 @@ function renderMembresias(lista) {
       header.setAttribute("aria-expanded", abierto ? "true" : "false");
     });
 
-    inputDias.addEventListener("input", () => {
-      inputDias.value = inputDias.value.replace(/[^0-9]/g, "");
+    botonesPlan.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const meses = Number(btn.dataset.meses || 0);
+        if (!meses) return;
+
+        mesesSeleccionados = meses;
+        totalSeleccionado = mesesSeleccionados * PRECIO_MENSUALIDAD;
+
+        botonesPlan.forEach(b => {
+          b.classList.toggle("activo", b === btn);
+        });
+
+        totalValor.textContent = fmtMoney(totalSeleccionado);
+        inputPago.value = totalSeleccionado.toFixed(2);
+        actualizarPagoSeleccionado();
+      });
     });
 
-    btnPlus7.addEventListener("click", () => extenderMembresia(cliente.id, 7));
-    btnPlus30.addEventListener("click", () => extenderMembresia(cliente.id, 30));
-    btnCustom.addEventListener("click", () => {
-      const dias = Number(inputDias.value);
-      if (!Number.isInteger(dias) || dias <= 0) {
-        alert("Ingrese solo números mayores a 0");
+    inputPago.addEventListener("input", () => {
+      actualizarPagoSeleccionado();
+    });
+
+    function actualizarPagoSeleccionado() {
+      if (!mesesSeleccionados || !totalSeleccionado) {
+        btnConfirmar.disabled = true;
+        btnConfirmar.textContent = "Confirmar pago";
+        cambioValor.textContent = "Cambio: $0.00";
+        cambioValor.style.color = "#d5d9df";
+        pagoSeleccionado = 0;
+        cambioSeleccionado = 0;
         return;
       }
-      extenderMembresia(cliente.id, dias);
+
+      const pago = Number(inputPago.value);
+      pagoSeleccionado = Number.isFinite(pago) ? pago : 0;
+      const diferencia = Number((pagoSeleccionado - totalSeleccionado).toFixed(2));
+      cambioSeleccionado = diferencia > 0 ? diferencia : 0;
+
+      if (diferencia < 0) {
+        cambioValor.textContent = `Falta: ${fmtMoney(Math.abs(diferencia))}`;
+        cambioValor.style.color = "#ff8e8e";
+        btnConfirmar.disabled = true;
+        btnConfirmar.textContent = `Falta ${fmtMoney(Math.abs(diferencia))}`;
+        return;
+      }
+
+      cambioValor.textContent = `Cambio: ${fmtMoney(cambioSeleccionado)}`;
+      cambioValor.style.color = "#2ecc71";
+      btnConfirmar.disabled = false;
+      btnConfirmar.textContent = `Confirmar pago (${fmtMoney(totalSeleccionado)})`;
+    }
+
+    btnConfirmar.addEventListener("click", async () => {
+      if (!mesesSeleccionados || !totalSeleccionado) {
+        await appAlert("Seleccione un plan antes de confirmar", "Membresia");
+        return;
+      }
+
+      if (!Number.isFinite(pagoSeleccionado) || pagoSeleccionado < totalSeleccionado) {
+        await appAlert("El pago no cubre el total de la membresia.", "Pago insuficiente");
+        return;
+      }
+
+      const etiquetaMeses = mesesSeleccionados === 1 ? "mes" : "meses";
+      const confirmar = await appConfirm(
+        `Confirmar pago de ${mesesSeleccionados} ${etiquetaMeses}.\nTotal: ${fmtMoney(totalSeleccionado)}\nPago: ${fmtMoney(pagoSeleccionado)}\nCambio: ${fmtMoney(cambioSeleccionado)}`,
+        "Confirmar pago"
+      );
+
+      if (!confirmar) return;
+
+      btnConfirmar.disabled = true;
+      btnConfirmar.textContent = "Aplicando...";
+
+      const ok = await extenderMembresia(
+        cliente,
+        mesesSeleccionados,
+        totalSeleccionado,
+        pagoSeleccionado,
+        cambioSeleccionado
+      );
+
+      if (!ok) {
+        actualizarPagoSeleccionado();
+      }
     });
 
     listaMembresias.appendChild(card);
   });
 }
 
-async function extenderMembresia(idCliente, dias) {
-  if (!idCliente) {
-    alert("Cliente sin ID válido");
-    return;
+async function extenderMembresia(cliente, meses, total, pago, cambio) {
+  if (!cliente?.id) {
+    await appAlert("Cliente sin ID valido", "Membresia");
+    return false;
   }
 
   if (!navigator.onLine || !window.supabaseClient) {
-    alert("Sin conexión a internet");
-    return;
+    await appAlert("Sin conexion a internet", "Membresia");
+    return false;
+  }
+
+  const dias = Number(meses) * DIAS_POR_MES;
+  if (!dias) {
+    await appAlert("Plan de membresia invalido", "Membresia");
+    return false;
   }
 
   const { data, error: fetchError } = await supabaseClient
     .from("clientes")
     .select("membresia_expira")
-    .eq("id", idCliente)
+    .eq("id", cliente.id)
     .single();
 
   if (fetchError) {
     console.error("Error obteniendo cliente:", fetchError);
-    return;
+    await appAlert("No se pudo leer la fecha actual de membresia", "Membresia");
+    return false;
   }
 
   const hoyLocal = new Date();
@@ -343,23 +507,53 @@ async function extenderMembresia(idCliente, dias) {
   if (base < hoyLocal) {
     base.setTime(hoyLocal.getTime());
   }
-  base.setDate(base.getDate() + dias);
 
+  base.setDate(base.getDate() + dias);
   const nuevaFecha = fechaDesdeTS(base.getTime());
 
   const { error } = await supabaseClient
     .from("clientes")
     .update({ membresia_expira: nuevaFecha })
-    .eq("id", idCliente);
+    .eq("id", cliente.id);
 
   if (error) {
-    console.error("Error actualizando membresía:", error);
-    return;
+    console.error("Error actualizando membresia:", error);
+    await appAlert("No se pudo actualizar la membresia", "Membresia");
+    return false;
   }
+
+  const ventaOk = await registrarVentaSuscripcionRenovada(cliente, meses, total, pago, cambio);
 
   await sincronizarDesdeSupabase();
   cargarMembresias();
   new BroadcastChannel("victory-data").postMessage("clientes");
+
+  if (!ventaOk) {
+    await appAlert(
+      "Membresia actualizada, pero la venta quedo pendiente de sincronizacion",
+      "Membresia"
+    );
+    return true;
+  }
+
+  appToast(
+    `Membresia actualizada hasta ${nuevaFecha}. Total: ${fmtMoney(total)} | Pago: ${fmtMoney(pago)} | Cambio: ${fmtMoney(cambio)}`,
+    "success"
+  );
+  return true;
+}
+
+async function registrarVentaSuscripcionRenovada(cliente, meses, total, pago, cambio) {
+  if (typeof registrarSuscripcionIngreso !== "function") return false;
+  return registrarSuscripcionIngreso({
+    cliente,
+    meses,
+    total,
+    pago,
+    cambio,
+    renovacion: true,
+    referenciaBase: window.APP_CONFIG?.referencias?.suscripcionRenovacion
+  });
 }
 
 function activarSyncLocal() {
