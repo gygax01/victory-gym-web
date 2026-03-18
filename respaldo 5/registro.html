@@ -228,11 +228,11 @@
       <input id="nombre" placeholder="Nombre completo">
       <input id="peso" type="number" step="0.1" placeholder="Peso (kg)">
       <input id="altura" type="number" step="0.01" placeholder="Altura (m)">
-      <input id="telefono" type="tel" placeholder="Telefono">
+      <input id="telefono" type="tel" placeholder="Teléfono">
     </div>
 
     <div class="registro-col">
-      <h3>Membresia</h3>
+      <h3>Membresía</h3>
 
       <div class="membresias-grid">
         <button type="button" class="plan-membresia-btn" data-meses="1" onclick="setPlan(1)">1 mes</button>
@@ -293,7 +293,7 @@
 
 <div class="overlay-suscripcion" id="overlaySuscripcion">
   <div class="box">
-    <p>Suscripcion</p>
+    <p>Suscripción</p>
     <h1>$<span id="montoSuscripcion">399.00</span></h1>
   </div>
 </div>
@@ -413,12 +413,12 @@ function recalcularPagoMembresia() {
 
 async function confirmarPagoMembresia() {
   if (!mesesMembresia || !totalMembresia) {
-    mostrarConfirm("Plan pendiente", "Seleccione un plan de membresia");
+    mostrarConfirm("Plan pendiente", "Seleccione un plan de membresía");
     return;
   }
 
   if (!Number.isFinite(pagoRecibidoMembresia) || pagoRecibidoMembresia < totalMembresia) {
-    await appAlert("El pago no cubre el total de la membresia.", "Pago insuficiente");
+    await appAlert("El pago no cubre el total de la membresía.", "Pago insuficiente");
     return;
   }
 
@@ -498,7 +498,7 @@ async function registrarCliente() {
   }
 
   if (!pagoMembresiaConfirmado) {
-    mostrarConfirm("Pago pendiente", "Primero confirme el pago de la membresia");
+    mostrarConfirm("Pago pendiente", "Primero confirme el pago de la membresía");
     return;
   }
 
@@ -536,15 +536,15 @@ async function registrarCliente() {
 
   if (ok === false) {
     mostrarConfirm(
-      "Suscripcion registrada",
-      "Cliente registrado. Venta pendiente de sincronizacion"
+      "Suscripción registrada",
+      "Cliente registrado. Venta pendiente de sincronización"
     );
     setTimeout(() => location.href = "index.html", 2800);
     return;
   }
 
   mostrarConfirm(
-    "Suscripcion registrada",
+    "Suscripción registrada",
     `Cliente registrado correctamente ($${totalMembresia.toFixed(2)})`
   );
   setTimeout(() => location.href = "index.html", 2800);
