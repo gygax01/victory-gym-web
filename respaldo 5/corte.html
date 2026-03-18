@@ -6,11 +6,13 @@
 <title>Corte</title>
 <link rel="stylesheet" href="css/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 
 <style>
 .filtros-grid{
   display:grid;
-  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
   gap:10px;
 }
 
@@ -100,8 +102,14 @@
 
 .total-final strong{
   color:#2ecc71;
-  font-size:28px;
+  font-size:40px;
   margin-left:6px;
+}
+
+.nota-total{
+  margin-top:8px;
+  font-size:13px;
+  opacity:.9;
 }
 
 @media (max-width: 768px){
@@ -169,6 +177,7 @@
     <input id="fechaDesde" type="date" title="Fecha desde">
     <input id="fechaHasta" type="date" title="Fecha hasta">
     <button id="btnActualizar" type="button">Actualizar corte</button>
+    <button id="btnExportPDF" type="button">Exportar PDF</button>
   </div>
 </div>
 
@@ -247,19 +256,52 @@
       </table>
     </div>
   </div>
+
+  <div class="corte-card">
+    <h3>5) Resumen de ingresos</h3>
+    <div class="meta-corte" id="metaResumenIngresos">Sin datos</div>
+    <div class="tabla-wrap">
+      <table class="corte-table">
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <th class="num">Cantidad</th>
+            <th class="num">Total</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyResumenIngresos"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <div class="search-bar">
   <div class="corte-card total-final" id="totalVentasFinal">
-    Total de dinero de las ventas:<strong>$0.00</strong>
+    Total general del corte:<strong>$0.00</strong>
+    <div class="nota-total" id="notaTotalFinal"></div>
   </div>
 </div>
 
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/corte-utils.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
+let estadoCorteActual = {
+  rango: null,
+  eventos: [],
+  clientesNuevos: [],
+  ventas: [],
+  resumenProductos: {
+    totalUnidades: 0,
+    productos: []
+  },
+  desgloseIngresos: null
+};
+
 function aNumero(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -278,6 +320,14 @@ function escapeHTML(valor) {
     .replace(/'/g, "&#39;");
 }
 
+function normalizarTexto(texto) {
+  return String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function tsValido(ts) {
   return Number.isFinite(ts) && ts > 0;
 }
@@ -294,16 +344,10 @@ function tsVenta(v) {
 }
 
 function totalVenta(v) {
-  const total = aNumero(v?.total);
-  if (total > 0) return total;
-
-  const items = Array.isArray(v?.items) ? v.items : [];
-  return items.reduce((acc, it) => {
-    const cantidad = aNumero(it?.cantidad);
-    const precio = aNumero(it?.precio_unitario);
-    const subtotal = aNumero(it?.subtotal);
-    return acc + (subtotal > 0 ? subtotal : (precio * cantidad));
-  }, 0);
+  if (typeof corteTotalVenta === "function") {
+    return corteTotalVenta(v);
+  }
+  return aNumero(v?.total);
 }
 
 function folioVenta(v) {
@@ -326,7 +370,7 @@ function crearRango() {
   const fechaHasta = document.getElementById("fechaHasta").value || fechaDesde;
 
   if (fechaDesde > fechaHasta) {
-    alert("La fecha desde no puede ser mayor que la fecha hasta.");
+    appAlert("La fecha desde no puede ser mayor que la fecha hasta.", "Rango invalido");
     return null;
   }
 
@@ -542,6 +586,28 @@ async function cargarVentas(rango) {
   return ventas;
 }
 
+function tipoIngresoVenta(v) {
+  if (typeof corteTipoIngreso === "function") {
+    return corteTipoIngreso(v);
+  }
+  return "venta";
+}
+
+function construirDesgloseIngresos(ventas) {
+  if (typeof corteConstruirDesglose === "function") {
+    return corteConstruirDesglose(ventas);
+  }
+  return {
+    suscripciones: [],
+    visitas: [],
+    ventas: [],
+    totalSuscripciones: 0,
+    totalVisitas: 0,
+    totalVentas: 0,
+    totalGeneral: 0
+  };
+}
+
 function construirResumenProductos(ventas) {
   const map = new Map();
   let totalUnidades = 0;
@@ -635,18 +701,52 @@ function renderClientesNuevos(clientes) {
     `Clientes nuevos: ${clientes.length}`;
 }
 
-function renderVentas(ventas, resumenProductos) {
+function renderResumenIngresos(desglose) {
+  const tbody = document.getElementById("tbodyResumenIngresos");
+  tbody.innerHTML = "";
+
+  const filas = [
+    {
+      concepto: "Mensualidades nuevas",
+      cantidad: desglose?.suscripciones?.length || 0,
+      total: desglose?.totalSuscripciones || 0
+    },
+    {
+      concepto: "Visitas",
+      cantidad: desglose?.visitas?.length || 0,
+      total: desglose?.totalVisitas || 0
+    },
+    {
+      concepto: "Ventas",
+      cantidad: desglose?.ventas?.length || 0,
+      total: desglose?.totalVentas || 0
+    }
+  ];
+
+  filas.forEach(f => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHTML(f.concepto)}</td>
+      <td class="num">${aNumero(f.cantidad)}</td>
+      <td class="num">${fmtMoney(f.total)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("metaResumenIngresos").textContent =
+    `Mensualidades: ${filas[0].cantidad} | Visitas: ${filas[1].cantidad} | Ventas: ${filas[2].cantidad}`;
+}
+
+function renderVentas(ventas, resumenProductos, desglose) {
   const tbodyVentas = document.getElementById("tbodyVentas");
   tbodyVentas.innerHTML = "";
 
-  let totalVentas = 0;
   let totalProductosVendidos = 0;
 
   if (!ventas.length) {
     tbodyVentas.innerHTML = "<tr><td colspan='6'>No hay ventas en el rango seleccionado</td></tr>";
   } else {
     ventas.forEach((v, i) => {
-      totalVentas += aNumero(v.total);
       totalProductosVendidos += aNumero(v.unidades);
 
       const tr = document.createElement("tr");
@@ -685,8 +785,14 @@ function renderVentas(ventas, resumenProductos) {
   document.getElementById("metaProductosVendidos").textContent =
     `Productos distintos: ${resumenProductos.productos.length} | Cantidad vendida: ${resumenProductos.totalUnidades}`;
 
+  const totalGeneral = aNumero(desglose?.totalGeneral);
   document.getElementById("totalVentasFinal").innerHTML =
-    `Total de dinero de las ventas:<strong>${fmtMoney(totalVentas)}</strong>`;
+    `Total general del corte:<strong>${fmtMoney(totalGeneral)}</strong>
+    <div class="nota-total" id="notaTotalFinal">
+      Mensualidades: ${desglose?.suscripciones?.length || 0} (${fmtMoney(desglose?.totalSuscripciones || 0)})
+      | Visitas: ${desglose?.visitas?.length || 0} (${fmtMoney(desglose?.totalVisitas || 0)})
+      | Ventas: ${desglose?.ventas?.length || 0} (${fmtMoney(desglose?.totalVentas || 0)})
+    </div>`;
 }
 
 function marcarCargando(loading) {
@@ -695,6 +801,328 @@ function marcarCargando(loading) {
   document.getElementById("metaClientesNuevos").textContent = txt;
   document.getElementById("metaVentas").textContent = txt;
   document.getElementById("metaProductosVendidos").textContent = txt;
+  document.getElementById("metaResumenIngresos").textContent = txt;
+
+  if (loading) {
+    document.getElementById("tbodyEntradasSalidas").innerHTML = "";
+    document.getElementById("tbodyClientesNuevos").innerHTML = "";
+    document.getElementById("tbodyVentas").innerHTML = "";
+    document.getElementById("tbodyProductosVendidos").innerHTML = "";
+    document.getElementById("tbodyResumenIngresos").innerHTML = "";
+  }
+}
+
+function filasEntradasSalidas(eventos) {
+  if (!Array.isArray(eventos) || !eventos.length) {
+    return [["-", "-", "-", "Sin registros", "-"]];
+  }
+
+  return eventos.map((ev, i) => [
+    i + 1,
+    String(ev?.fecha || "-"),
+    String(ev?.hora || "-"),
+    String(ev?.cliente || "Cliente"),
+    String(ev?.movimiento || "-")
+  ]);
+}
+
+function filasClientesNuevos(clientes) {
+  if (!Array.isArray(clientes) || !clientes.length) {
+    return [["-", "-", "Sin registros", "-"]];
+  }
+
+  return clientes.map((c, i) => [
+    i + 1,
+    String(c?.fechaRegistro || "-"),
+    String(c?.nombre || "Cliente"),
+    String(c?.telefono || "0")
+  ]);
+}
+
+function filasVentas(ventas) {
+  if (!Array.isArray(ventas) || !ventas.length) {
+    return [["-", "-", "-", "-", "0", "$0.00"]];
+  }
+
+  return ventas.map((v, i) => [
+    i + 1,
+    String(v?.fecha || "-"),
+    String(v?.hora || "-"),
+    String(v?.folio || "-"),
+    String(aNumero(v?.unidades)),
+    fmtMoney(v?.total)
+  ]);
+}
+
+function filasProductosVendidos(resumenProductos) {
+  const productos = Array.isArray(resumenProductos?.productos)
+    ? resumenProductos.productos
+    : [];
+
+  if (!productos.length) {
+    return [["-", "Sin registros", "0", "$0.00"]];
+  }
+
+  return productos.map((p, i) => [
+    i + 1,
+    String(p?.nombre || "Producto"),
+    String(p?.cantidad ?? 0),
+    fmtMoney(p?.importe)
+  ]);
+}
+
+function filasDetalleIngresos(lista) {
+  if (!Array.isArray(lista) || !lista.length) {
+    return [["-", "-", "-", "-", "Sin registros", "$0.00"]];
+  }
+
+  return lista.map((x, i) => [
+    i + 1,
+    String(x?.fecha || "-"),
+    String(x?.hora || "-"),
+    String(x?.folio || "-"),
+    String(x?.referencia || "Sin referencia"),
+    fmtMoney(x?.total || 0)
+  ]);
+}
+
+function totalVentasCorte(ventas) {
+  return (Array.isArray(ventas) ? ventas : [])
+    .reduce((acc, v) => acc + aNumero(v?.total), 0);
+}
+
+function exportarPDFCorte() {
+  if (!estadoCorteActual?.rango) {
+    appAlert("Primero actualiza el corte para exportar.", "Corte");
+    return;
+  }
+
+  const jsPdfApi = window.jspdf;
+  if (!jsPdfApi || typeof jsPdfApi.jsPDF !== "function") {
+    appAlert("No se pudo cargar el motor PDF. Recarga la pagina e intenta de nuevo.", "Exportar PDF");
+    return;
+  }
+
+  const doc = new jsPdfApi.jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4"
+  });
+
+  const colorNaranja = [243, 114, 44];
+  const colorTexto = [32, 32, 32];
+  const colorCebra = [248, 248, 248];
+
+  doc.setTextColor(...colorTexto);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Corte", 10, 12);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(
+    `Rango: ${estadoCorteActual.rango.fechaDesde} a ${estadoCorteActual.rango.fechaHasta}`,
+    10,
+    18
+  );
+  doc.text(`Generado: ${hoy()} ${horaActual()}`, 10, 23);
+
+  let currentY = 28;
+
+  const printSection = (titulo, head, body, options = {}) => {
+    const startY = currentY;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(titulo, 10, startY);
+
+    doc.autoTable({
+      startY: startY + 2,
+      head: [head],
+      body,
+      styles: {
+        font: "helvetica",
+        fontSize: 8,
+        textColor: colorTexto,
+        lineColor: [220, 220, 220],
+        lineWidth: 0.1,
+        cellPadding: 1.6,
+        overflow: "linebreak"
+      },
+      headStyles: {
+        fillColor: colorNaranja,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        halign: "center"
+      },
+      alternateRowStyles: {
+        fillColor: colorCebra
+      },
+      margin: { left: 8, right: 8, top: 6, bottom: 8 },
+      ...options
+    });
+
+    currentY = (doc.lastAutoTable?.finalY || startY + 10) + 6;
+
+    if (currentY > 180) {
+      doc.addPage();
+      currentY = 16;
+    }
+  };
+
+  const eventos = estadoCorteActual.eventos || [];
+  const clientesNuevos = estadoCorteActual.clientesNuevos || [];
+  const ventas = estadoCorteActual.ventas || [];
+  const resumenProductos = estadoCorteActual.resumenProductos || { totalUnidades: 0, productos: [] };
+  const desglose = estadoCorteActual.desgloseIngresos || construirDesgloseIngresos(ventas);
+
+  printSection(
+    "1) Entradas y salidas",
+    ["#", "Fecha", "Hora", "Cliente", "Movimiento"],
+    filasEntradasSalidas(eventos),
+    {
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 28 },
+        3: { cellWidth: 110 },
+        4: { cellWidth: 35, halign: "center" }
+      }
+    }
+  );
+
+  printSection(
+    "2) Registros nuevos de clientes",
+    ["#", "Fecha registro", "Nombre", "Telefono"],
+    filasClientesNuevos(clientesNuevos),
+    {
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 120 },
+        3: { cellWidth: 50 }
+      }
+    }
+  );
+
+  printSection(
+    "3) Ventas",
+    ["#", "Fecha", "Hora", "Folio", "Productos", "Total"],
+    filasVentas(ventas),
+    {
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 28 },
+        3: { cellWidth: 80 },
+        4: { cellWidth: 28, halign: "right" },
+        5: { cellWidth: 28, halign: "right" }
+      }
+    }
+  );
+
+  printSection(
+    "4) Productos vendidos",
+    ["#", "Producto", "Cantidad vendida", "Importe"],
+    filasProductosVendidos(resumenProductos),
+    {
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 120 },
+        2: { cellWidth: 45, halign: "right" },
+        3: { cellWidth: 35, halign: "right" }
+      }
+    }
+  );
+
+  printSection(
+    "5) Suscripciones mensuales",
+    ["#", "Fecha", "Hora", "Folio", "Referencia", "Total"],
+    filasDetalleIngresos(desglose.suscripciones),
+    {
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 52 },
+        4: { cellWidth: 120 },
+        5: { cellWidth: 28, halign: "right" }
+      }
+    }
+  );
+
+  printSection(
+    "6) Visitas",
+    ["#", "Fecha", "Hora", "Folio", "Referencia", "Total"],
+    filasDetalleIngresos(desglose.visitas),
+    {
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 52 },
+        4: { cellWidth: 120 },
+        5: { cellWidth: 28, halign: "right" }
+      }
+    }
+  );
+
+  printSection(
+    "7) Ventas",
+    ["#", "Fecha", "Hora", "Folio", "Referencia", "Total"],
+    filasDetalleIngresos(desglose.ventas),
+    {
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 52 },
+        4: { cellWidth: 120 },
+        5: { cellWidth: 28, halign: "right" }
+      }
+    }
+  );
+
+  if (currentY > 190) {
+    doc.addPage();
+    currentY = 16;
+  }
+
+  const notaW = 280;
+  const notaH = 52;
+  if (currentY + notaH > 200) {
+    doc.addPage();
+    currentY = 16;
+  }
+
+  doc.setFillColor(248, 248, 248);
+  doc.roundedRect(8, currentY, notaW, notaH, 3, 3, "F");
+  doc.setDrawColor(...colorNaranja);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(8, currentY, notaW, notaH, 3, 3, "S");
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...colorTexto);
+  doc.setFontSize(12);
+  doc.text("Resumen de corte", 12, currentY + 8);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Registros asistencia: ${eventos.length}`, 12, currentY + 15);
+  doc.text(`Clientes nuevos: ${clientesNuevos.length}`, 95, currentY + 15);
+  doc.text(`Mensualidades nuevas: ${desglose.suscripciones.length}`, 175, currentY + 15);
+  doc.text(`Visitas: ${desglose.visitas.length}`, 12, currentY + 22);
+  doc.text(`Ventas: ${desglose.ventas.length}`, 95, currentY + 22);
+  doc.text(`Cantidad vendida: ${aNumero(resumenProductos.totalUnidades)}`, 175, currentY + 22);
+  doc.text(`Ingreso mensualidades: ${fmtMoney(desglose.totalSuscripciones)}`, 12, currentY + 29);
+  doc.text(`Ingreso visitas: ${fmtMoney(desglose.totalVisitas)}`, 95, currentY + 29);
+  doc.text(`Ingreso ventas: ${fmtMoney(desglose.totalVentas)}`, 175, currentY + 29);
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(26, 140, 73);
+  doc.setFontSize(22);
+  doc.text(`TOTAL GENERAL: ${fmtMoney(desglose.totalGeneral)}`, 12, currentY + 45);
+
+  doc.save(`corte_${estadoCorteActual.rango.fechaDesde}_a_${estadoCorteActual.rango.fechaHasta}.pdf`);
 }
 
 async function cargarCorte() {
@@ -702,7 +1130,9 @@ async function cargarCorte() {
   if (!rango) return;
 
   const btn = document.getElementById("btnActualizar");
+  const btnPDF = document.getElementById("btnExportPDF");
   btn.disabled = true;
+  if (btnPDF) btnPDF.disabled = true;
   marcarCargando(true);
 
   try {
@@ -713,15 +1143,26 @@ async function cargarCorte() {
     ]);
 
     const resumenProductos = construirResumenProductos(ventas);
+    const desgloseIngresos = construirDesgloseIngresos(ventas);
+    estadoCorteActual = {
+      rango,
+      eventos,
+      clientesNuevos,
+      ventas,
+      resumenProductos,
+      desgloseIngresos
+    };
 
     renderEntradasSalidas(eventos);
     renderClientesNuevos(clientesNuevos);
-    renderVentas(ventas, resumenProductos);
+    renderResumenIngresos(desgloseIngresos);
+    renderVentas(ventas, resumenProductos, desgloseIngresos);
   } catch (error) {
     console.error("[CORTE] Error cargando corte:", error);
-    alert("No se pudo cargar el corte. Revisa la consola para mas detalle.");
+    await appAlert("No se pudo cargar el corte. Revisa la consola para mas detalle.", "Corte");
   } finally {
     btn.disabled = false;
+    if (btnPDF) btnPDF.disabled = false;
   }
 }
 
@@ -731,6 +1172,7 @@ function initCorte() {
   const fechaDesde = document.getElementById("fechaDesde");
   const fechaHasta = document.getElementById("fechaHasta");
   const btnActualizar = document.getElementById("btnActualizar");
+  const btnExportPDF = document.getElementById("btnExportPDF");
 
   fechaDesde.value = fechaActual;
   fechaHasta.value = fechaActual;
@@ -738,6 +1180,9 @@ function initCorte() {
   fechaDesde.addEventListener("change", cargarCorte);
   fechaHasta.addEventListener("change", cargarCorte);
   btnActualizar.addEventListener("click", cargarCorte);
+  if (btnExportPDF) {
+    btnExportPDF.addEventListener("click", exportarPDFCorte);
+  }
 
   cargarCorte();
 }
