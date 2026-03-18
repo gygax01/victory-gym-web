@@ -13,7 +13,7 @@
 <header class="header-brand">
   <div class="brand">
     <img src="img/logo.png">
-    <h2>Asistencias del dia</h2>
+    <h2>Asistencias del día</h2>
   </div>
 
   <div class="estado-sistema">
@@ -37,7 +37,7 @@
   <button class="destacado" onclick="location.href='registro.html'">Registro</button>
   <button onclick="location.href='pos.html'">Ventas</button>
   <button onclick="location.href='stock.html'">Stock</button>
-  <button onclick="location.href='membresias.html'">Membresias</button>
+  <button onclick="location.href='membresias.html'">Membresías</button>
   <button onclick="location.href='clientes.html'">Clientes</button>
   <button onclick="location.href='historial.html'">Historial</button>
 </div>
@@ -106,7 +106,7 @@ window.addEventListener("load", () => {
   iniciarMonitorHeartbeat(estadoLector);
 });
 
-/* ================= CONEXION ================= */
+/* ================= CONEXIÓN ================= */
 function actualizarEstadoConexion(el) {
   if (!el) return;
 
@@ -293,7 +293,7 @@ async function registrarVisitaRapida() {
   await actualizarTotalVentasInicio();
 
   if (ok === false) {
-    mostrarConfirmacion("gracia", "Visita registrada", "Pendiente de sincronizacion");
+    mostrarConfirmacion("gracia", "Visita registrada", "Pendiente de sincronización");
     return;
   }
 
@@ -316,7 +316,7 @@ function iniciarLecturaNFCIndex(estadoLector) {
       onHeartbeat: evento => {
         marcarHeartbeatLector(
           estadoLector,
-          `ultima ${horaDesdeTS(evento?.ts || Date.now())}`
+          `última ${horaDesdeTS(evento?.ts || Date.now())}`
         );
       },
       onStatus: status => {
@@ -352,7 +352,7 @@ function evaluarMembresia(membresiaExpira) {
     return {
       estado: "vencida",
       diasRestantes: null,
-      mensaje: "Membresia no configurada"
+      mensaje: "Membresía no configurada"
     };
   }
 
@@ -363,8 +363,8 @@ function evaluarMembresia(membresiaExpira) {
 
   if (diasRestantes >= 0) {
     const msg = diasRestantes === 0
-      ? "Membresia vigente (vence hoy)"
-      : `Membresia vigente (${diasRestantes} dia(s) restantes)`;
+      ? "Membresía vigente (vence hoy)"
+      : `Membresía vigente (${diasRestantes} día(s) restantes)`;
     return { estado: "vigente", diasRestantes, mensaje: msg };
   }
 
@@ -373,14 +373,14 @@ function evaluarMembresia(membresiaExpira) {
     return {
       estado: "gracia",
       diasRestantes,
-      mensaje: `Periodo de gracia (${diasGracia} dia(s) vencido)`
+      mensaje: `Periodo de gracia (${diasGracia} día(s) vencido)`
     };
   }
 
   return {
     estado: "vencida",
     diasRestantes,
-    mensaje: `Membresia vencida hace ${Math.abs(diasRestantes)} dia(s)`
+    mensaje: `Membresía vencida hace ${Math.abs(diasRestantes)} día(s)`
   };
 }
 
@@ -521,7 +521,7 @@ async function procesarTarjeta(uid) {
     }
 
     if (errorCliente || !cliente) {
-      mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepcion");
+      mostrarConfirmacion("error", "Tarjeta no registrada", "Consulte recepción");
       return;
     }
 
@@ -558,10 +558,10 @@ async function procesarTarjeta(uid) {
     if (resultado?.accion !== accionEsperada) {
       mostrarConfirmacion(
         "error",
-        "Secuencia invalida",
-        "Anti-passback activo: el sistema detecto una accion fuera de orden"
+        "Secuencia inválida",
+        "Anti-passback activo: el sistema detectó una acción fuera de orden"
       );
-      console.warn("[ANTI-PASSBACK] Accion inesperada", {
+      console.warn("[ANTI-PASSBACK] Acción inesperada", {
         clienteId: cliente.id,
         esperado: accionEsperada,
         recibido: resultado?.accion,
@@ -586,7 +586,7 @@ async function procesarTarjeta(uid) {
 
   } catch (err) {
     console.error("[INDEX] Error procesando tarjeta:", err);
-    mostrarConfirmacion("error", "Error de lectura", "Consulte recepcion");
+    mostrarConfirmacion("error", "Error de lectura", "Consulte recepción");
   } finally {
     if (clienteIdProcesado) {
       clientesEnProceso.delete(clienteIdProcesado);
