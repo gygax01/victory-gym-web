@@ -203,6 +203,9 @@
 
 <script src="js/auth.js?v=20260302"></script>
 <script src="js/storage.js?v=20260302"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/corte-utils.js"></script>
 <script src="js/realtime.js?v=20260302"></script>
 
 <script>
@@ -372,13 +375,10 @@ function itemsVenta(v) {
 }
 
 function totalVenta(v) {
-  const total = aNumero(v?.total);
-  if (total > 0) return total;
-  return itemsVenta(v).reduce((acc, it) => {
-    const subtotal = aNumero(it?.subtotal);
-    if (subtotal > 0) return acc + subtotal;
-    return acc + (aNumero(it?.precio_unitario) * aNumero(it?.cantidad));
-  }, 0);
+  if (typeof corteTotalVenta === "function") {
+    return corteTotalVenta(v);
+  }
+  return aNumero(v?.total);
 }
 
 function guardarVentasLocales(lista) {
@@ -860,7 +860,7 @@ async function exportarExcel() {
   const data = filtrarPorDias(ventasFiltradas, dias);
   const filas = filasExportacion(data);
   if (!filas.length) {
-    alert("No hay ventas para exportar en ese rango.");
+    await appAlert("No hay ventas para exportar en ese rango.", "Exportar Excel");
     return;
   }
 
@@ -1056,7 +1056,7 @@ async function exportarPDF() {
   const data = filtrarPorDias(ventasFiltradas, dias);
   const filas = filasExportacion(data);
   if (!filas.length) {
-    alert("No hay ventas para exportar en ese rango.");
+    await appAlert("No hay ventas para exportar en ese rango.", "Exportar PDF");
     return;
   }
 
