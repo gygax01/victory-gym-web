@@ -69,9 +69,7 @@
   text-align:center;
 }
 
-/* ===== ADAPTACION SOLO TAMANO MOVIL ===== */
 @media(max-width:768px){
-
   header{
     flex-direction:column;
     gap:12px;
@@ -130,7 +128,6 @@
     width:90%;
     padding:50px 20px;
   }
-
 }
 </style>
 </head>
@@ -139,7 +136,7 @@
 
 <header>
   <h2>Punto de Venta</h2>
-  <button onclick="location.href='index.html'">⬅ Inicio</button>
+  <button onclick="location.href='index.html'">← Inicio</button>
 </header>
 
 <div class="pos-wrap">
@@ -156,7 +153,7 @@
       Total $<span id="total">0.00</span>
     </div>
 
-    <input id="pago" type="number" placeholder="¿Con cuánto paga?">
+    <input id="pago" type="number" placeholder="Con cuanto paga?">
     <button onclick="cobrar()">Cobrar</button>
     <button onclick="cancelar()">Cancelar</button>
   </div>
@@ -171,29 +168,25 @@
 
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
-
-<!-- SUPABASE v1 (global, compatible) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@1.35.7/dist/umd/supabase.min.js"></script>
-
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/ingresos.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/realtime.js"></script>
 
 <script>
-/* ================= VARS ================= */
 let productos = [];
 let carrito = [];
 let cobrando = false;
 
-function registrarVenta(){}
-
-/* ================= INIT ================= */
 function initPOS(){
   cargarProductos();
   iniciarSyncPOS();
 }
 
-/* ================= SYNC ================= */
 function iniciarSyncPOS(){
-  const bc = new BroadcastChannel("victory-data");
+  const channelName = window.APP_CONFIG?.syncChannel || "victory-data";
+  const bc = new BroadcastChannel(channelName);
 
   bc.onmessage = e => {
     if (cobrando) return;
@@ -206,7 +199,6 @@ function iniciarSyncPOS(){
   });
 }
 
-/* ================= PRODUCTOS ================= */
 function cargarProductos(){
   grid.innerHTML = "";
   productos = obtenerProductos().filter(p => p && p.stock > 0);
@@ -216,7 +208,7 @@ function cargarProductos(){
     return;
   }
 
-  productos.forEach(p=>{
+  productos.forEach(p => {
     const d = document.createElement("div");
     d.className = "prod";
     d.innerHTML = `<b>${p.nombre}</b><span>$${Number(p.precio).toFixed(2)}</span>`;
@@ -225,7 +217,6 @@ function cargarProductos(){
   });
 }
 
-/* ================= CARRITO ================= */
 function agregar(id){
   carrito.push(id);
   render();
@@ -235,8 +226,8 @@ function render(){
   lista.innerHTML = "";
   let totalVenta = 0;
 
-  carrito.forEach(id=>{
-    const p = productos.find(x=>x.id===id);
+  carrito.forEach(id => {
+    const p = productos.find(x => x.id === id);
     if (!p) return;
     totalVenta += Number(p.precio);
     lista.innerHTML += `<li>${p.nombre}<span>$${Number(p.precio).toFixed(2)}</span></li>`;
@@ -251,13 +242,18 @@ function cancelar(){
   render();
 }
 
-/* ================= COBRAR ================= */
 async function cobrar(){
-  if (!carrito.length) return alert("Carrito vacío");
+  if (!carrito.length) {
+    await appAlert("Carrito vacio", "Venta");
+    return;
+  }
 
   const totalVenta = Number(total.innerText);
   const paga = Number(pago.value);
-  if (paga < totalVenta) return alert("Pago insuficiente");
+  if (paga < totalVenta) {
+    await appAlert("Pago insuficiente", "Venta");
+    return;
+  }
 
   const referenciaRaw = prompt(
     "Referencia de venta (ticket/nota). Ej: Mostrador #A-120"
@@ -266,18 +262,17 @@ async function cobrar(){
 
   const referencia = String(referenciaRaw).trim();
   if (referencia.length < 3) {
-    alert("La referencia es obligatoria (mínimo 3 caracteres).");
+    await appAlert("La referencia es obligatoria (minimo 3 caracteres).", "Venta");
     return;
   }
 
   cobrando = true;
 
   const stock = obtenerProductos();
-
   const conteo = {};
   carrito.forEach(id => conteo[id] = (conteo[id] || 0) + 1);
-  const itemsVenta = [];
 
+  const itemsVenta = [];
   Object.keys(conteo).forEach(id => {
     const p = stock.find(x => x.id === id);
     if (!p) return;
@@ -302,25 +297,21 @@ async function cobrar(){
   });
 
   safeSet("productos", stock);
-  new BroadcastChannel("victory-data").postMessage("productos");
+  if (typeof broadcastVictory === "function") {
+    broadcastVictory("productos");
+  }
 
   const cambioVenta = Number((paga - totalVenta).toFixed(2));
   cambio.innerText = cambioVenta.toFixed(2);
   overlay.style.display = "flex";
 
-  if (typeof pushHistorialVenta === "function") {
-    await pushHistorialVenta(
-      {
-        total: Number(totalVenta.toFixed(2)),
-        pago: Number(paga.toFixed(2)),
-        cambio: cambioVenta,
-        items: itemsVenta
-      },
-      {
-        referencia
-      }
-    );
-  }
+  await registrarVentaGeneral({
+    total: Number(totalVenta.toFixed(2)),
+    pago: Number(paga.toFixed(2)),
+    cambio: cambioVenta,
+    items: itemsVenta,
+    referencia
+  });
 
   setTimeout(() => {
     cobrando = false;
@@ -331,4 +322,3 @@ async function cobrar(){
 
 </body>
 </html>
-
