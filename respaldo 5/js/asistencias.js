@@ -70,7 +70,7 @@ function cargarAsistencias() {
 
   tbody.innerHTML = "";
 
-  asistencias
+  const filasHoy = asistencias
     .filter(a =>
       a &&
       a.fecha === hoyFecha &&
@@ -78,8 +78,22 @@ function cargarAsistencias() {
     )
     .sort((a, b) =>
       obtenerTimestampSeguro(b) - obtenerTimestampSeguro(a)
-    )
-    .forEach(a => {
+    );
+
+  if (!filasHoy.length) {
+    const trVacio = document.createElement("tr");
+    const tdVacio = document.createElement("td");
+    tdVacio.colSpan = 3;
+    tdVacio.className = "small muted";
+    tdVacio.style.textAlign = "center";
+    tdVacio.style.padding = "14px";
+    tdVacio.textContent = "Sin asistencias registradas hoy";
+    trVacio.appendChild(tdVacio);
+    tbody.appendChild(trVacio);
+    return;
+  }
+
+  filasHoy.forEach(a => {
 
       const tr = document.createElement("tr");
 
