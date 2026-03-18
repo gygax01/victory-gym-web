@@ -148,15 +148,15 @@
     <button onclick="abrirModalCorte()" style="opacity:.85">
       Corte
     </button>
-    <button onclick="location.href='index.html'">← Inicio</button>
+    <button onclick="location.href='index.html'">â† Inicio</button>
   </div>
 </header>
 
 <!-- ================= MODAL MASTER ================= -->
 <div id="modalMaster" class="modal-overlay">
   <div class="modal-card pop">
-    <h3>🔒 Acceso restringido</h3>
-    <p>Ingresa la contraseña maestra</p>
+    <h3>ðŸ”’ Acceso restringido</h3>
+    <p>Ingresa la contraseÃ±a maestra</p>
     <input id="inputMaster" type="password">
     <div id="msgMaster" class="modal-msg"></div>
     <div class="modal-actions">
@@ -209,6 +209,8 @@
 <!-- CORE -->
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
@@ -288,7 +290,7 @@ function renderStock() {
         !modoEdicion
         ? `
           <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
-          <div class="small">Stock mínimo: ${p.stock_minimo || 0}</div>
+          <div class="small">Stock mÃ­nimo: ${p.stock_minimo || 0}</div>
         `
         : `
           <input value="${p.nombre}">
@@ -316,7 +318,7 @@ function renderPanel() {
     folioPendiente = "";
 
     const btn = document.createElement("button");
-    btn.textContent = "✏️ Editar stock";
+    btn.textContent = "âœï¸ Editar stock";
     btn.onclick = () => {
       modoEdicion = true;
       folioPendiente = generarFolioStockLocal();
@@ -331,14 +333,14 @@ function renderPanel() {
 
     const guardar = document.createElement("button");
     guardar.className = "btn-guardar";
-    guardar.textContent = "💾 Guardar cambios";
+    guardar.textContent = "ðŸ’¾ Guardar cambios";
     guardar.onclick = () => {
       accionMaster = "guardar";
       abrirModalMaster();
     };
 
     const cancelar = document.createElement("button");
-    cancelar.textContent = "❌ Cancelar";
+    cancelar.textContent = "âŒ Cancelar";
     cancelar.onclick = () => {
       modoEdicion = false;
       inputReferenciaCambio.value = "";
@@ -386,7 +388,7 @@ function cerrarModal() {
 /* ================= CONFIRMAR ================= */
 function confirmarMaster() {
   if (!validarPasswordMaestra(inputMaster.value)) {
-    msgMaster.textContent = "✖ Contraseña incorrecta";
+    msgMaster.textContent = "âœ– ContraseÃ±a incorrecta";
     msgMaster.className = "modal-msg error";
     return;
   }
@@ -425,7 +427,7 @@ function esEnteroNoNegativo(n) {
 function referenciaValida() {
   const ref = String(inputReferenciaCambio.value || "").trim();
   if (ref.length < 3) {
-    alert("La referencia es obligatoria (mínimo 3 caracteres).");
+    appAlert("La referencia es obligatoria (minimo 3 caracteres).", "Stock");
     return null;
   }
   return ref.slice(0, 120);
@@ -446,7 +448,7 @@ function resumenCambioExtremo(op) {
     partes.push(`stock ${op.antes.stock} -> ${op.despues.stock}`);
   }
   if (deltaMin >= DELTA_STOCK_EXTREMO) {
-    partes.push(`stock mínimo ${op.antes.stock_minimo} -> ${op.despues.stock_minimo}`);
+    partes.push(`stock mÃ­nimo ${op.antes.stock_minimo} -> ${op.despues.stock_minimo}`);
   }
   if (cambioPrecio >= CAMBIO_PRECIO_EXTREMO_PCT) {
     partes.push(`precio ${op.antes.precio} -> ${op.despues.precio}`);
@@ -480,19 +482,19 @@ async function guardarCambiosStock() {
     const nombre = nombreInput || (prod.nombre ?? "");
 
     if (!nombre) {
-      alert(`Producto inválido en fila ${i + 1}: el nombre es obligatorio.`);
+      await appAlert(`Producto invalido en fila ${i + 1}: el nombre es obligatorio.`, "Stock");
       return;
     }
     if (!Number.isFinite(precio) || precio < 0 || precio > MAX_PRECIO) {
-      alert(`Precio inválido en "${nombre}". Debe ser un número entre 0 y ${MAX_PRECIO}.`);
+      await appAlert(`Precio invalido en "${nombre}". Debe ser un numero entre 0 y ${MAX_PRECIO}.`, "Stock");
       return;
     }
     if (!esEnteroNoNegativo(nuevoStock) || nuevoStock > MAX_STOCK) {
-      alert(`Stock inválido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`);
+      await appAlert(`Stock invalido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`, "Stock");
       return;
     }
     if (!esEnteroNoNegativo(stockMin) || stockMin > MAX_STOCK) {
-      alert(`Stock mínimo inválido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`);
+      await appAlert(`Stock minimo invalido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`, "Stock");
       return;
     }
 
@@ -521,7 +523,7 @@ async function guardarCambiosStock() {
   }
 
   if (!operaciones.length) {
-    alert("No hubo cambios para guardar.");
+    await appAlert("No hubo cambios para guardar.", "Stock");
     return;
   }
 
@@ -532,10 +534,11 @@ async function guardarCambiosStock() {
   if (extremos.length) {
     const preview = extremos.slice(0, 5).join("\n");
     const extra = extremos.length > 5
-      ? `\n...y ${extremos.length - 5} cambios extremos más.`
+      ? `\n...y ${extremos.length - 5} cambios extremos mÃ¡s.`
       : "";
-    const continuar = confirm(
-      `Se detectaron cambios extremos:\n${preview}${extra}\n\n¿Deseas continuar?`
+    const continuar = await appConfirm(
+      `Se detectaron cambios extremos:\n${preview}${extra}\n\nDeseas continuar?`,
+      "Cambios extremos"
     );
     if (!continuar) return;
   }
@@ -553,7 +556,7 @@ async function guardarCambiosStock() {
 
     if (error) {
       console.error("[STOCK] Error actualizando producto:", op.prod.id, error);
-      alert(`No se pudo guardar "${op.nombre}".`);
+      await appAlert(`No se pudo guardar "${op.nombre}".`, "Stock");
       return;
     }
 
@@ -600,15 +603,15 @@ async function confirmarNuevoProducto() {
   const stockInicial = Number(inputStock.value || 0);
 
   if (!nombre) {
-    alert("El nombre del producto es obligatorio.");
+    await appAlert("El nombre del producto es obligatorio.", "Nuevo producto");
     return;
   }
   if (!Number.isFinite(precio) || precio < 0 || precio > MAX_PRECIO) {
-    alert(`Precio inválido. Debe ser un número entre 0 y ${MAX_PRECIO}.`);
+    await appAlert(`Precio invalido. Debe ser un numero entre 0 y ${MAX_PRECIO}.`, "Nuevo producto");
     return;
   }
   if (!esEnteroNoNegativo(stockInicial) || stockInicial > MAX_STOCK) {
-    alert(`Stock inicial inválido. Debe ser entero entre 0 y ${MAX_STOCK}.`);
+    await appAlert(`Stock inicial invalido. Debe ser entero entre 0 y ${MAX_STOCK}.`, "Nuevo producto");
     return;
   }
 
