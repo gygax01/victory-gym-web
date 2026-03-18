@@ -138,7 +138,7 @@
       cambio,
       items: [{
         producto_id: null,
-        nombre: normalizeString(input.nombre, `Suscripcion ${meses} ${etiqueta}`),
+        nombre: normalizeString(input.nombre, `Suscripción ${meses} ${etiqueta}`),
         cantidad: meses,
         precio_unitario: money(precioMensual),
         subtotal: total,
