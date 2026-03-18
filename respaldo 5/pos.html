@@ -153,7 +153,7 @@
       Total $<span id="total">0.00</span>
     </div>
 
-    <input id="pago" type="number" placeholder="Con cuanto paga?">
+    <input id="pago" type="number" placeholder="¿Con cuánto paga?">
     <button onclick="cobrar()">Cobrar</button>
     <button onclick="cancelar()">Cancelar</button>
   </div>
@@ -262,7 +262,7 @@ async function cobrar(){
 
   const referencia = String(referenciaRaw).trim();
   if (referencia.length < 3) {
-    await appAlert("La referencia es obligatoria (minimo 3 caracteres).", "Venta");
+    await appAlert("La referencia es obligatoria (mínimo 3 caracteres).", "Venta");
     return;
   }
 
