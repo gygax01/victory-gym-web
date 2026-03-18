@@ -211,7 +211,7 @@
             <th>#</th>
             <th>Fecha registro</th>
             <th>Nombre</th>
-            <th>Telefono</th>
+            <th>Teléfono</th>
           </tr>
         </thead>
         <tbody id="tbodyClientesNuevos"></tbody>
@@ -370,7 +370,7 @@ function crearRango() {
   const fechaHasta = document.getElementById("fechaHasta").value || fechaDesde;
 
   if (fechaDesde > fechaHasta) {
-    appAlert("La fecha desde no puede ser mayor que la fecha hasta.", "Rango invalido");
+    appAlert("La fecha desde no puede ser mayor que la fecha hasta.", "Rango inválido");
     return null;
   }
 
@@ -899,7 +899,7 @@ function exportarPDFCorte() {
 
   const jsPdfApi = window.jspdf;
   if (!jsPdfApi || typeof jsPdfApi.jsPDF !== "function") {
-    appAlert("No se pudo cargar el motor PDF. Recarga la pagina e intenta de nuevo.", "Exportar PDF");
+    appAlert("No se pudo cargar el motor PDF. Recarga la página e intenta de nuevo.", "Exportar PDF");
     return;
   }
 
@@ -992,7 +992,7 @@ function exportarPDFCorte() {
 
   printSection(
     "2) Registros nuevos de clientes",
-    ["#", "Fecha registro", "Nombre", "Telefono"],
+    ["#", "Fecha registro", "Nombre", "Teléfono"],
     filasClientesNuevos(clientesNuevos),
     {
       columnStyles: {
@@ -1159,7 +1159,7 @@ async function cargarCorte() {
     renderVentas(ventas, resumenProductos, desgloseIngresos);
   } catch (error) {
     console.error("[CORTE] Error cargando corte:", error);
-    await appAlert("No se pudo cargar el corte. Revisa la consola para mas detalle.", "Corte");
+    await appAlert("No se pudo cargar el corte. Revisa la consola para más detalle.", "Corte");
   } finally {
     btn.disabled = false;
     if (btnPDF) btnPDF.disabled = false;
