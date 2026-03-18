@@ -187,6 +187,8 @@
 
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/nfc.js"></script>
 <script src="js/realtime.js"></script>
 
@@ -378,7 +380,7 @@ async function guardarEdicionCliente() {
 
   const nombre = editNombre.value.trim();
   if (!nombre) {
-    alert("El nombre es obligatorio");
+    await appAlert("El nombre es obligatorio", "Clientes");
     return;
   }
 
