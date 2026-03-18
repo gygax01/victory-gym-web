@@ -23,6 +23,12 @@
 
     <span id="estadoLector" class="lector off">Lector inactivo</span>
     <span id="estadoConexion" class="lector off">Offline</span>
+    <span id="totalVentasHoy" class="contador total-ventas">
+      Total de ventas: <strong>$0.00</strong>
+    </span>
+    <button id="btnVisitaRapida" class="btn-visita" type="button" onclick="registrarVisitaRapida()">
+      Visita
+    </button>
 
   </div>
 </header>
@@ -57,6 +63,10 @@
 </div>
 
 <script src="js/storage.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/corte-utils.js"></script>
+<script src="js/ingresos.js"></script>
 <script src="js/asistencias.js"></script>
 <script src="js/realtime.js"></script>
 <script src="js/nfc.js"></script>
@@ -70,6 +80,7 @@ const COOLDOWN_LECTURA_MS = 3000;
 const DIAS_GRACIA_MEMBRESIA = 2;
 const PERMITIR_ENTRADA_EN_GRACIA = true;
 const HEARTBEAT_STALE_MS = 20000;
+const COSTO_VISITA = typeof getPrecioVisita === "function" ? getPrecioVisita() : 60;
 
 let estadoCanalNFC = "INIT";
 let ultimoHeartbeatLector = 0;
@@ -88,6 +99,8 @@ window.addEventListener("load", () => {
 
   cargarAsistencias();
   actualizarContador();
+  iniciarSyncVentasInicio();
+  actualizarTotalVentasInicio();
 
   iniciarLecturaNFCIndex(estadoLector);
   iniciarMonitorHeartbeat(estadoLector);
@@ -168,6 +181,123 @@ function mostrarConfirmacion(tipo, titulo, mensaje) {
   setTimeout(() => {
     box.style.display = "none";
   }, 2200);
+}
+
+/* ================= VENTAS HOY ================= */
+function claveVenta(v) {
+  const id = String(v?.id || "").trim();
+  if (id) return `id:${id}`;
+  return [
+    String(v?.fecha || ""),
+    String(v?.hora || ""),
+    String(v?.folio || ""),
+    String(v?.total || "")
+  ].join("|");
+}
+
+function totalVentaRegistro(v) {
+  if (typeof corteTotalVenta === "function") {
+    return corteTotalVenta(v);
+  }
+  const total = Number(v?.total);
+  return Number.isFinite(total) ? total : 0;
+}
+
+function rangoHoyTs() {
+  const now = new Date();
+  const inicio = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+  const fin = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0).getTime();
+  return { inicio, fin };
+}
+
+function filtrarVentasHoy(ventas) {
+  const { inicio, fin } = rangoHoyTs();
+  return (Array.isArray(ventas) ? ventas : []).filter(v => {
+    const ts = Number(v?.ts || 0);
+    if (Number.isFinite(ts) && ts > 0) {
+      return ts >= inicio && ts < fin;
+    }
+    return String(v?.fecha || "") === hoy();
+  });
+}
+
+async function obtenerVentasHoy() {
+  const map = new Map();
+  const locales = safeGet("historial_ventas_local");
+  filtrarVentasHoy(locales).forEach(v => map.set(claveVenta(v), v));
+
+  if (navigator.onLine && window.supabaseClient) {
+    const { inicio, fin } = rangoHoyTs();
+    const { data, error } = await window.supabaseClient
+      .from("historial_ventas")
+      .select("*")
+      .gte("ts", inicio)
+      .lt("ts", fin);
+
+    if (!error) {
+      filtrarVentasHoy(data || []).forEach(v => map.set(claveVenta(v), v));
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+async function actualizarTotalVentasInicio() {
+  const el = document.getElementById("totalVentasHoy");
+  if (!el) return;
+
+  try {
+    const ventas = await obtenerVentasHoy();
+    const total = ventas.reduce((acc, v) => acc + totalVentaRegistro(v), 0);
+    const strong = el.querySelector("strong");
+    if (strong) {
+      strong.textContent = `$${total.toFixed(2)}`;
+    } else {
+      el.textContent = `Total de ventas: $${total.toFixed(2)}`;
+    }
+  } catch (error) {
+    console.warn("[INDEX] No se pudo actualizar total de ventas:", error);
+  }
+}
+
+function iniciarSyncVentasInicio() {
+  const bc = new BroadcastChannel("victory-data");
+  bc.onmessage = e => {
+    if (e.data === "historial_ventas" || e.data === "ventas") {
+      actualizarTotalVentasInicio();
+    }
+  };
+
+  window.addEventListener("storage", e => {
+    if (e.key === "historial_ventas_local") {
+      actualizarTotalVentasInicio();
+    }
+  });
+
+  window.addEventListener("online", () => actualizarTotalVentasInicio());
+}
+
+async function registrarVisitaRapida() {
+  const confirmar = await appConfirm(
+    `Confirmar cobro de visita por $${COSTO_VISITA.toFixed(2)}?`,
+    "Registrar visita"
+  );
+  if (!confirmar) return;
+
+  if (typeof registrarVisitaIngreso !== "function") {
+    await appAlert("No se pudo registrar la visita.", "Error");
+    return;
+  }
+
+  const ok = await registrarVisitaIngreso();
+  await actualizarTotalVentasInicio();
+
+  if (ok === false) {
+    mostrarConfirmacion("gracia", "Visita registrada", "Pendiente de sincronizacion");
+    return;
+  }
+
+  mostrarConfirmacion("entrada", "Visita registrada", `Cobro aplicado: $${COSTO_VISITA.toFixed(2)}`);
 }
 
 /* ================= NFC ================= */
