@@ -148,15 +148,15 @@
     <button onclick="abrirModalCorte()" style="opacity:.85">
       Corte
     </button>
-    <button onclick="location.href='index.html'">â† Inicio</button>
+    <button onclick="location.href='index.html'">&larr; Inicio</button>
   </div>
 </header>
 
 <!-- ================= MODAL MASTER ================= -->
 <div id="modalMaster" class="modal-overlay">
   <div class="modal-card pop">
-    <h3>ðŸ”’ Acceso restringido</h3>
-    <p>Ingresa la contraseÃ±a maestra</p>
+    <h3>&#128274; Acceso restringido</h3>
+    <p>Ingresa la contrase&ntilde;a maestra</p>
     <input id="inputMaster" type="password">
     <div id="msgMaster" class="modal-msg"></div>
     <div class="modal-actions">
@@ -290,7 +290,7 @@ function renderStock() {
         !modoEdicion
         ? `
           <div class="stock-cantidad">Stock: <span>${p.stock}</span></div>
-          <div class="small">Stock mÃ­nimo: ${p.stock_minimo || 0}</div>
+          <div class="small">Stock m\u00ednimo: ${p.stock_minimo || 0}</div>
         `
         : `
           <input value="${p.nombre}">
@@ -318,7 +318,7 @@ function renderPanel() {
     folioPendiente = "";
 
     const btn = document.createElement("button");
-    btn.textContent = "âœï¸ Editar stock";
+    btn.textContent = "\u270F\uFE0F Editar stock";
     btn.onclick = () => {
       modoEdicion = true;
       folioPendiente = generarFolioStockLocal();
@@ -333,14 +333,14 @@ function renderPanel() {
 
     const guardar = document.createElement("button");
     guardar.className = "btn-guardar";
-    guardar.textContent = "ðŸ’¾ Guardar cambios";
+    guardar.textContent = "\uD83D\uDCBE Guardar cambios";
     guardar.onclick = () => {
       accionMaster = "guardar";
       abrirModalMaster();
     };
 
     const cancelar = document.createElement("button");
-    cancelar.textContent = "âŒ Cancelar";
+    cancelar.textContent = "\u274C Cancelar";
     cancelar.onclick = () => {
       modoEdicion = false;
       inputReferenciaCambio.value = "";
@@ -388,7 +388,7 @@ function cerrarModal() {
 /* ================= CONFIRMAR ================= */
 function confirmarMaster() {
   if (!validarPasswordMaestra(inputMaster.value)) {
-    msgMaster.textContent = "âœ– ContraseÃ±a incorrecta";
+    msgMaster.textContent = "\u2716 Contrase\u00f1a incorrecta";
     msgMaster.className = "modal-msg error";
     return;
   }
@@ -448,7 +448,7 @@ function resumenCambioExtremo(op) {
     partes.push(`stock ${op.antes.stock} -> ${op.despues.stock}`);
   }
   if (deltaMin >= DELTA_STOCK_EXTREMO) {
-    partes.push(`stock mÃ­nimo ${op.antes.stock_minimo} -> ${op.despues.stock_minimo}`);
+    partes.push(`stock m\u00ednimo ${op.antes.stock_minimo} -> ${op.despues.stock_minimo}`);
   }
   if (cambioPrecio >= CAMBIO_PRECIO_EXTREMO_PCT) {
     partes.push(`precio ${op.antes.precio} -> ${op.despues.precio}`);
@@ -534,7 +534,7 @@ async function guardarCambiosStock() {
   if (extremos.length) {
     const preview = extremos.slice(0, 5).join("\n");
     const extra = extremos.length > 5
-      ? `\n...y ${extremos.length - 5} cambios extremos mÃ¡s.`
+      ? `\n...y ${extremos.length - 5} cambios extremos m\u00e1s.`
       : "";
     const continuar = await appConfirm(
       `Se detectaron cambios extremos:\n${preview}${extra}\n\nDeseas continuar?`,
