@@ -237,7 +237,7 @@ async function syncOfflineQueue() {
   for (const ev of cola) {
     try {
       if (ev?.tipo !== "db" || !ev.tabla || !ev.accion) {
-        console.warn("[SYNC] Evento invalido omitido", ev);
+        console.warn("[SYNC] Evento inválido omitido", ev);
         exitos++;
         continue;
       }
