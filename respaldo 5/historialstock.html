@@ -132,7 +132,7 @@
   </div>
 
   <button onclick="location.href='stock.html'">
-    ← Volver
+    â† Volver
   </button>
 </header>
 
@@ -156,7 +156,7 @@
       <option value="alta">Alta de producto</option>
       <option value="nombre">Cambio de nombre</option>
       <option value="stock">Cambio de stock</option>
-      <option value="stock_minimo">Cambio de stock mínimo</option>
+      <option value="stock_minimo">Cambio de stock mÃ­nimo</option>
       <option value="precio">Cambio de precio</option>
     </select>
   </div>
@@ -171,6 +171,8 @@
 
 <script src="js/auth.js"></script>
 <script src="js/storage.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
@@ -180,7 +182,7 @@ let historialFiltrado = [];
 const ETIQUETAS_CAMPO = {
   nombre: "Nombre",
   stock: "Stock",
-  stock_minimo: "Stock mínimo",
+  stock_minimo: "Stock mÃ­nimo",
   precio: "Precio"
 };
 
@@ -469,7 +471,7 @@ function renderTablaCambios(cambios = []) {
         <tr>
           <th>Producto</th>
           <th>Antes</th>
-          <th>Después</th>
+          <th>DespuÃ©s</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -500,11 +502,11 @@ function renderHistorial() {
         <div class="info-wrapper">
           <div class="info-bloque">
             <h3>${escapeHTML(fechaMostrar)}</h3>
-            <div class="racha">${escapeHTML(horaMostrar)} · ${escapeHTML(usuarioMostrar)}</div>
-            <div class="meta meta-extra">Folio: ${escapeHTML(folio)} · Ref: ${escapeHTML(referencia)}</div>
+            <div class="racha">${escapeHTML(horaMostrar)} Â· ${escapeHTML(usuarioMostrar)}</div>
+            <div class="meta meta-extra">Folio: ${escapeHTML(folio)} Â· Ref: ${escapeHTML(referencia)}</div>
           </div>
         </div>
-        <div class="flecha">▾</div>
+        <div class="flecha">â–¾</div>
       </div>
 
       <div class="historial">
@@ -614,10 +616,10 @@ function csvEscape(v) {
   return s;
 }
 
-function exportarCSV() {
+async function exportarCSV() {
   const filas = filasExportacion(historialFiltrado);
   if (!filas.length) {
-    alert("No hay datos para exportar.");
+    await appAlert("No hay datos para exportar.", "Exportar CSV");
     return;
   }
 
@@ -651,16 +653,16 @@ function exportarCSV() {
   URL.revokeObjectURL(url);
 }
 
-function exportarPDF() {
+async function exportarPDF() {
   const win = window.open("", "_blank");
   if (!win) {
-    alert("El navegador bloqueó la ventana. Habilita popups para exportar PDF.");
+    await appAlert("El navegador bloqueo la ventana. Habilita popups para exportar PDF.", "Exportar PDF");
     return;
   }
 
   const filas = filasExportacion(historialFiltrado);
   if (!filas.length) {
-    alert("No hay datos para exportar.");
+    await appAlert("No hay datos para exportar.", "Exportar PDF");
     win.close();
     return;
   }
@@ -707,7 +709,7 @@ function exportarPDF() {
     "<th>Producto</th>",
     "<th>Campo</th>",
     "<th>Antes</th>",
-    "<th>Después</th>",
+    "<th>DespuÃ©s</th>",
     "<th>Diferencia</th>",
     "</tr>",
     "</thead>",
