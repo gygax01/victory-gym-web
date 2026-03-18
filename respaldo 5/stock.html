@@ -10,7 +10,7 @@
 <!-- SUPABASE (ESTA ES LA BUENA) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- ===== ADAPTACION SOLO TAMANO MOVIL ===== -->
+<!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
 <style>
 @media (max-width:768px){
 
@@ -427,7 +427,7 @@ function esEnteroNoNegativo(n) {
 function referenciaValida() {
   const ref = String(inputReferenciaCambio.value || "").trim();
   if (ref.length < 3) {
-    appAlert("La referencia es obligatoria (minimo 3 caracteres).", "Stock");
+    appAlert("La referencia es obligatoria (mínimo 3 caracteres).", "Stock");
     return null;
   }
   return ref.slice(0, 120);
@@ -482,19 +482,19 @@ async function guardarCambiosStock() {
     const nombre = nombreInput || (prod.nombre ?? "");
 
     if (!nombre) {
-      await appAlert(`Producto invalido en fila ${i + 1}: el nombre es obligatorio.`, "Stock");
+      await appAlert(`Producto inválido en fila ${i + 1}: el nombre es obligatorio.`, "Stock");
       return;
     }
     if (!Number.isFinite(precio) || precio < 0 || precio > MAX_PRECIO) {
-      await appAlert(`Precio invalido en "${nombre}". Debe ser un numero entre 0 y ${MAX_PRECIO}.`, "Stock");
+      await appAlert(`Precio inválido en "${nombre}". Debe ser un número entre 0 y ${MAX_PRECIO}.`, "Stock");
       return;
     }
     if (!esEnteroNoNegativo(nuevoStock) || nuevoStock > MAX_STOCK) {
-      await appAlert(`Stock invalido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`, "Stock");
+      await appAlert(`Stock inválido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`, "Stock");
       return;
     }
     if (!esEnteroNoNegativo(stockMin) || stockMin > MAX_STOCK) {
-      await appAlert(`Stock minimo invalido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`, "Stock");
+      await appAlert(`Stock mínimo inválido en "${nombre}". Debe ser entero entre 0 y ${MAX_STOCK}.`, "Stock");
       return;
     }
 
@@ -607,11 +607,11 @@ async function confirmarNuevoProducto() {
     return;
   }
   if (!Number.isFinite(precio) || precio < 0 || precio > MAX_PRECIO) {
-    await appAlert(`Precio invalido. Debe ser un numero entre 0 y ${MAX_PRECIO}.`, "Nuevo producto");
+    await appAlert(`Precio inválido. Debe ser un número entre 0 y ${MAX_PRECIO}.`, "Nuevo producto");
     return;
   }
   if (!esEnteroNoNegativo(stockInicial) || stockInicial > MAX_STOCK) {
-    await appAlert(`Stock inicial invalido. Debe ser entero entre 0 y ${MAX_STOCK}.`, "Nuevo producto");
+    await appAlert(`Stock inicial inválido. Debe ser entero entre 0 y ${MAX_STOCK}.`, "Nuevo producto");
     return;
   }
 
