@@ -12,6 +12,8 @@
   <!-- CORE -->
   <script src="js/storage.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/ui.js"></script>
   <script src="js/nfc.js"></script>
   <script src="js/realtime.js"></script>
 
@@ -254,18 +256,21 @@ function cerrarPopup() {
 }
 
 /* ================= REGISTRO ================= */
-function pedirClaveRegistro() {
-  if (!tarjetaUID) return alert("Asigne una tarjeta primero");
-  registrarUsuario();
+async function pedirClaveRegistro() {
+  if (!tarjetaUID) {
+    await appAlert("Asigne una tarjeta primero", "Usuarios");
+    return;
+  }
+  await registrarUsuario();
 }
 
-function confirmarRegistro() {
-  registrarUsuario();
+async function confirmarRegistro() {
+  await registrarUsuario();
 }
 
-function registrarUsuario() {
+async function registrarUsuario() {
   if (!nombre.value || !usuario.value || !password.value || !tarjetaUID) {
-    alert("Complete todos los datos");
+    await appAlert("Complete todos los datos", "Usuarios");
     return;
   }
 
