@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Membresias</title>
+<title>Membresías</title>
 <link rel="stylesheet" href="css/styles.css">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -170,7 +170,7 @@
 <header class="header-brand">
   <div class="brand">
     <img src="img/logo.png" alt="Victory Pro Fitness">
-    <h2>Membresias</h2>
+    <h2>Membresías</h2>
   </div>
   <button onclick="location.href='index.html'">← Inicio</button>
 </header>
@@ -431,12 +431,12 @@ function renderMembresias(lista) {
 
     btnConfirmar.addEventListener("click", async () => {
       if (!mesesSeleccionados || !totalSeleccionado) {
-        await appAlert("Seleccione un plan antes de confirmar", "Membresia");
+        await appAlert("Seleccione un plan antes de confirmar", "Membresía");
         return;
       }
 
       if (!Number.isFinite(pagoSeleccionado) || pagoSeleccionado < totalSeleccionado) {
-        await appAlert("El pago no cubre el total de la membresia.", "Pago insuficiente");
+        await appAlert("El pago no cubre el total de la membresía.", "Pago insuficiente");
         return;
       }
 
@@ -470,18 +470,18 @@ function renderMembresias(lista) {
 
 async function extenderMembresia(cliente, meses, total, pago, cambio) {
   if (!cliente?.id) {
-    await appAlert("Cliente sin ID valido", "Membresia");
+    await appAlert("Cliente sin ID válido", "Membresía");
     return false;
   }
 
   if (!navigator.onLine || !window.supabaseClient) {
-    await appAlert("Sin conexion a internet", "Membresia");
+    await appAlert("Sin conexión a internet", "Membresía");
     return false;
   }
 
   const dias = Number(meses) * DIAS_POR_MES;
   if (!dias) {
-    await appAlert("Plan de membresia invalido", "Membresia");
+    await appAlert("Plan de membresía inválido", "Membresía");
     return false;
   }
 
@@ -493,7 +493,7 @@ async function extenderMembresia(cliente, meses, total, pago, cambio) {
 
   if (fetchError) {
     console.error("Error obteniendo cliente:", fetchError);
-    await appAlert("No se pudo leer la fecha actual de membresia", "Membresia");
+    await appAlert("No se pudo leer la fecha actual de membresía", "Membresía");
     return false;
   }
 
@@ -518,7 +518,7 @@ async function extenderMembresia(cliente, meses, total, pago, cambio) {
 
   if (error) {
     console.error("Error actualizando membresia:", error);
-    await appAlert("No se pudo actualizar la membresia", "Membresia");
+    await appAlert("No se pudo actualizar la membresía", "Membresía");
     return false;
   }
 
@@ -530,14 +530,14 @@ async function extenderMembresia(cliente, meses, total, pago, cambio) {
 
   if (!ventaOk) {
     await appAlert(
-      "Membresia actualizada, pero la venta quedo pendiente de sincronizacion",
-      "Membresia"
+      "Membresía actualizada, pero la venta quedó pendiente de sincronización",
+      "Membresía"
     );
     return true;
   }
 
   appToast(
-    `Membresia actualizada hasta ${nuevaFecha}. Total: ${fmtMoney(total)} | Pago: ${fmtMoney(pago)} | Cambio: ${fmtMoney(cambio)}`,
+    `Membresía actualizada hasta ${nuevaFecha}. Total: ${fmtMoney(total)} | Pago: ${fmtMoney(pago)} | Cambio: ${fmtMoney(cambio)}`,
     "success"
   );
   return true;
