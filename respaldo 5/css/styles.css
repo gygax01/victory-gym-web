@@ -1844,6 +1844,195 @@ button.nfc {
 
 }
 
+/* ======================================================
+   ===== MOBILE STABILIZER (ANTI-CHUECO) ================
+   ====================================================== */
+@media (max-width: 768px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  header,
+  .header-brand {
+    padding: 14px !important;
+    gap: 10px !important;
+  }
+
+  .brand {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .brand img {
+    height: 64px !important;
+    max-width: 70vw;
+    object-fit: contain;
+  }
+
+  .brand h2 {
+    font-size: clamp(20px, 6vw, 24px) !important;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  .brand h2::after {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .estado-sistema {
+    width: 100%;
+    justify-content: center !important;
+    gap: 8px !important;
+  }
+
+  .estado-sistema .contador,
+  .estado-sistema .lector,
+  .estado-sistema .total-ventas {
+    font-size: 13px !important;
+    padding: 6px 8px !important;
+    margin: 0 !important;
+  }
+
+  .estado-sistema .btn-visita,
+  header button,
+  .stock-form button,
+  .stock-footer button,
+  .carrito button,
+  .registro-acciones button,
+  .usuarios-col button {
+    width: 100% !important;
+  }
+
+  .panel-acciones,
+  .search-bar,
+  .historial-container,
+  .stock-grid,
+  .stock-footer,
+  .pos-wrap {
+    width: 92% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .panel-acciones {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .panel-acciones button {
+    padding: 14px !important;
+    font-size: 15px !important;
+  }
+
+  .card,
+  .card.registro-pc,
+  .card.usuarios-pc,
+  .card.stock-nuevo,
+  .popup,
+  .modal-card,
+  .flow-popup-card {
+    width: 92% !important;
+    max-width: 92vw !important;
+    margin: 16px auto !important;
+    padding: 20px !important;
+  }
+
+  .card.registro-pc,
+  .card.usuarios-pc {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .registro-datos,
+  .registro-acciones,
+  .membresias-grid,
+  .membresia-grid,
+  .pago-grid,
+  .pago-row,
+  .stock-form,
+  .flow-popup-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .productos {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .prod {
+    padding: 14px !important;
+  }
+
+  #contenedorTabla,
+  .historial {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    width: 100% !important;
+    margin: 12px 0 !important;
+  }
+
+  th,
+  td {
+    padding: 10px 8px !important;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.3;
+  }
+
+  .cliente {
+    padding: 14px !important;
+  }
+
+  .cliente-header {
+    gap: 10px !important;
+    align-items: flex-start;
+  }
+
+  .info-wrapper {
+    min-width: 0;
+  }
+
+  .cliente h3 {
+    font-size: 20px !important;
+    word-break: break-word;
+  }
+
+  .meta,
+  .racha {
+    font-size: 13px;
+  }
+
+  .flecha {
+    right: 8px !important;
+    font-size: 18px !important;
+  }
+
+  .confirmacion .box {
+    width: 92% !important;
+    max-width: 92vw !important;
+    padding: 30px 18px !important;
+  }
+
+  .confirmacion h1 {
+    font-size: 30px !important;
+  }
+
+  .confirmacion p {
+    font-size: 16px !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
