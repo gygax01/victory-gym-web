@@ -6,96 +6,202 @@
   <title>Registro de Cliente</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
   <style>
-  @media (max-width: 768px){
-
-    .header-brand{
+  @media (max-width: 768px) {
+    .header-brand {
       flex-direction: column;
       gap: 14px;
       padding: 18px;
-      text-align:center;
+      text-align: center;
     }
 
-    .brand{
+    .brand {
       flex-direction: column;
       gap: 8px;
     }
 
-    .brand img{
+    .brand img {
       height: 70px;
     }
 
-    .brand h2{
+    .brand h2 {
       font-size: 20px;
     }
 
-    header button{
+    header button {
       width: 100%;
       margin-left: 0;
     }
 
-    .card.registro-pc{
+    .card.registro-pc {
       grid-template-columns: 1fr !important;
       padding: 28px 20px;
       gap: 24px;
     }
 
-    .registro-col h3{
-      text-align:center;
+    .registro-col h3 {
+      text-align: center;
     }
 
-    .registro-col input{
+    .registro-col input {
       height: 48px;
       font-size: 15px;
     }
 
-    .membresias-grid{
-      grid-template-columns: 1fr 1fr;
+    .membresias-grid {
+      grid-template-columns: 1fr;
       gap: 12px;
     }
 
-    .membresias-grid button{
+    .pago-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .membresias-grid button {
       padding: 14px;
       font-size: 14px;
     }
 
-    .registro-acciones{
+    .registro-acciones {
       flex-direction: column;
       gap: 12px;
     }
 
-    .registro-acciones button{
+    .registro-acciones button {
       width: 100%;
       height: 46px;
       font-size: 15px;
     }
 
-    .popup{
+    .popup {
       width: 92%;
       padding: 30px 20px;
     }
 
-    .confirmacion .box{
+    .confirmacion .box {
       width: 92%;
       padding: 40px 20px;
     }
-
   }
   </style>
 
   <style>
-  .membresias-grid input{
-    width: 100%;
-    padding: 14px;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,.08);
-    background: #3f4147;
+  .membresias-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .plan-membresia-btn.activo {
+    background: #f3722c;
     color: #fff;
+    box-shadow: 0 0 0 2px rgba(243, 114, 44, .45);
+  }
+
+  #expiraTexto {
+    margin-bottom: 4px;
+  }
+
+  #precioMembresiaTexto {
+    color: #d8ffe7;
+    font-weight: 600;
+    min-height: 44px;
+    margin: 0;
     text-align: center;
+    border: 1px solid rgba(46, 204, 113, .38);
+    background: rgba(46, 204, 113, .14);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  #precioMembresiaTexto strong {
+    color: #2ecc71;
+    font-size: 24px;
+    margin-left: 6px;
+  }
+
+  .pago-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+    margin-bottom: 8px;
+  }
+
+  .pago-grid input {
+    margin: 0;
+    height: 46px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  #cambioMembresiaTexto {
+    margin: 0;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    background: #2f3238;
+    color: #d5d9df;
+    font-weight: 700;
+    font-size: 18px;
+  }
+
+  .confirmar-pago-btn {
+    width: 100%;
+    margin: 2px 0 6px;
+    background: #2ecc71;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .confirmar-pago-btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .confirmar-pago-btn:disabled:hover {
+    background: #2ecc71;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .overlay-suscripcion {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .72);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 5200;
+    backdrop-filter: blur(4px);
+  }
+
+  .overlay-suscripcion .box {
+    background: #2ecc71;
+    color: #fff;
+    padding: 52px 40px;
+    border-radius: 18px;
+    text-align: center;
+    min-width: 320px;
+    box-shadow:
+      0 0 40px rgba(46, 204, 113, .55),
+      0 0 120px rgba(46, 204, 113, .3);
+    animation: zoomBig .55s cubic-bezier(.25, .8, .25, 1);
+  }
+
+  .overlay-suscripcion .box p {
+    margin: 0 0 10px;
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .overlay-suscripcion .box h1 {
+    margin: 0;
+    font-size: 52px;
   }
   </style>
 </head>
@@ -104,7 +210,7 @@
 
 <header class="header-brand">
   <div class="brand">
-    <img src="img/logo.png">
+    <img src="img/logo.png" alt="Victory Pro Fitness">
     <h2>Registro de Cliente</h2>
   </div>
 
@@ -122,30 +228,42 @@
       <input id="nombre" placeholder="Nombre completo">
       <input id="peso" type="number" step="0.1" placeholder="Peso (kg)">
       <input id="altura" type="number" step="0.01" placeholder="Altura (m)">
-      <input id="telefono" type="tel" placeholder="Teléfono">
+      <input id="telefono" type="tel" placeholder="Telefono">
     </div>
 
     <div class="registro-col">
-      <h3>Membresía</h3>
+      <h3>Membresia</h3>
 
       <div class="membresias-grid">
-        <button onclick="setDias(7)">7 días</button>
-        <button onclick="setDias(15)">15 días</button>
-        <button onclick="setDias(30)">1 mes</button>
-        <button onclick="setDias(90)">3 meses</button>
-        <input
-          id="diasCustom"
-          type="number"
-          min="1"
-          step="1"
-          inputmode="numeric"
-          placeholder="Días personalizados"
-          oninput="this.value=this.value.replace(/[^0-9]/g,'')"
-        >
-        <button onclick="setDiasCustom()">Aplicar días</button>
+        <button type="button" class="plan-membresia-btn" data-meses="1" onclick="setPlan(1)">1 mes</button>
+        <button type="button" class="plan-membresia-btn" data-meses="2" onclick="setPlan(2)">2 meses</button>
+        <button type="button" class="plan-membresia-btn" data-meses="3" onclick="setPlan(3)">3 meses</button>
       </div>
 
       <p id="expiraTexto"></p>
+      <p id="precioMembresiaTexto">Seleccione un plan para calcular el total.</p>
+
+      <div class="pago-grid">
+        <input
+          id="pagoMembresia"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="Pago con"
+        >
+        <p id="cambioMembresiaTexto">Cambio: $0.00</p>
+      </div>
+
+      <button
+        id="btnConfirmarPago"
+        type="button"
+        class="confirmar-pago-btn"
+        onclick="confirmarPagoMembresia()"
+        disabled
+      >
+        Confirmar pago
+      </button>
 
       <div class="registro-acciones">
         <button class="nfc" onclick="abrirPopup()">Asignar tarjeta</button>
@@ -161,7 +279,7 @@
 <div class="overlay" id="overlay">
   <div class="popup">
     <h2>Acerque la tarjeta</h2>
-    <div id="estado" class="estado amarillo">Esperando tarjeta…</div>
+    <div id="estado" class="estado amarillo">Esperando tarjeta...</div>
     <div id="uidTexto" class="uid"></div>
   </div>
 </div>
@@ -173,34 +291,159 @@
   </div>
 </div>
 
+<div class="overlay-suscripcion" id="overlaySuscripcion">
+  <div class="box">
+    <p>Suscripcion</p>
+    <h1>$<span id="montoSuscripcion">399.00</span></h1>
+  </div>
+</div>
+
 <script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/ingresos.js"></script>
 <script src="js/realtime.js"></script>
 <script src="js/nfc.js"></script>
 
 <script>
 let tarjetaUID = null;
 let diasMembresia = 0;
+let mesesMembresia = 0;
+let totalMembresia = 0;
+let pagoRecibidoMembresia = 0;
+let cambioMembresia = 0;
+let pagoMembresiaConfirmado = false;
 let leyendoNFC = false;
-const diasCustom = document.getElementById("diasCustom");
 
-/* ===== MEMBRESÍA ===== */
-function setDias(d) {
-  diasMembresia = d;
-  const expira = new Date();
-  expira.setDate(expira.getDate() + d);
-  expiraTexto.innerText =
-    "Expira el: " + fechaDesdeTS(expira.getTime());
+const PRECIO_MENSUALIDAD =
+  typeof getPrecioMembresiaMensual === "function" ? getPrecioMembresiaMensual() : 399;
+const DIAS_POR_MES = window.APP_CONFIG?.membresias?.diasPorMes || 30;
+
+const inputNombre = document.getElementById("nombre");
+const inputPeso = document.getElementById("peso");
+const inputAltura = document.getElementById("altura");
+const inputTelefono = document.getElementById("telefono");
+const expiraTexto = document.getElementById("expiraTexto");
+const precioMembresiaTexto = document.getElementById("precioMembresiaTexto");
+const inputPagoMembresia = document.getElementById("pagoMembresia");
+const cambioMembresiaTexto = document.getElementById("cambioMembresiaTexto");
+const btnFinalizar = document.getElementById("finalizar");
+const btnConfirmarPago = document.getElementById("btnConfirmarPago");
+const overlaySuscripcion = document.getElementById("overlaySuscripcion");
+const montoSuscripcion = document.getElementById("montoSuscripcion");
+const planButtons = Array.from(document.querySelectorAll(".plan-membresia-btn"));
+const overlayNfc = document.getElementById("overlay");
+const estadoNfc = document.getElementById("estado");
+const uidTextoNfc = document.getElementById("uidTexto");
+const confirmacionOverlay = document.getElementById("confirmacion");
+const tituloConfirmEl = document.getElementById("tituloConfirm");
+const mensajeConfirmEl = document.getElementById("mensajeConfirm");
+
+inputPagoMembresia.addEventListener("input", recalcularPagoMembresia);
+
+function fmtMoney(valor) {
+  return `$${(Number(valor) || 0).toFixed(2)}`;
 }
 
-function setDiasCustom() {
-  const n = Number(diasCustom.value);
-  if (!Number.isInteger(n) || n <= 0) {
-    mostrarConfirm("Días inválidos", "Ingrese solo números mayores a 0");
+/* ===== MEMBRESIA ===== */
+function setPlan(meses) {
+  mesesMembresia = Number(meses) || 0;
+  diasMembresia = mesesMembresia * DIAS_POR_MES;
+  totalMembresia = mesesMembresia * PRECIO_MENSUALIDAD;
+  pagoMembresiaConfirmado = false;
+  pagoRecibidoMembresia = totalMembresia;
+  cambioMembresia = 0;
+
+  planButtons.forEach(btn => {
+    const actual = Number(btn.dataset.meses || 0);
+    btn.classList.toggle("activo", actual === mesesMembresia);
+  });
+
+  const expira = new Date();
+  expira.setDate(expira.getDate() + diasMembresia);
+  expiraTexto.innerText = "Expira el: " + fechaDesdeTS(expira.getTime());
+
+  const etiquetaMeses = mesesMembresia === 1 ? "mes" : "meses";
+  precioMembresiaTexto.innerHTML =
+    `Total a pagar (${mesesMembresia} ${etiquetaMeses}): <strong>$${totalMembresia.toFixed(2)}</strong>`;
+
+  inputPagoMembresia.value = totalMembresia ? totalMembresia.toFixed(2) : "";
+  recalcularPagoMembresia();
+  btnFinalizar.textContent = "Registrar cliente";
+
+  actualizarEstadoFinalizar();
+}
+
+function recalcularPagoMembresia() {
+  if (pagoMembresiaConfirmado) {
+    pagoMembresiaConfirmado = false;
+    btnFinalizar.textContent = "Registrar cliente";
+    actualizarEstadoFinalizar();
+  }
+
+  if (!mesesMembresia || !totalMembresia) {
+    pagoRecibidoMembresia = 0;
+    cambioMembresia = 0;
+    btnConfirmarPago.disabled = true;
+    btnConfirmarPago.textContent = "Confirmar pago";
+    cambioMembresiaTexto.textContent = "Cambio: $0.00";
+    cambioMembresiaTexto.style.color = "#d5d9df";
     return;
   }
 
-  setDias(n);
+  const pago = Number(inputPagoMembresia.value);
+  pagoRecibidoMembresia = Number.isFinite(pago) ? pago : 0;
+  const diferencia = Number((pagoRecibidoMembresia - totalMembresia).toFixed(2));
+  cambioMembresia = diferencia > 0 ? diferencia : 0;
+
+  if (diferencia < 0) {
+    cambioMembresiaTexto.textContent = `Falta: ${fmtMoney(Math.abs(diferencia))}`;
+    cambioMembresiaTexto.style.color = "#ff8e8e";
+    btnConfirmarPago.disabled = true;
+    btnConfirmarPago.textContent = `Falta ${fmtMoney(Math.abs(diferencia))}`;
+    return;
+  }
+
+  cambioMembresiaTexto.textContent = `Cambio: ${fmtMoney(cambioMembresia)}`;
+  cambioMembresiaTexto.style.color = "#2ecc71";
+  btnConfirmarPago.disabled = false;
+  btnConfirmarPago.textContent = `Confirmar pago de ${fmtMoney(totalMembresia)}`;
+}
+
+async function confirmarPagoMembresia() {
+  if (!mesesMembresia || !totalMembresia) {
+    mostrarConfirm("Plan pendiente", "Seleccione un plan de membresia");
+    return;
+  }
+
+  if (!Number.isFinite(pagoRecibidoMembresia) || pagoRecibidoMembresia < totalMembresia) {
+    await appAlert("El pago no cubre el total de la membresia.", "Pago insuficiente");
+    return;
+  }
+
+  const etiquetaMeses = mesesMembresia === 1 ? "mes" : "meses";
+  const confirmar = await appConfirm(
+    `Confirmar pago de ${mesesMembresia} ${etiquetaMeses}.\nTotal: ${fmtMoney(totalMembresia)}\nPago: ${fmtMoney(pagoRecibidoMembresia)}\nCambio: ${fmtMoney(cambioMembresia)}`,
+    "Confirmar pago"
+  );
+
+  if (!confirmar) return;
+
+  pagoMembresiaConfirmado = true;
+  btnConfirmarPago.disabled = true;
+  btnConfirmarPago.textContent = `Pago confirmado (${fmtMoney(pagoRecibidoMembresia)})`;
+  btnFinalizar.textContent = `Registrar cliente (${fmtMoney(totalMembresia)})`;
+
+  actualizarEstadoFinalizar();
+}
+
+function actualizarEstadoFinalizar() {
+  btnFinalizar.disabled = !Boolean(
+    tarjetaUID &&
+    diasMembresia > 0 &&
+    pagoMembresiaConfirmado
+  );
 }
 
 /* ===== NFC ===== */
@@ -209,68 +452,68 @@ function abrirPopup() {
 
   tarjetaUID = null;
   leyendoNFC = true;
-  finalizar.disabled = true;
+  btnFinalizar.disabled = true;
 
-  overlay.style.display = "flex";
-  estado.className = "estado amarillo";
-  estado.innerText = "Esperando tarjeta…";
-  uidTexto.innerText = "";
+  overlayNfc.style.display = "flex";
+  estadoNfc.className = "estado amarillo";
+  estadoNfc.innerText = "Esperando tarjeta...";
+  uidTextoNfc.innerText = "";
 
   iniciarNFCControlado({
     onUID: async uid => {
       uid = normalizarUID(uid);
 
       if (await uidYaRegistrada(uid)) {
-        estado.className = "estado rojo";
-        estado.innerText = "Tarjeta ya registrada";
-        uidTexto.innerText = "UID: " + uid;
+        estadoNfc.className = "estado rojo";
+        estadoNfc.innerText = "Tarjeta ya registrada";
+        uidTextoNfc.innerText = "UID: " + uid;
         setTimeout(cerrarPopup, 1500);
         return;
       }
 
       tarjetaUID = uid;
-      estado.className = "estado verde";
-      estado.innerText = "Tarjeta asignada";
-      uidTexto.innerText = "UID: " + uid;
+      estadoNfc.className = "estado verde";
+      estadoNfc.innerText = "Tarjeta asignada";
+      uidTextoNfc.innerText = "UID: " + uid;
 
       setTimeout(() => {
         cerrarPopup();
-        finalizar.disabled = false;
+        actualizarEstadoFinalizar();
       }, 1200);
     }
   });
 }
 
 function cerrarPopup() {
-  overlay.style.display = "none";
+  overlayNfc.style.display = "none";
   detenerNFC();
   leyendoNFC = false;
 }
 
 /* ===== REGISTRO CLIENTE ===== */
-function registrarCliente() {
-  if (
-    !nombre.value.trim() ||
-    !tarjetaUID ||
-    diasMembresia === 0
-  ) {
-    mostrarConfirm("Datos incompletos",
-      "Complete todos los campos");
+async function registrarCliente() {
+  if (!inputNombre.value.trim() || !tarjetaUID || diasMembresia === 0) {
+    mostrarConfirm("Datos incompletos", "Complete todos los campos");
+    return;
+  }
+
+  if (!pagoMembresiaConfirmado) {
+    mostrarConfirm("Pago pendiente", "Primero confirme el pago de la membresia");
     return;
   }
 
   const expira = new Date();
   expira.setDate(expira.getDate() + diasMembresia);
 
-  const pesoNum = Number(peso.value);
-  const alturaNum = Number(altura.value);
+  const pesoNum = Number(inputPeso.value);
+  const alturaNum = Number(inputAltura.value);
 
   const cliente = {
     id: crypto.randomUUID(),
-    nombre: nombre.value.trim(),
+    nombre: inputNombre.value.trim(),
     peso: Number.isFinite(pesoNum) ? pesoNum : 0,
     altura: Number.isFinite(alturaNum) ? alturaNum : 0,
-    telefono: telefono.value.trim() || "0",
+    telefono: inputTelefono.value.trim() || "0",
     tarjetaUID,
     membresiaExpira: fechaDesdeTS(expira.getTime()),
     fechaRegistro: hoy()
@@ -278,12 +521,33 @@ function registrarCliente() {
 
   registrarClienteOffline(cliente);
 
-  mostrarConfirm(
-    "Registro completado",
-    "Cliente registrado correctamente"
-  );
+  const ok = await registrarVentaSuscripcion(cliente);
 
-  setTimeout(() => location.href = "index.html", 1800);
+  if (montoSuscripcion) {
+    montoSuscripcion.textContent = totalMembresia.toFixed(2);
+  }
+
+  if (overlaySuscripcion) {
+    overlaySuscripcion.style.display = "flex";
+    setTimeout(() => {
+      overlaySuscripcion.style.display = "none";
+    }, 2200);
+  }
+
+  if (ok === false) {
+    mostrarConfirm(
+      "Suscripcion registrada",
+      "Cliente registrado. Venta pendiente de sincronizacion"
+    );
+    setTimeout(() => location.href = "index.html", 2800);
+    return;
+  }
+
+  mostrarConfirm(
+    "Suscripcion registrada",
+    `Cliente registrado correctamente ($${totalMembresia.toFixed(2)})`
+  );
+  setTimeout(() => location.href = "index.html", 2800);
 }
 
 /* ===== OFFLINE + SUPABASE ===== */
@@ -292,7 +556,6 @@ function registrarClienteOffline(cliente) {
   lista.push(cliente);
 
   safeSet("clientes", lista);
-
   new BroadcastChannel("victory-data").postMessage("clientes");
 
   if (typeof insertarClienteSupabase === "function") {
@@ -300,12 +563,27 @@ function registrarClienteOffline(cliente) {
   }
 }
 
+async function registrarVentaSuscripcion(cliente) {
+  if (typeof registrarSuscripcionIngreso !== "function") return false;
+  const meses = Number(mesesMembresia) || 1;
+  const total = Number(totalMembresia) || 0;
+  const pago = Number(pagoRecibidoMembresia) || total;
+  const cambio = Number(cambioMembresia) || 0;
+  return registrarSuscripcionIngreso({
+    cliente,
+    meses,
+    total,
+    pago,
+    cambio,
+    renovacion: false
+  });
+}
+
 /* ===== HELPERS ===== */
 function obtenerClientes() {
   return safeGet("clientes");
 }
 
-/* 🔥 VALIDACIÓN GLOBAL CLIENTES + EMPLEADOS */
 async function uidYaRegistrada(uid) {
   uid = normalizarUID(uid);
 
@@ -316,7 +594,6 @@ async function uidYaRegistrada(uid) {
   if (empleados.some(e => normalizarUID(e.tarjetaUID) === uid)) return true;
 
   if (navigator.onLine && window.supabaseClient) {
-
     const { data: c1 } = await supabaseClient
       .from("clientes")
       .select("id")
@@ -337,11 +614,10 @@ async function uidYaRegistrada(uid) {
   return false;
 }
 
-/* ===== CONFIRM ===== */
 function mostrarConfirm(t, m) {
-  confirmacion.style.display = "flex";
-  tituloConfirm.innerText = t;
-  mensajeConfirm.innerText = m;
+  confirmacionOverlay.style.display = "flex";
+  tituloConfirmEl.innerText = t;
+  mensajeConfirmEl.innerText = m;
 }
 </script>
 
