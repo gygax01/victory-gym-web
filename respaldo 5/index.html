@@ -26,6 +26,9 @@
     <span id="totalVentasHoy" class="contador total-ventas">
       Total de ventas: <strong>$0.00</strong>
     </span>
+    <span id="tarjetasDisponiblesHoy" class="contador total-ventas">
+      Tarjetas disponibles: <strong>0</strong>
+    </span>
     <button id="btnVisitaRapida" class="btn-visita" type="button" onclick="registrarVisitaRapida()">
       Visita
     </button>
@@ -101,6 +104,7 @@ window.addEventListener("load", () => {
   actualizarContador();
   iniciarSyncVentasInicio();
   actualizarTotalVentasInicio();
+  actualizarTarjetasDisponiblesInicio();
 
   iniciarLecturaNFCIndex(estadoLector);
   iniciarMonitorHeartbeat(estadoLector);
@@ -141,7 +145,7 @@ function actualizarEstadoCanal(estadoLector, status) {
   }
 
   if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED", "ERROR_NO_SUPABASE"].includes(s)) {
-    setEstadoLector(estadoLector, "off", "Lector sin senal");
+    setEstadoLector(estadoLector, "off", "Lector sin señal");
     return;
   }
 }
@@ -260,11 +264,29 @@ async function actualizarTotalVentasInicio() {
   }
 }
 
+function actualizarTarjetasDisponiblesInicio() {
+  const el = document.getElementById("tarjetasDisponiblesHoy");
+  if (!el || typeof obtenerStockTarjetas !== "function") return;
+
+  const stock = obtenerStockTarjetas();
+  const cantidad = Number(stock?.cantidad || 0);
+  const strong = el.querySelector("strong");
+
+  if (strong) {
+    strong.textContent = String(cantidad);
+  } else {
+    el.textContent = `Tarjetas disponibles: ${cantidad}`;
+  }
+}
+
 function iniciarSyncVentasInicio() {
   const bc = new BroadcastChannel("victory-data");
   bc.onmessage = e => {
     if (e.data === "historial_ventas" || e.data === "ventas") {
       actualizarTotalVentasInicio();
+    }
+    if (e.data === "stock_tarjetas") {
+      actualizarTarjetasDisponiblesInicio();
     }
   };
 
@@ -272,9 +294,15 @@ function iniciarSyncVentasInicio() {
     if (e.key === "historial_ventas_local") {
       actualizarTotalVentasInicio();
     }
+    if (e.key === "stock_tarjetas") {
+      actualizarTarjetasDisponiblesInicio();
+    }
   });
 
-  window.addEventListener("online", () => actualizarTotalVentasInicio());
+  window.addEventListener("online", () => {
+    actualizarTotalVentasInicio();
+    actualizarTarjetasDisponiblesInicio();
+  });
 }
 
 async function registrarVisitaRapida() {
