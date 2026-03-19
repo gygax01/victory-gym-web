@@ -1,5 +1,10 @@
 (function initIngresosModule(global) {
-  if (global.registrarVentaGeneral && global.registrarVisitaIngreso && global.registrarSuscripcionIngreso) {
+  if (
+    global.registrarVentaGeneral &&
+    global.registrarVisitaIngreso &&
+    global.registrarSuscripcionIngreso &&
+    global.registrarReasignacionTarjetaIngreso
+  ) {
     return;
   }
 
@@ -30,11 +35,16 @@
 
   function cfg() {
     return global.APP_CONFIG || {
-      tiposEvento: { visita: "visita", suscripcion: "suscripcion_mensual" },
+      tiposEvento: {
+        visita: "visita",
+        suscripcion: "suscripcion_mensual",
+        reasignacionTarjeta: "reasignacion_tarjeta"
+      },
       referencias: {
         visita: "VISITA_DIARIA",
         suscripcionAlta: "SUSCRIPCION_MENSUAL",
-        suscripcionRenovacion: "SUSCRIPCION_MENSUAL_RENOVACION"
+        suscripcionRenovacion: "SUSCRIPCION_MENSUAL_RENOVACION",
+        reasignacionTarjeta: "REASIGNACION_TARJETA"
       }
     };
   }
@@ -145,6 +155,43 @@
         tipo_evento: eventType,
         cliente_id: cliente?.id || null,
         cliente_nombre: normalizeString(cliente?.nombre, "Cliente")
+      }]
+    };
+
+    return enviarVenta(venta, { referencia });
+  };
+
+  global.registrarReasignacionTarjetaIngreso = async function registrarReasignacionTarjetaIngreso(input = {}) {
+    const eventType = cfg().tiposEvento?.reasignacionTarjeta || "reasignacion_tarjeta";
+    const precioDefault = (typeof global.getPrecioReasignacionTarjeta === "function")
+      ? global.getPrecioReasignacionTarjeta()
+      : 50;
+
+    const total = money(input.total ?? precioDefault);
+    const pago = money(input.pago ?? total);
+    const cambio = calcCambio(total, pago, input.cambio);
+    const cliente = input.cliente || {};
+
+    const referencia = shortRef(
+      input.referencia ||
+      `${cfg().referencias?.reasignacionTarjeta || "REASIGNACION_TARJETA"}_${normalizeString(cliente?.nombre, "CLIENTE").slice(0, 46)}`
+    );
+
+    const venta = {
+      total,
+      pago,
+      cambio,
+      items: [{
+        producto_id: null,
+        nombre: normalizeString(input.nombre, "Reasignación de tarjeta"),
+        cantidad: 1,
+        precio_unitario: total,
+        subtotal: total,
+        tipo_evento: eventType,
+        cliente_id: cliente?.id || null,
+        cliente_nombre: normalizeString(cliente?.nombre, "Cliente"),
+        uid_anterior: normalizeString(input.uidAnterior),
+        uid_nuevo: normalizeString(input.uidNuevo)
       }]
     };
 
