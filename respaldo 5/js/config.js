@@ -5,7 +5,8 @@
     syncChannel: "victory-data",
     precios: {
       visita: 60,
-      membresiaMensual: 399
+      membresiaMensual: 399,
+      reasignacionTarjeta: 50
     },
     membresias: {
       diasPorMes: 30,
@@ -13,12 +14,14 @@
     },
     tiposEvento: {
       visita: "visita",
-      suscripcion: "suscripcion_mensual"
+      suscripcion: "suscripcion_mensual",
+      reasignacionTarjeta: "reasignacion_tarjeta"
     },
     referencias: {
       visita: "VISITA_DIARIA",
       suscripcionAlta: "SUSCRIPCION_MENSUAL",
-      suscripcionRenovacion: "SUSCRIPCION_MENSUAL_RENOVACION"
+      suscripcionRenovacion: "SUSCRIPCION_MENSUAL_RENOVACION",
+      reasignacionTarjeta: "REASIGNACION_TARJETA"
     }
   };
 
@@ -43,6 +46,10 @@
 
   global.getPrecioMembresiaMensual = function getPrecioMembresiaMensual() {
     return toNumberSafe(config.precios.membresiaMensual, 0);
+  };
+
+  global.getPrecioReasignacionTarjeta = function getPrecioReasignacionTarjeta() {
+    return toNumberSafe(config.precios.reasignacionTarjeta, 50);
   };
 
   global.getMembresiaDias = function getMembresiaDias(meses) {
