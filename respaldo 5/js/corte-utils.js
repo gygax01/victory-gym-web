@@ -33,6 +33,7 @@
     const cfg = global.APP_CONFIG || {};
     const tipoSus = normalizeText(cfg?.tiposEvento?.suscripcion || "suscripcion_mensual");
     const tipoVisita = normalizeText(cfg?.tiposEvento?.visita || "visita");
+    const tipoReasignacion = normalizeText(cfg?.tiposEvento?.reasignacionTarjeta || "reasignacion_tarjeta");
 
     const ref = normalizeText(v?.referencia || "");
     const tags = itemsVenta(v).map(it => normalizeText(it?.tipo_evento || it?._tipo_evento || ""));
@@ -46,6 +47,24 @@
       ref.includes("suscripcion");
 
     if (esSuscripcion) return "suscripcion";
+
+    const esReasignacion =
+      tags.includes(tipoReasignacion) ||
+      tags.includes("reasignacion_tarjeta") ||
+      tags.includes("reposicion_tarjeta") ||
+      nombres.some(n =>
+        n.includes("reasignacion de tarjeta") ||
+        n.includes("reasignación de tarjeta") ||
+        n.includes("reposicion de tarjeta") ||
+        n.includes("reposición de tarjeta") ||
+        (n.includes("tarjeta") && n.includes("reasignacion"))
+      ) ||
+      ref.includes("reasignacion_tarjeta") ||
+      ref.includes("reposicion_tarjeta") ||
+      ref.includes("reasignacion de tarjeta") ||
+      ref.includes("reasignación de tarjeta");
+
+    if (esReasignacion) return "reasignacion_tarjeta";
 
     const esVisita =
       tags.includes(tipoVisita) ||
@@ -63,9 +82,11 @@
       suscripciones: [],
       visitas: [],
       ventas: [],
+      reasignacionesTarjeta: [],
       totalSuscripciones: 0,
       totalVisitas: 0,
       totalVentas: 0,
+      totalReasignacionesTarjeta: 0,
       totalGeneral: 0
     };
 
@@ -92,6 +113,12 @@
         return;
       }
 
+      if (tipo === "reasignacion_tarjeta") {
+        desglose.reasignacionesTarjeta.push(item);
+        desglose.totalReasignacionesTarjeta += total;
+        return;
+      }
+
       desglose.ventas.push(item);
       desglose.totalVentas += total;
     });
@@ -99,8 +126,14 @@
     desglose.totalSuscripciones = Number(desglose.totalSuscripciones.toFixed(2));
     desglose.totalVisitas = Number(desglose.totalVisitas.toFixed(2));
     desglose.totalVentas = Number(desglose.totalVentas.toFixed(2));
+    desglose.totalReasignacionesTarjeta = Number(desglose.totalReasignacionesTarjeta.toFixed(2));
     desglose.totalGeneral = Number(
-      (desglose.totalSuscripciones + desglose.totalVisitas + desglose.totalVentas).toFixed(2)
+      (
+        desglose.totalSuscripciones +
+        desglose.totalVisitas +
+        desglose.totalVentas +
+        desglose.totalReasignacionesTarjeta
+      ).toFixed(2)
     );
 
     return desglose;
