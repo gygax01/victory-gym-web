@@ -106,26 +106,12 @@
 
 }
 
-.auditoria-box{
-  display:grid;
-  gap:8px;
-  margin-top: 18px;
+.stock-card.stock-card-tarjetas{
+  border-left: 6px solid #f3722c;
 }
 
-.auditoria-box label{
-  font-size: 13px;
-  opacity:.88;
+.stock-card.stock-card-tarjetas .small{
   text-align:left;
-}
-
-.auditoria-box input{
-  margin:0;
-}
-
-.folio-previo{
-  text-align:left;
-  opacity:.7;
-  font-size:12px;
 }
 </style>
 </head>
@@ -190,19 +176,6 @@
 <!-- ================= LISTA ================= -->
 <div class="stock-grid" id="listaStock"></div>
 
-<!-- ================= AUDITORIA ================= -->
-<div class="stock-footer auditoria-box" id="panelAuditoria" style="display:none">
-  <label for="inputReferenciaCambio">Referencia (ticket/nota) *</label>
-  <input
-    id="inputReferenciaCambio"
-    maxlength="120"
-    placeholder="Ej: Ajuste inventario turno noche #T-2041"
-  >
-  <div class="folio-previo" id="previewFolio">
-    El folio se genera al guardar.
-  </div>
-</div>
-
 <!-- ================= PANEL EDICION ================= -->
 <div class="stock-footer" id="panelEdicion"></div>
 
@@ -225,6 +198,8 @@ const MAX_PRECIO = 1000000;
 const MAX_STOCK = 1000000;
 const DELTA_STOCK_EXTREMO = 500;
 const CAMBIO_PRECIO_EXTREMO_PCT = 0.5;
+const PRECIO_REASIGNACION_TARJETA =
+  typeof getPrecioReasignacionTarjeta === "function" ? getPrecioReasignacionTarjeta() : 50;
 
 /* ================= DOM ================= */
 const inputNombre   = document.getElementById("inputNombre");
@@ -234,9 +209,6 @@ const buscadorStock = document.getElementById("buscadorStock");
 const listaStock    = document.getElementById("listaStock");
 const panelEdicion  = document.getElementById("panelEdicion");
 const panelNuevoProducto = document.getElementById("panelNuevoProducto");
-const panelAuditoria = document.getElementById("panelAuditoria");
-const inputReferenciaCambio = document.getElementById("inputReferenciaCambio");
-const previewFolio = document.getElementById("previewFolio");
 
 /* ================= INIT ================= */
 function initStock() {
@@ -252,17 +224,17 @@ function iniciarSyncStock() {
   const bc = new BroadcastChannel("victory-data");
 
   bc.onmessage = e => {
-    if (e.data === "productos") cargarStock();
+    if (e.data === "productos" || e.data === "stock_tarjetas") cargarStock();
   };
 
   window.addEventListener("storage", e => {
-    if (e.key === "productos") cargarStock();
+    if (e.key === "productos" || e.key === "stock_tarjetas") cargarStock();
   });
 }
 
 /* ================= DATA ================= */
 function cargarStock() {
-  productos = JSON.parse(localStorage.getItem("productos") || "[]");
+  productos = obtenerProductos();
   productosFiltrados = [...productos];
   renderStock();
 }
@@ -271,8 +243,14 @@ function cargarStock() {
 function renderStock() {
   listaStock.innerHTML = "";
 
+  listaStock.appendChild(crearCardTarjetas());
+
   if (!productosFiltrados.length) {
-    listaStock.innerHTML = "<p style='opacity:.6'>No hay productos</p>";
+    const vacio = document.createElement("p");
+    vacio.style.opacity = ".6";
+    vacio.textContent = "No hay productos";
+    listaStock.appendChild(vacio);
+    renderPanel();
     return;
   }
 
@@ -280,7 +258,7 @@ function renderStock() {
     const bajo = Number(p.stock) <= Number(p.stock_minimo || 0);
 
     const card = document.createElement("div");
-    card.className = "stock-card" + (bajo ? " bajo" : "");
+    card.className = "stock-card stock-card-producto" + (bajo ? " bajo" : "");
 
     card.innerHTML = `
       <h4 style="${bajo ? "color:#e74c3c" : ""}">${p.nombre}</h4>
@@ -308,13 +286,40 @@ function renderStock() {
   renderPanel();
 }
 
+function crearCardTarjetas() {
+  const card = document.createElement("div");
+  card.className = "stock-card stock-card-tarjetas";
+  const stockTarjetas = (typeof obtenerStockTarjetas === "function")
+    ? obtenerStockTarjetas()
+    : { cantidad: 0 };
+  const cantidadTarjetas = Number(stockTarjetas?.cantidad || 0);
+
+  card.innerHTML = `
+    <h4>Tarjetas de acceso</h4>
+    <div class="precio">$${Number(PRECIO_REASIGNACION_TARJETA).toFixed(2)} reposición / reasignación</div>
+    ${
+      !modoEdicion
+        ? `
+          <div class="stock-cantidad">Stock: <span>${cantidadTarjetas}</span></div>
+          <div class="small">Se descuenta al registrar cliente nuevo o reasignar tarjeta.</div>
+        `
+        : `
+          <label class="small" for="inputStockTarjetasEdit">Cantidad disponible</label>
+          <input id="inputStockTarjetasEdit" type="number" min="0" step="1" value="${cantidadTarjetas}">
+          <div class="small">Solo edita la cantidad total disponible.</div>
+        `
+    }
+  `;
+
+  return card;
+}
+
 /* ================= PANEL EDICION ================= */
 function renderPanel() {
   panelEdicion.innerHTML = "";
 
   if (!modoEdicion) {
     panelNuevoProducto.style.display = "none";
-    panelAuditoria.style.display = "none";
     folioPendiente = "";
 
     const btn = document.createElement("button");
@@ -327,9 +332,7 @@ function renderPanel() {
     panelEdicion.appendChild(btn);
   } else {
     panelNuevoProducto.style.display = "block";
-    panelAuditoria.style.display = "grid";
     if (!folioPendiente) folioPendiente = generarFolioStockLocal();
-    previewFolio.textContent = `Folio actual: ${folioPendiente}`;
 
     const guardar = document.createElement("button");
     guardar.className = "btn-guardar";
@@ -343,7 +346,6 @@ function renderPanel() {
     cancelar.textContent = "\u274C Cancelar";
     cancelar.onclick = () => {
       modoEdicion = false;
-      inputReferenciaCambio.value = "";
       folioPendiente = "";
       cargarStock();
     };
@@ -424,13 +426,11 @@ function esEnteroNoNegativo(n) {
   return Number.isInteger(n) && n >= 0;
 }
 
-function referenciaValida() {
-  const ref = String(inputReferenciaCambio.value || "").trim();
-  if (ref.length < 3) {
-    appAlert("La referencia es obligatoria (mínimo 3 caracteres).", "Stock");
-    return null;
-  }
-  return ref.slice(0, 120);
+function generarReferenciaStockAutomatica(tipo = "EDICION") {
+  const fechaCompacta = hoy().replace(/-/g, "");
+  const horaCompacta = horaActual().replace(/:/g, "");
+  const sufijo = Date.now().toString(36).toUpperCase().slice(-4);
+  return `${String(tipo || "EDICION").toUpperCase()}_${fechaCompacta}_${horaCompacta}_${sufijo}`.slice(0, 120);
 }
 
 function resumenCambioExtremo(op) {
@@ -460,11 +460,24 @@ function resumenCambioExtremo(op) {
 
 /* ================= GUARDAR CAMBIOS ================= */
 async function guardarCambiosStock() {
-  const referencia = referenciaValida();
-  if (!referencia) return;
+  const referencia = generarReferenciaStockAutomatica("EDICION_STOCK");
 
-  const cards = document.querySelectorAll(".stock-card");
+  const cards = document.querySelectorAll(".stock-card-producto");
   const operaciones = [];
+  const stockTarjetasActual = (typeof obtenerStockTarjetas === "function")
+    ? Number(obtenerStockTarjetas()?.cantidad || 0)
+    : 0;
+  const inputStockTarjetasEdit = document.getElementById("inputStockTarjetasEdit");
+  let stockTarjetasNuevo = stockTarjetasActual;
+
+  if (inputStockTarjetasEdit) {
+    const valorTarjetas = Number(inputStockTarjetasEdit.value);
+    if (!esEnteroNoNegativo(valorTarjetas) || valorTarjetas > MAX_STOCK) {
+      await appAlert(`Stock de tarjetas inválido. Debe ser entero entre 0 y ${MAX_STOCK}.`, "Stock");
+      return;
+    }
+    stockTarjetasNuevo = valorTarjetas;
+  }
 
   for (let i = 0; i < cards.length; i++) {
     const inputs = cards[i].querySelectorAll("input");
@@ -522,7 +535,9 @@ async function guardarCambiosStock() {
     operaciones.push({ prod, nombre, antes, despues });
   }
 
-  if (!operaciones.length) {
+  const huboCambioTarjetas = stockTarjetasNuevo !== stockTarjetasActual;
+
+  if (!operaciones.length && !huboCambioTarjetas) {
     await appAlert("No hubo cambios para guardar.", "Stock");
     return;
   }
@@ -566,14 +581,39 @@ async function guardarCambiosStock() {
     op.prod.stock_minimo = op.despues.stock_minimo;
   }
 
+  if (huboCambioTarjetas && typeof guardarStockTarjetas === "function") {
+    guardarStockTarjetas({ cantidad: stockTarjetasNuevo });
+  }
+
   const folio = folioPendiente || generarFolioStockLocal();
+  const cambiosHistorial = operaciones.map(op => ({
+    producto_id: op.prod.id,
+    nombre: op.nombre,
+    antes: op.antes,
+    despues: op.despues
+  }));
+
+  if (huboCambioTarjetas) {
+    cambiosHistorial.push({
+      producto_id: null,
+      nombre: "Tarjetas de acceso",
+      antes: {
+        nombre: "Tarjetas de acceso",
+        stock: stockTarjetasActual,
+        precio: PRECIO_REASIGNACION_TARJETA,
+        stock_minimo: 0
+      },
+      despues: {
+        nombre: "Tarjetas de acceso",
+        stock: stockTarjetasNuevo,
+        precio: PRECIO_REASIGNACION_TARJETA,
+        stock_minimo: 0
+      }
+    });
+  }
+
   await pushHistorialStock(
-    operaciones.map(op => ({
-      producto_id: op.prod.id,
-      nombre: op.nombre,
-      antes: op.antes,
-      despues: op.despues
-    })),
+    cambiosHistorial,
     {
       folio,
       referencia,
@@ -583,20 +623,22 @@ async function guardarCambiosStock() {
 
   if (typeof bc !== "undefined") {
     bc.postMessage("productos");
+    if (huboCambioTarjetas) bc.postMessage("stock_tarjetas");
   } else {
-    new BroadcastChannel("victory-data").postMessage("productos");
+    const canal = new BroadcastChannel("victory-data");
+    canal.postMessage("productos");
+    if (huboCambioTarjetas) canal.postMessage("stock_tarjetas");
+    canal.close();
   }
 
   localStorage.setItem("productos", JSON.stringify(productos));
-  inputReferenciaCambio.value = "";
   folioPendiente = "";
   location.reload();
 }
 
 /* ================= NUEVO PRODUCTO ================= */
 async function confirmarNuevoProducto() {
-  const referencia = referenciaValida();
-  if (!referencia) return;
+  const referencia = generarReferenciaStockAutomatica("ALTA_PRODUCTO");
 
   const nombre = inputNombre.value.trim();
   const precio = Number(inputPrecio.value);
@@ -648,7 +690,6 @@ async function confirmarNuevoProducto() {
   inputNombre.value = "";
   inputPrecio.value = "";
   inputStock.value = "";
-  inputReferenciaCambio.value = "";
   folioPendiente = "";
 
   location.reload();
