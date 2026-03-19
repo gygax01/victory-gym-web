@@ -346,6 +346,11 @@ function fmtMoney(valor) {
   return `$${(Number(valor) || 0).toFixed(2)}`;
 }
 
+function tarjetasDisponibles() {
+  if (typeof obtenerStockTarjetas !== "function") return 0;
+  return Number(obtenerStockTarjetas()?.cantidad || 0);
+}
+
 /* ===== MEMBRESIA ===== */
 function setPlan(meses) {
   mesesMembresia = Number(meses) || 0;
@@ -442,13 +447,19 @@ function actualizarEstadoFinalizar() {
   btnFinalizar.disabled = !Boolean(
     tarjetaUID &&
     diasMembresia > 0 &&
-    pagoMembresiaConfirmado
+    pagoMembresiaConfirmado &&
+    tarjetasDisponibles() > 0
   );
 }
 
 /* ===== NFC ===== */
-function abrirPopup() {
+async function abrirPopup() {
   if (leyendoNFC) return;
+
+  if (tarjetasDisponibles() <= 0) {
+    await appAlert("No hay tarjetas disponibles en stock.", "Stock de tarjetas");
+    return;
+  }
 
   tarjetaUID = null;
   leyendoNFC = true;
@@ -499,6 +510,22 @@ async function registrarCliente() {
 
   if (!pagoMembresiaConfirmado) {
     mostrarConfirm("Pago pendiente", "Primero confirme el pago de la membresía");
+    return;
+  }
+
+  if (tarjetasDisponibles() <= 0) {
+    await appAlert("No hay tarjetas disponibles para asignar.", "Stock de tarjetas");
+    actualizarEstadoFinalizar();
+    return;
+  }
+
+  const descuentoTarjeta = (typeof descontarStockTarjetas === "function")
+    ? descontarStockTarjetas(1)
+    : { ok: true };
+
+  if (!descuentoTarjeta?.ok) {
+    await appAlert("No hay tarjetas disponibles para asignar.", "Stock de tarjetas");
+    actualizarEstadoFinalizar();
     return;
   }
 
