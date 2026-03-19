@@ -102,6 +102,78 @@ function guardarProductos(data) {
   safeSet("productos", data);
 }
 
+/* ================= STOCK TARJETAS ================= */
+
+const STOCK_TARJETAS_KEY = "stock_tarjetas";
+
+function numeroEnteroNoNegativo(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.floor(n));
+}
+
+function notificarCambioStockTarjetas() {
+  const channelName = window.APP_CONFIG?.syncChannel || "victory-data";
+  try {
+    const ch = new BroadcastChannel(channelName);
+    ch.postMessage("stock_tarjetas");
+    ch.close();
+  } catch (error) {
+    console.warn("[STORAGE] No se pudo notificar stock de tarjetas:", error);
+  }
+}
+
+function obtenerStockTarjetas() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STOCK_TARJETAS_KEY) || "{}");
+    return {
+      cantidad: numeroEnteroNoNegativo(raw?.cantidad, 0),
+      updated_at: String(raw?.updated_at || "")
+    };
+  } catch {
+    return {
+      cantidad: 0,
+      updated_at: ""
+    };
+  }
+}
+
+function guardarStockTarjetas(input = {}, options = {}) {
+  const actual = obtenerStockTarjetas();
+  const payload = {
+    cantidad: numeroEnteroNoNegativo(
+      input?.cantidad,
+      numeroEnteroNoNegativo(actual?.cantidad, 0)
+    ),
+    updated_at: new Date().toISOString()
+  };
+
+  localStorage.setItem(STOCK_TARJETAS_KEY, JSON.stringify(payload));
+
+  if (!options?.silent) {
+    notificarCambioStockTarjetas();
+  }
+
+  return payload;
+}
+
+function descontarStockTarjetas(cantidad = 1) {
+  const requerido = numeroEnteroNoNegativo(cantidad, 1);
+  const actual = obtenerStockTarjetas();
+  const disponible = numeroEnteroNoNegativo(actual?.cantidad, 0);
+
+  if (requerido <= 0) {
+    return { ok: true, stock: actual };
+  }
+
+  if (disponible < requerido) {
+    return { ok: false, stock: actual };
+  }
+
+  const stock = guardarStockTarjetas({ cantidad: disponible - requerido });
+  return { ok: true, stock };
+}
+
 /* ================= ASISTENCIAS ================= */
 
 function obtenerAsistencias() {
