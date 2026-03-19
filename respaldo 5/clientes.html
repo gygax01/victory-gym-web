@@ -6,13 +6,10 @@
   <title>Clientes</title>
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- ===== ADAPTACIÓN SOLO TAMAÑO MÓVIL ===== -->
   <style>
   @media (max-width: 768px){
-
     .header-brand{
       flex-direction: column;
       gap: 14px;
@@ -93,6 +90,9 @@
       margin-top: 10px;
     }
 
+    .reasign-pago-grid{
+      grid-template-columns: 1fr;
+    }
   }
   </style>
 
@@ -133,6 +133,61 @@
   .cliente-panel .acciones button:hover{
     background:#4a4d55;
   }
+
+  .reasign-precio{
+    margin: 0 0 10px;
+    color: #d8ffe7;
+    border: 1px solid rgba(46, 204, 113, .35);
+    background: rgba(46, 204, 113, .12);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-weight: 700;
+  }
+
+  .reasign-precio strong{
+    color: #2ecc71;
+    font-size: 24px;
+    margin-left: 6px;
+  }
+
+  .reasign-pago-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin: 8px 0;
+  }
+
+  .reasign-pago-grid input{
+    margin:0;
+    text-align:center;
+    font-weight:600;
+  }
+
+  .reasign-cambio{
+    margin:0;
+    min-height:46px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.12);
+    background:#2f3238;
+    color:#d5d9df;
+    font-weight:700;
+    font-size:18px;
+  }
+
+  .reasign-btn-confirmar{
+    background:#2ecc71;
+    color:#fff;
+    font-weight:700;
+  }
+
+  .reasign-btn-confirmar:disabled{
+    opacity:.55;
+    cursor:not-allowed;
+    transform:none;
+  }
   </style>
 </head>
 
@@ -164,8 +219,29 @@
 <div class="confirmacion" id="confirmReasignar">
   <div class="box">
     <h1>Reasignar tarjeta</h1>
-    <p>Acerque la nueva tarjeta</p>
-    <div id="estadoTarjeta" class="estado amarillo">Esperando tarjeta…</div>
+    <p class="reasign-precio">
+      Reposición / reasignación: <strong id="montoReasignacion">$50.00</strong>
+    </p>
+
+    <div class="reasign-pago-grid">
+      <input
+        id="pagoReasignacion"
+        type="number"
+        min="0"
+        step="0.01"
+        inputmode="decimal"
+        placeholder="Pago con"
+      >
+      <p id="cambioReasignacionTexto" class="reasign-cambio">Cambio: $0.00</p>
+    </div>
+
+    <button id="btnConfirmarPagoReasignacion" class="reasign-btn-confirmar">
+      Confirmar pago
+    </button>
+
+    <p id="txtPasoReasignacion">Confirma el pago para iniciar lectura de tarjeta.</p>
+    <div id="estadoTarjeta" class="estado amarillo">Pago pendiente</div>
+
     <button id="btnCancelarReasignar">Cancelar</button>
   </div>
 </div>
@@ -189,11 +265,11 @@
 <script src="js/auth.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/ingresos.js"></script>
 <script src="js/nfc.js"></script>
 <script src="js/realtime.js"></script>
 
 <script>
-
 function obtenerClientes() {
   return safeGet("clientes");
 }
@@ -225,9 +301,21 @@ function escapeHTML(valor) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+function fmtMoney(valor) {
+  return `$${(Number(valor) || 0).toFixed(2)}`;
+}
+
+function stockTarjetasDisponibles() {
+  if (typeof obtenerStockTarjetas !== "function") return 0;
+  return Number(obtenerStockTarjetas()?.cantidad || 0);
+}
+
+const COSTO_REASIGNACION_TARJETA =
+  typeof getPrecioReasignacionTarjeta === "function" ? getPrecioReasignacionTarjeta() : 50;
 
 const listaClientes = document.getElementById("listaClientes");
 const busqueda = document.getElementById("busqueda");
@@ -235,6 +323,11 @@ const confirmBorrar = document.getElementById("confirmBorrar");
 const confirmReasignar = document.getElementById("confirmReasignar");
 const confirmEditar = document.getElementById("confirmEditar");
 const estadoTarjeta = document.getElementById("estadoTarjeta");
+const montoReasignacion = document.getElementById("montoReasignacion");
+const pagoReasignacion = document.getElementById("pagoReasignacion");
+const cambioReasignacionTexto = document.getElementById("cambioReasignacionTexto");
+const btnConfirmarPagoReasignacion = document.getElementById("btnConfirmarPagoReasignacion");
+const txtPasoReasignacion = document.getElementById("txtPasoReasignacion");
 
 const btnConfirmarBorrado = document.getElementById("btnConfirmarBorrado");
 const btnCancelarBorrado = document.getElementById("btnCancelarBorrado");
@@ -252,8 +345,14 @@ let clienteIdEliminar = null;
 let clienteIdReasignar = null;
 let clienteIdEditar = null;
 let leyendoTarjeta = false;
+let pagoReasignacionConfirmado = false;
+let pagoRecibidoReasignacion = 0;
+let cambioReasignacion = 0;
 
 window.addEventListener("load", () => {
+  if (montoReasignacion) {
+    montoReasignacion.textContent = fmtMoney(COSTO_REASIGNACION_TARJETA);
+  }
 
   busqueda.oninput = filtrar;
   btnConfirmarBorrado.onclick = confirmarBorrado;
@@ -261,6 +360,13 @@ window.addEventListener("load", () => {
   btnCancelarReasignar.onclick = cancelarReasignacion;
   btnGuardarEdicion.onclick = guardarEdicionCliente;
   btnCancelarEdicion.onclick = cancelarEdicionCliente;
+
+  if (pagoReasignacion) {
+    pagoReasignacion.addEventListener("input", recalcularPagoReasignacion);
+  }
+  if (btnConfirmarPagoReasignacion) {
+    btnConfirmarPagoReasignacion.addEventListener("click", confirmarPagoReasignacion);
+  }
 
   iniciarSyncClientes();
   cargarClientes();
@@ -297,7 +403,6 @@ function render(lista) {
   }
 
   lista.forEach(c => {
-
     const cont = document.createElement("div");
     cont.className = "cliente";
 
@@ -354,7 +459,6 @@ function render(lista) {
     btnEliminar.addEventListener("click", () => pedirConfirmacion(c.id));
 
     listaClientes.appendChild(cont);
-
   });
 }
 
@@ -427,8 +531,6 @@ function filtrar() {
   ));
 }
 
-/* Solo esta funcion fue corregida */
-
 function pedirConfirmacion(id) {
   clienteIdEliminar = id;
   confirmBorrar.style.display = "flex";
@@ -440,22 +542,17 @@ function cancelarBorrado() {
 }
 
 async function confirmarBorrado() {
-
   if (!clienteIdEliminar) return;
 
   const listaLocal = obtenerClientes();
   const cliente = listaLocal.find(c => c.id === clienteIdEliminar);
-
   if (!cliente) return;
 
   if (navigator.onLine && window.borrarClienteSupabase) {
     await borrarClienteSupabase(cliente.id);
   }
 
-  const nuevaLista = listaLocal.filter(
-    c => c.id !== cliente.id
-  );
-
+  const nuevaLista = listaLocal.filter(c => c.id !== cliente.id);
   safeSet("clientes", nuevaLista);
   new BroadcastChannel("victory-data").postMessage("clientes");
 
@@ -463,72 +560,251 @@ async function confirmarBorrado() {
   cargarClientes();
 }
 
-/* Reasignacion intacta */
-function iniciarReasignacion(clienteId) {
+function resetFlujoReasignacion() {
+  pagoReasignacionConfirmado = false;
+  pagoRecibidoReasignacion = COSTO_REASIGNACION_TARJETA;
+  cambioReasignacion = 0;
 
-  clienteIdReasignar = clienteId;
-  leyendoTarjeta = false;
+  if (pagoReasignacion) {
+    pagoReasignacion.disabled = false;
+    pagoReasignacion.value = COSTO_REASIGNACION_TARJETA.toFixed(2);
+  }
+
+  if (btnConfirmarPagoReasignacion) {
+    btnConfirmarPagoReasignacion.disabled = false;
+    btnConfirmarPagoReasignacion.textContent = `Confirmar pago de ${fmtMoney(COSTO_REASIGNACION_TARJETA)}`;
+  }
+
+  if (txtPasoReasignacion) {
+    txtPasoReasignacion.textContent = "Confirma el pago para iniciar lectura de tarjeta.";
+  }
 
   estadoTarjeta.className = "estado amarillo";
-  estadoTarjeta.textContent = "Esperando tarjeta…";
-  confirmReasignar.style.display = "flex";
+  estadoTarjeta.textContent = "Pago pendiente";
+
+  recalcularPagoReasignacion();
+}
+
+function recalcularPagoReasignacion() {
+  if (!pagoReasignacion || !btnConfirmarPagoReasignacion || !cambioReasignacionTexto) return;
+  if (pagoReasignacionConfirmado) return;
+
+  const pago = Number(pagoReasignacion.value);
+  pagoRecibidoReasignacion = Number.isFinite(pago) ? pago : 0;
+  const diferencia = Number((pagoRecibidoReasignacion - COSTO_REASIGNACION_TARJETA).toFixed(2));
+  cambioReasignacion = diferencia > 0 ? diferencia : 0;
+
+  if (diferencia < 0) {
+    cambioReasignacionTexto.textContent = `Falta: ${fmtMoney(Math.abs(diferencia))}`;
+    cambioReasignacionTexto.style.color = "#ff8e8e";
+    btnConfirmarPagoReasignacion.disabled = true;
+    btnConfirmarPagoReasignacion.textContent = `Falta ${fmtMoney(Math.abs(diferencia))}`;
+    return;
+  }
+
+  cambioReasignacionTexto.textContent = `Cambio: ${fmtMoney(cambioReasignacion)}`;
+  cambioReasignacionTexto.style.color = "#2ecc71";
+  btnConfirmarPagoReasignacion.disabled = false;
+  btnConfirmarPagoReasignacion.textContent = `Confirmar pago de ${fmtMoney(COSTO_REASIGNACION_TARJETA)}`;
+}
+
+async function confirmarPagoReasignacion() {
+  if (pagoReasignacionConfirmado || !clienteIdReasignar) return;
+
+  if (!Number.isFinite(pagoRecibidoReasignacion) || pagoRecibidoReasignacion < COSTO_REASIGNACION_TARJETA) {
+    await appAlert("El pago no cubre el costo de la reasignación.", "Pago insuficiente");
+    return;
+  }
+
+  if (stockTarjetasDisponibles() <= 0) {
+    await appAlert("No hay tarjetas disponibles en stock.", "Stock de tarjetas");
+    return;
+  }
+
+  const confirmar = await appConfirm(
+    `Confirmar cobro de reasignación de tarjeta.\nTotal: ${fmtMoney(COSTO_REASIGNACION_TARJETA)}\nPago: ${fmtMoney(pagoRecibidoReasignacion)}\nCambio: ${fmtMoney(cambioReasignacion)}`,
+    "Confirmar pago"
+  );
+
+  if (!confirmar) return;
+
+  pagoReasignacionConfirmado = true;
+  pagoReasignacion.disabled = true;
+  btnConfirmarPagoReasignacion.disabled = true;
+  btnConfirmarPagoReasignacion.textContent = `Pago confirmado (${fmtMoney(pagoRecibidoReasignacion)})`;
+  txtPasoReasignacion.textContent = "Acerque la nueva tarjeta";
+  estadoTarjeta.className = "estado amarillo";
+  estadoTarjeta.textContent = "Esperando tarjeta...";
+
+  iniciarLecturaTarjetaReasignacion();
+}
+
+async function uidYaAsignadaAOtro(uid, clienteActualId) {
+  uid = normalizarUID(uid);
+
+  const lista = obtenerClientes();
+  if (lista.some(c => c.id !== clienteActualId && normalizarUID(c.tarjetaUID) === uid)) {
+    return true;
+  }
+
+  const empleados = safeGet("empleados");
+  if (empleados.some(e => normalizarUID(e.tarjetaUID) === uid)) {
+    return true;
+  }
+
+  if (navigator.onLine && window.supabaseClient) {
+    const { data: c1 } = await supabaseClient
+      .from("clientes")
+      .select("id")
+      .ilike("tarjeta_uid", uid)
+      .maybeSingle();
+
+    if (c1 && String(c1.id) !== String(clienteActualId)) return true;
+
+    const { data: c2 } = await supabaseClient
+      .from("empleados")
+      .select("id")
+      .ilike("tarjeta_uid", uid)
+      .maybeSingle();
+
+    if (c2) return true;
+  }
+
+  return false;
+}
+
+function iniciarLecturaTarjetaReasignacion() {
+  detenerNFC();
+  leyendoTarjeta = false;
 
   iniciarNFCControlado({
     onUID: async uidNuevo => {
       uidNuevo = normalizarUID(uidNuevo);
 
-      if (leyendoTarjeta) return;
+      if (leyendoTarjeta || !clienteIdReasignar) return;
       leyendoTarjeta = true;
+
+      const clienteObjetivo = obtenerClientes().find(c => c.id === clienteIdReasignar);
+      if (!clienteObjetivo) {
+        estadoTarjeta.className = "estado rojo";
+        estadoTarjeta.textContent = "Cliente no encontrado";
+        leyendoTarjeta = false;
+        return;
+      }
+
+      if (await uidYaAsignadaAOtro(uidNuevo, clienteIdReasignar)) {
+        estadoTarjeta.className = "estado rojo";
+        estadoTarjeta.textContent = "Tarjeta ya asignada a otro usuario";
+        leyendoTarjeta = false;
+        return;
+      }
+
+      const stockAntes = stockTarjetasDisponibles();
+      const descuento = (typeof descontarStockTarjetas === "function")
+        ? descontarStockTarjetas(1)
+        : { ok: true };
+
+      if (!descuento?.ok) {
+        estadoTarjeta.className = "estado rojo";
+        estadoTarjeta.textContent = "Sin tarjetas disponibles";
+        leyendoTarjeta = false;
+        return;
+      }
 
       let clienteActualizado = null;
       let uidAnterior = null;
 
-      const lista = obtenerClientes().map(c => {
+      try {
+        const lista = obtenerClientes().map(c => {
+          if (c.id === clienteIdReasignar) {
+            uidAnterior = c.tarjetaUID;
+            const actualizado = { ...c, tarjetaUID: uidNuevo };
+            clienteActualizado = actualizado;
+            return actualizado;
+          }
+          return c;
+        });
 
-        if (c.id === clienteIdReasignar) {
-          uidAnterior = c.tarjetaUID;
-          c.tarjetaUID = uidNuevo;
-          clienteActualizado = c;
+        if (!clienteActualizado) {
+          if (typeof guardarStockTarjetas === "function") {
+            guardarStockTarjetas({ cantidad: stockAntes });
+          }
+          estadoTarjeta.className = "estado rojo";
+          estadoTarjeta.textContent = "Cliente no encontrado";
+          leyendoTarjeta = false;
+          return;
         }
 
-        return c;
-      });
+        safeSet("clientes", lista);
+        new BroadcastChannel("victory-data").postMessage("clientes");
 
-      safeSet("clientes", lista);
-      new BroadcastChannel("victory-data").postMessage("clientes");
+        if (typeof actualizarClienteSupabase === "function") {
+          await actualizarClienteSupabase(clienteActualizado);
+        }
 
-      if (clienteActualizado && typeof actualizarClienteSupabase === "function") {
-        await actualizarClienteSupabase(clienteActualizado);
+        if (typeof migrarUIDEnAttendance === "function") {
+          await migrarUIDEnAttendance(uidAnterior, uidNuevo);
+        }
+
+        let ventaOk = true;
+        if (typeof registrarReasignacionTarjetaIngreso === "function") {
+          ventaOk = await registrarReasignacionTarjetaIngreso({
+            cliente: clienteActualizado,
+            total: COSTO_REASIGNACION_TARJETA,
+            pago: pagoRecibidoReasignacion,
+            cambio: cambioReasignacion,
+            uidAnterior,
+            uidNuevo
+          });
+        }
+
+        estadoTarjeta.className = "estado verde";
+        estadoTarjeta.textContent = ventaOk === false
+          ? "Tarjeta reasignada (venta pendiente de sincronizacion)"
+          : "Tarjeta reasignada y cobrada";
+
+        setTimeout(() => {
+          cancelarReasignacion();
+          cargarClientes();
+        }, 1600);
+      } catch (error) {
+        console.error("[CLIENTES] Error en reasignación:", error);
+        if (typeof guardarStockTarjetas === "function") {
+          guardarStockTarjetas({ cantidad: stockAntes });
+        }
+        estadoTarjeta.className = "estado rojo";
+        estadoTarjeta.textContent = "No se pudo completar la reasignación";
+        leyendoTarjeta = false;
       }
-
-      if (clienteActualizado && typeof migrarUIDEnAttendance === "function") {
-        await migrarUIDEnAttendance(
-          uidAnterior,
-          uidNuevo
-        );
-      }
-
-      estadoTarjeta.className = "estado verde";
-      estadoTarjeta.textContent = "Tarjeta reasignada";
-
-      setTimeout(() => {
-        cancelarReasignacion();
-        cargarClientes();
-      }, 1200);
     }
   });
+}
+
+async function iniciarReasignacion(clienteId) {
+  if (stockTarjetasDisponibles() <= 0) {
+    await appAlert("No hay tarjetas disponibles en stock.", "Stock de tarjetas");
+    return;
+  }
+
+  clienteIdReasignar = clienteId;
+  leyendoTarjeta = false;
+
+  if (montoReasignacion) {
+    montoReasignacion.textContent = fmtMoney(COSTO_REASIGNACION_TARJETA);
+  }
+
+  resetFlujoReasignacion();
+  confirmReasignar.style.display = "flex";
 }
 
 function cancelarReasignacion() {
   clienteIdReasignar = null;
   leyendoTarjeta = false;
+  pagoReasignacionConfirmado = false;
   detenerNFC();
   confirmReasignar.style.display = "none";
 }
-
 </script>
 
 </body>
 </html>
-
-
