@@ -242,6 +242,13 @@ function cancelar(){
   render();
 }
 
+function generarReferenciaVentaAutomatica() {
+  const fechaCompacta = hoy().replace(/-/g, "");
+  const horaCompacta = horaActual().replace(/:/g, "");
+  const sufijo = Date.now().toString(36).toUpperCase().slice(-4);
+  return `VENTA_${fechaCompacta}_${horaCompacta}_${sufijo}`.slice(0, 120);
+}
+
 async function cobrar(){
   if (!carrito.length) {
     await appAlert("Carrito vacio", "Venta");
@@ -254,17 +261,7 @@ async function cobrar(){
     await appAlert("Pago insuficiente", "Venta");
     return;
   }
-
-  const referenciaRaw = prompt(
-    "Referencia de venta (ticket/nota). Ej: Mostrador #A-120"
-  );
-  if (referenciaRaw === null) return;
-
-  const referencia = String(referenciaRaw).trim();
-  if (referencia.length < 3) {
-    await appAlert("La referencia es obligatoria (mínimo 3 caracteres).", "Venta");
-    return;
-  }
+  const referencia = generarReferenciaVentaAutomatica();
 
   cobrando = true;
 
