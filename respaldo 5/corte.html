@@ -601,9 +601,11 @@ function construirDesgloseIngresos(ventas) {
     suscripciones: [],
     visitas: [],
     ventas: [],
+    reasignacionesTarjeta: [],
     totalSuscripciones: 0,
     totalVisitas: 0,
     totalVentas: 0,
+    totalReasignacionesTarjeta: 0,
     totalGeneral: 0
   };
 }
@@ -720,6 +722,11 @@ function renderResumenIngresos(desglose) {
       concepto: "Ventas",
       cantidad: desglose?.ventas?.length || 0,
       total: desglose?.totalVentas || 0
+    },
+    {
+      concepto: "Reasignación de tarjeta",
+      cantidad: desglose?.reasignacionesTarjeta?.length || 0,
+      total: desglose?.totalReasignacionesTarjeta || 0
     }
   ];
 
@@ -734,7 +741,7 @@ function renderResumenIngresos(desglose) {
   });
 
   document.getElementById("metaResumenIngresos").textContent =
-    `Mensualidades: ${filas[0].cantidad} | Visitas: ${filas[1].cantidad} | Ventas: ${filas[2].cantidad}`;
+    `Mensualidades: ${filas[0].cantidad} | Visitas: ${filas[1].cantidad} | Ventas: ${filas[2].cantidad} | Reasignaciones: ${filas[3].cantidad}`;
 }
 
 function renderVentas(ventas, resumenProductos, desglose) {
@@ -788,10 +795,11 @@ function renderVentas(ventas, resumenProductos, desglose) {
   const totalGeneral = aNumero(desglose?.totalGeneral);
   document.getElementById("totalVentasFinal").innerHTML =
     `Total general del corte:<strong>${fmtMoney(totalGeneral)}</strong>
-    <div class="nota-total" id="notaTotalFinal">
+    <div class="nota-total">
       Mensualidades: ${desglose?.suscripciones?.length || 0} (${fmtMoney(desglose?.totalSuscripciones || 0)})
       | Visitas: ${desglose?.visitas?.length || 0} (${fmtMoney(desglose?.totalVisitas || 0)})
       | Ventas: ${desglose?.ventas?.length || 0} (${fmtMoney(desglose?.totalVentas || 0)})
+      | Reasignaciones: ${desglose?.reasignacionesTarjeta?.length || 0} (${fmtMoney(desglose?.totalReasignacionesTarjeta || 0)})
     </div>`;
 }
 
@@ -1082,13 +1090,29 @@ function exportarPDFCorte() {
     }
   );
 
+  printSection(
+    "8) Reasignaciones de tarjeta",
+    ["#", "Fecha", "Hora", "Folio", "Referencia", "Total"],
+    filasDetalleIngresos(desglose.reasignacionesTarjeta),
+    {
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 52 },
+        4: { cellWidth: 120 },
+        5: { cellWidth: 28, halign: "right" }
+      }
+    }
+  );
+
   if (currentY > 190) {
     doc.addPage();
     currentY = 16;
   }
 
   const notaW = 280;
-  const notaH = 52;
+  const notaH = 62;
   if (currentY + notaH > 200) {
     doc.addPage();
     currentY = 16;
@@ -1112,15 +1136,17 @@ function exportarPDFCorte() {
   doc.text(`Mensualidades nuevas: ${desglose.suscripciones.length}`, 175, currentY + 15);
   doc.text(`Visitas: ${desglose.visitas.length}`, 12, currentY + 22);
   doc.text(`Ventas: ${desglose.ventas.length}`, 95, currentY + 22);
-  doc.text(`Cantidad vendida: ${aNumero(resumenProductos.totalUnidades)}`, 175, currentY + 22);
-  doc.text(`Ingreso mensualidades: ${fmtMoney(desglose.totalSuscripciones)}`, 12, currentY + 29);
-  doc.text(`Ingreso visitas: ${fmtMoney(desglose.totalVisitas)}`, 95, currentY + 29);
-  doc.text(`Ingreso ventas: ${fmtMoney(desglose.totalVentas)}`, 175, currentY + 29);
+  doc.text(`Reasignaciones de tarjeta: ${(desglose.reasignacionesTarjeta || []).length}`, 175, currentY + 22);
+  doc.text(`Cantidad vendida: ${aNumero(resumenProductos.totalUnidades)}`, 12, currentY + 29);
+  doc.text(`Ingreso reasignaciones: ${fmtMoney(desglose.totalReasignacionesTarjeta)}`, 95, currentY + 29);
+  doc.text(`Ingreso mensualidades: ${fmtMoney(desglose.totalSuscripciones)}`, 175, currentY + 29);
+  doc.text(`Ingreso visitas: ${fmtMoney(desglose.totalVisitas)}`, 12, currentY + 36);
+  doc.text(`Ingreso ventas: ${fmtMoney(desglose.totalVentas)}`, 95, currentY + 36);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(26, 140, 73);
   doc.setFontSize(22);
-  doc.text(`TOTAL GENERAL: ${fmtMoney(desglose.totalGeneral)}`, 12, currentY + 45);
+  doc.text(`TOTAL GENERAL: ${fmtMoney(desglose.totalGeneral)}`, 12, currentY + 55);
 
   doc.save(`corte_${estadoCorteActual.rango.fechaDesde}_a_${estadoCorteActual.rango.fechaHasta}.pdf`);
 }
